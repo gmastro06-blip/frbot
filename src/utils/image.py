@@ -1,5 +1,11 @@
 import cv2
-from numba import njit
+try:
+    from numba import njit
+except Exception:  # pragma: no cover
+    def njit(*_args, **_kwargs):
+        def decorator(func):
+            return func
+        return decorator
 import numpy as np
 from PIL import Image
 from typing import Union

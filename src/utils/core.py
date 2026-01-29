@@ -1,6 +1,11 @@
 import cv2
 import dxcam
-from farmhash import FarmHash64
+import hashlib
+
+try:
+    from farmhash import FarmHash64
+except Exception:  # pragma: no cover
+    FarmHash64 = None
 import numpy as np
 from typing import Callable, Union
 from src.shared.typings import BBox, GrayImage
@@ -38,7 +43,13 @@ def cacheObjectPosition(func: Callable) -> Callable:
 
 # TODO: add unit tests
 def hashit(arr: np.ndarray) -> int:
-    return FarmHash64(np.ascontiguousarray(arr))
+    contiguous = np.ascontiguousarray(arr)
+    if FarmHash64 is not None:
+        return FarmHash64(contiguous)
+    # Fallback for environments where the farmhash extension is unavailable
+    # (e.g. missing MSVC build tools). Produces a stable 64-bit integer.
+    digest = hashlib.blake2b(contiguous.tobytes(), digest_size=8).digest()
+    return int.from_bytes(digest, byteorder='little', signed=False)
 
 
 # TODO: add unit tests
