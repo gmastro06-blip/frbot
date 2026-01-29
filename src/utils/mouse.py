@@ -1,13 +1,22 @@
-import pyautogui
 import os
+try:
+    import pyautogui
+except Exception:  # pragma: no cover
+    pyautogui = None
 from src.shared.typings import XYCoordinate
 from .ino import sendCommandArduino
 
 
 _INPUT_BACKEND = os.environ.get('FENRIL_INPUT_BACKEND', 'pyautogui').strip().lower()
 
+
+def _require_pyautogui():
+    if pyautogui is None:
+        raise RuntimeError('pyautogui is not available; set FENRIL_INPUT_BACKEND=arduino or install pyautogui')
+
 def drag(x1y1: XYCoordinate, x2y2: XYCoordinate):
     if _INPUT_BACKEND != 'arduino':
+        _require_pyautogui()
         pyautogui.moveTo(x1y1[0], x1y1[1])
         pyautogui.dragTo(x2y2[0], x2y2[1], button='left')
         return
@@ -19,6 +28,7 @@ def drag(x1y1: XYCoordinate, x2y2: XYCoordinate):
 
 def leftClick(windowCoordinate: XYCoordinate = None):
     if _INPUT_BACKEND != 'arduino':
+        _require_pyautogui()
         if windowCoordinate is None:
             pyautogui.leftClick()
         else:
@@ -33,6 +43,7 @@ def leftClick(windowCoordinate: XYCoordinate = None):
 
 def moveTo(windowCoordinate: XYCoordinate):
     if _INPUT_BACKEND != 'arduino':
+        _require_pyautogui()
         pyautogui.moveTo(windowCoordinate[0], windowCoordinate[1])
         return
 
@@ -40,6 +51,7 @@ def moveTo(windowCoordinate: XYCoordinate):
 
 def rightClick(windowCoordinate: XYCoordinate = None):
     if _INPUT_BACKEND != 'arduino':
+        _require_pyautogui()
         if windowCoordinate is None:
             pyautogui.rightClick()
         else:
@@ -54,8 +66,12 @@ def rightClick(windowCoordinate: XYCoordinate = None):
 
 def scroll(clicks: int):
     if _INPUT_BACKEND != 'arduino':
+        _require_pyautogui()
         pyautogui.scroll(clicks)
         return
 
-    curX, curY = pyautogui.position()
+    if pyautogui is None:
+        curX, curY = 0, 0
+    else:
+        curX, curY = pyautogui.position()
     sendCommandArduino(f"scroll,{curX}, {curY}, {clicks}")

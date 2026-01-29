@@ -1,4 +1,10 @@
-from numba import njit
+try:
+    from numba import njit
+except Exception:  # pragma: no cover
+    def njit(*_args, **_kwargs):
+        def decorator(func):
+            return func
+        return decorator
 from src.shared.typings import GrayImage
 
 

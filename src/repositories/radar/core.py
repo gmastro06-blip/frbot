@@ -1,6 +1,8 @@
-from numba import njit
 import numpy as np
-from scipy.spatial import distance
+try:
+    from scipy.spatial import distance
+except Exception:  # pragma: no cover
+    distance = None
 from typing import Union
 from src.shared.typings import Coordinate, GrayImage, GrayPixel, WaypointList
 from src.utils.core import hashit, locate
@@ -9,6 +11,12 @@ from .config import availableTilesFrictions, breakpointTileMovementSpeed, coordi
 from .extractors import getRadarImage
 from .locators import getRadarToolsPosition
 from .typings import FloorLevel, TileFriction
+
+
+def _distance_2d(a_xy, b_xy) -> float:
+    a = np.asarray(a_xy, dtype=np.float32)
+    b = np.asarray(b_xy, dtype=np.float32)
+    return float(np.linalg.norm(a - b))
 
 
 # TODO: add unit tests
@@ -109,15 +117,29 @@ def getClosestWaypointIndexFromCoordinate(coordinate: Coordinate, waypoints: Way
     closestWaypointIndex = None
     closestWaypointDistance = 9999
     for waypointIndex, waypoint in enumerate(waypoints):
-        waypointCoordinate = waypoint.get('coordinate') if isinstance(waypoint, dict) else None
+        if isinstance(waypoint, dict):
+            waypointCoordinate = waypoint.get('coordinate')
+        elif isinstance(waypoint, (tuple, list)) and len(waypoint) >= 3:
+            waypointCoordinate = waypoint[2]
+        else:
+            try:
+                waypointCoordinate = waypoint['coordinate']
+            except Exception:
+                waypointCoordinate = None
         if waypointCoordinate is None or len(waypointCoordinate) < 3:
             continue
         if any(value is None for value in waypointCoordinate):
             continue
         if waypointCoordinate[2] != coordinate[2]:
             continue
-        waypointDistance = distance.cdist(
-            [(waypointCoordinate[0], waypointCoordinate[1])], [(coordinate[0], coordinate[1])]).flatten()[0]
+        if distance is not None:
+            waypointDistance = distance.cdist(
+                [(waypointCoordinate[0], waypointCoordinate[1])], [(coordinate[0], coordinate[1])]).flatten()[0]
+        else:
+            waypointDistance = _distance_2d(
+                (waypointCoordinate[0], waypointCoordinate[1]),
+                (coordinate[0], coordinate[1]),
+            )
         if waypointDistance < closestWaypointDistance:
             closestWaypointIndex = waypointIndex
             closestWaypointDistance = waypointDistance
@@ -158,8 +180,12 @@ def isCloseToCoordinate(currentCoordinate: Coordinate, possibleCloseCoordinate: 
     (xOfPossibleCloseCoordinate, yOfPossibleCloseCoordinate, _) = possibleCloseCoordinate
     XYOfPossibleCloseCoordinate = (
         xOfPossibleCloseCoordinate, yOfPossibleCloseCoordinate)
-    euclideanDistance = distance.cdist(
-        [XYOfCurrentCoordinate], [XYOfPossibleCloseCoordinate])
+    if distance is not None:
+        euclideanDistance = float(distance.cdist(
+            [XYOfCurrentCoordinate], [XYOfPossibleCloseCoordinate]
+        ).flatten()[0])
+    else:
+        euclideanDistance = _distance_2d(XYOfCurrentCoordinate, XYOfPossibleCloseCoordinate)
     return euclideanDistance <= distanceTolerance
 
 

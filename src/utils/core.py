@@ -1,6 +1,11 @@
 import cv2
-import dxcam
+try:
+    import dxcam
+except Exception:  # pragma: no cover
+    dxcam = None
 import hashlib
+import os
+import sys
 
 try:
     from farmhash import FarmHash64
@@ -11,7 +16,16 @@ from typing import Callable, Union
 from src.shared.typings import BBox, GrayImage
 
 
-camera = dxcam.create(device_idx=0, output_idx=1, output_color='BGRA')
+def _is_test_mode() -> bool:
+    return (
+        os.environ.get('PYTEST_CURRENT_TEST') is not None
+        or 'pytest' in sys.modules
+        or os.environ.get('FENRIL_TEST_MODE') == '1'
+        or os.environ.get('FENRIL_SKIP_CAPTURE') == '1'
+    )
+
+
+camera = None
 latestScreenshot = None
 
 
@@ -74,6 +88,16 @@ def locateMultiple(compareImg: GrayImage, img: GrayImage, confidence: float = 0.
 # TODO: add unit tests
 def getScreenshot() -> GrayImage:
     global camera, latestScreenshot
+    if _is_test_mode():
+        if latestScreenshot is None:
+            latestScreenshot = np.zeros((1, 1), dtype=np.uint8)
+        return latestScreenshot
+
+    if camera is None:
+        if dxcam is None:
+            raise RuntimeError('dxcam is not available; cannot capture screenshots')
+        camera = dxcam.create(device_idx=0, output_idx=1, output_color='BGRA')
+
     screenshot = camera.grab()
     if screenshot is None:
         return latestScreenshot

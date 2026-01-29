@@ -1,4 +1,10 @@
-from numba import njit
+try:
+    from numba import njit
+except Exception:  # pragma: no cover
+    def njit(*_args, **_kwargs):
+        def decorator(func):
+            return func
+        return decorator
 import numpy as np
 from typing import Generator, Union
 from src.shared.typings import CreatureCategory, CreatureCategoryOrUnknown, GrayImage

@@ -1,0 +1,122 @@
+[
+    {
+        "label": "",
+        "type": "walk",
+        "coordinate": [
+            32410,
+            32184,
+            7
+        ],
+        "options": {},
+        "ignore": true,
+        "passinho": false
+    },
+    {
+        "label": "",
+        "type": "singleMove",
+        "coordinate": [
+            32410,
+            32185,
+            7
+        ],
+        "options": {
+            "direction": "south"
+        },
+        "ignore": false,
+        "passinho": false
+    },
+    {
+        "label": "",
+        "type": "singleMove",
+        "coordinate": [
+            32410,
+            32186,
+            7
+        ],
+        "options": {
+            "direction": "south"
+        },
+        "ignore": false,
+        "passinho": false
+    },
+    {
+        "label": "",
+        "type": "singleMove",
+        "coordinate": [
+            32410,
+            32187,
+            7
+        ],
+        "options": {
+            "direction": "south"
+        },
+        "ignore": false,
+        "passinho": false
+    },
+    {
+        "label": "",
+        "type": "singleMove",
+        "coordinate": [
+            32410,
+            32186,
+            7
+        ],
+        "options": {
+            "direction": "north"
+        },
+        "ignore": false,
+        "passinho": false
+    },
+    {
+        "label": "",
+        "type": "singleMove",
+        "coordinate": [
+            32410,
+            32185,
+            7
+        ],
+        "options": {
+            "direction": "north"
+        },
+        "ignore": false,
+        "passinho": false
+    },
+    {
+        "label": "",
+        "type": "singleMove",
+        "coordinate": [
+            32410,
+            32184,
+            7
+        ],
+        "options": {
+            "direction": "north"
+        },
+        "ignore": false,
+        "passinho": false
+    },
+    {
+        "label": "",
+        "type": "walk",
+        "coordinate": [
+            32410,
+            32183,
+            7
+        ],
+        "options": {},
+        "ignore": true,
+        "passinho": false
+    },
+    {
+        "label": "",
+        "type": "walk",
+        "coordinate": [
+            32416,
+            32183,
+            7
+        ],
+        "options": {},
+        "ignore": true,
+        "passinho": false
+    }
+]

@@ -3,8 +3,8 @@ import pathlib
 from src.utils.core import hashit
 from src.utils.image import loadFromRGBToGray
 
-
 currentPath = pathlib.Path(__file__).parent.resolve()
+
 coordinates = {}
 dimensions = {
     'width': 106,
@@ -15,6 +15,7 @@ dimensions = {
 floors = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 floorsConfidence = [0.85, 0.85, 0.9, 0.95, 0.95, 0.95,
                     0.95, 0.85, 0.95, 0.95, 0.95, 0.95, 0.95, 0.9, 0.85, 0.85]
+
 floorsImgs = [
     loadFromRGBToGray(
         f'{currentPath}/images/floor-0.png'),
@@ -49,6 +50,7 @@ floorsImgs = [
     loadFromRGBToGray(
         f'{currentPath}/images/floor-15.png'),
 ]
+
 floorsPathsImgs = [
     loadFromRGBToGray(
         f'{currentPath}/images/paths/floor-0.png'),
@@ -83,10 +85,13 @@ floorsPathsImgs = [
     loadFromRGBToGray(
         f'{currentPath}/images/paths/floor-15.png'),
 ]
+
 floorsPathsSqms = np.load(f'{currentPath}/npys/floorsPathsSqms.npy')
+
 images = {
     'tools': loadFromRGBToGray(f'{currentPath}/images/buttons/radarTools.png')
 }
+
 floorsLevelsImgs = [
     loadFromRGBToGray(
         f'{currentPath}/images/floorLevels/0.png'),
@@ -121,6 +126,7 @@ floorsLevelsImgs = [
     loadFromRGBToGray(
         f'{currentPath}/images/floorLevels/15.png'),
 ]
+
 floorsLevelsImgsHashes = {}
 pixelsColorsValues = {
     'accessPoint': 226,

@@ -4,12 +4,13 @@ from src.shared.typings import Waypoint
 import src.utils.keyboard as keyboard
 from ...typings import Context
 from .common.base import BaseTask
-from time import sleep
 
 class UseShovelTask(BaseTask):
     def __init__(self, waypoint: Waypoint):
         super().__init__()
         self.name = 'useShovel'
+        self.delayBeforeStart = 1
+        self.delayAfterComplete = 0.5
         self.waypoint = waypoint
 
     def shouldIgnore(self, context: Context) -> bool:
@@ -19,11 +20,13 @@ class UseShovelTask(BaseTask):
     def do(self, context: Context) -> Context:
         slot = gameWindowCore.getSlotFromCoordinate(
             context['ng_radar']['coordinate'], self.waypoint['coordinate'])
-        sleep(0.2)
-        keyboard.press(context['general_hotkeys']['shovel_hotkey'])
-        sleep(0.2)
+        shovel_hotkey = (
+            context.get('general_hotkeys', {}).get('shovel_hotkey')
+            if isinstance(context, dict)
+            else None
+        )
+        keyboard.press(shovel_hotkey or 'p')
         gameWindowSlot.clickSlot(slot, context['gameWindow']['coordinate'])
-        sleep(0.2)
         return context
 
     def did(self, context: Context) -> bool:

@@ -160,7 +160,14 @@ class Context:
 
     def loadScript(self, script):
         self.context['ng_cave']['waypoints']['items'] = script.copy()
+        self.context['ng_cave']['waypoints']['currentIndex'] = None
         self.enabledProfile['config']['ng_cave']['waypoints']['items'] = script.copy()
+        self.db.update(self.enabledProfile)
+
+    def clearWaypoints(self):
+        self.context['ng_cave']['waypoints']['items'] = []
+        self.context['ng_cave']['waypoints']['currentIndex'] = None
+        self.enabledProfile['config']['ng_cave']['waypoints']['items'] = []
         self.db.update(self.enabledProfile)
 
     def loadCfg(self, cfg):

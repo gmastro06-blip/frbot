@@ -10,6 +10,8 @@ class DropFlasksTask(VectorTask):
     def __init__(self):
         super().__init__()
         self.name = 'dropFlasks'
+        self.delayBeforeStart = 1
+        self.delayAfterComplete = True
         self.isRootTask = True
 
     def onBeforeStart(self, context: Context) -> Context:

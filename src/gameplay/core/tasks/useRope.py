@@ -4,21 +4,24 @@ from src.shared.typings import Waypoint
 import src.utils.keyboard as keyboard
 from ...typings import Context
 from .common.base import BaseTask
-from time import sleep
 
 # TODO: implement did method checking coordinate change to up floor
 class UseRopeTask(BaseTask):
     def __init__(self, waypoint: Waypoint):
         super().__init__()
         self.name = 'useRope'
+        self.delayBeforeStart = 1
+        self.delayAfterComplete = 1
         self.waypoint = waypoint
 
     def do(self, context: Context) -> Context:
         slot = gameWindowCore.getSlotFromCoordinate(
             context['ng_radar']['coordinate'], self.waypoint['coordinate'])
-        sleep(0.2)
-        keyboard.press(context['general_hotkeys']['rope_hotkey'])
-        sleep(0.2)
+        rope_hotkey = (
+            context.get('general_hotkeys', {}).get('rope_hotkey')
+            if isinstance(context, dict)
+            else None
+        )
+        keyboard.press(rope_hotkey or 'o')
         gameWindowSlot.clickSlot(slot, context['gameWindow']['coordinate'])
-        sleep(0.2)
         return context

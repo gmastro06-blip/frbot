@@ -1,4 +1,12 @@
-import pytesseract
+import math
+try:
+    import pytesseract  # type: ignore
+except Exception:  # pragma: no cover
+    class _PyTesseractStub:
+        def image_to_string(self, *_args, **_kwargs):
+            raise RuntimeError('pytesseract is not available')
+
+    pytesseract = _PyTesseractStub()  # type: ignore
 import numpy as np
 from typing import Union
 import src.repositories.actionBar.extractors as actionBarExtractors
@@ -6,9 +14,13 @@ import src.repositories.actionBar.locators as actionBarLocators
 from src.shared.typings import GrayImage
 import src.utils.core as coreUtils
 from .config import hashes, images
-from skimage import exposure
+try:
+    from skimage import exposure
+except Exception:  # pragma: no cover
+    exposure = None
 
-pytesseract.pytesseract.tesseract_cmd = "C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
+if hasattr(pytesseract, 'pytesseract'):
+    pytesseract.pytesseract.tesseract_cmd = "C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
 
 # TODO: add unit tests
 # PERF: [0.04209370000000012, 9.999999999621423e-06]
@@ -23,11 +35,12 @@ def getSlotCount(screenshot: GrayImage, slot: int) -> Union[int, None]:
     
     number_region_image = np.array(digits, dtype=np.uint8)
 
-    stretch = exposure.rescale_intensity(number_region_image, in_range=(50,175), out_range=(0,255)).astype(np.uint8)
-
-    equalized = exposure.equalize_hist(stretch)
-
-    equalized_image = (equalized * 255).astype(np.uint8)
+    if exposure is not None:
+        stretch = exposure.rescale_intensity(number_region_image, in_range=(50,175), out_range=(0,255)).astype(np.uint8)
+        equalized = exposure.equalize_hist(stretch)
+        equalized_image = (equalized * 255).astype(np.uint8)
+    else:
+        equalized_image = number_region_image
 
     count = pytesseract.image_to_string(equalized_image, config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
 

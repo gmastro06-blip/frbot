@@ -269,9 +269,26 @@ class CavebotPage(customtkinter.CTkToplevel):
                                         fg_color="transparent", border_color="#C20034",
                                         border_width=2, hover_color="#C20034", command=self.loadScript)
         loadConfigButton.grid(row=0, column=1, padx=20, pady=20, sticky='nsew')
+
+        clearWaypointsButton = customtkinter.CTkButton(self.saveConfigFrame, text="Clear Waypoints", corner_radius=32,
+                        fg_color="transparent", border_color="#C20034",
+                        border_width=2, hover_color="#C20034", command=self.clearWaypoints)
+        clearWaypointsButton.grid(row=1, column=0, columnspan=2, padx=20, pady=(0, 20), sticky='nsew')
         
         self.saveConfigFrame.columnconfigure(0, weight=1, uniform='equal')
         self.saveConfigFrame.columnconfigure(1, weight=1, uniform='equal')
+
+    def clearWaypoints(self, confirm: bool = True):
+        if confirm and len(self.context.context['ng_cave']['waypoints']['items']) > 0:
+            shouldClear = messagebox.askyesno(
+                'Confirmar', 'Deseja limpar todos os waypoints do script atual?')
+            if not shouldClear:
+                return
+
+        self.context.clearWaypoints()
+        for item in self.table.get_children():
+            self.table.delete(item)
+        self.table.update()
 
     def openBaseModal(self):
         if self.baseModal is None or not self.baseModal.winfo_exists():
@@ -334,10 +351,14 @@ class CavebotPage(customtkinter.CTkToplevel):
             waypoint['label'], waypoint['type'], waypoint['coordinate'], waypoint['options']))
 
     def removeSelectedWaypoints(self):
-        selectedWaypoints = self.table.selection()
-        for waypoint in selectedWaypoints:
-            index = self.table.index(waypoint)
-            self.table.delete(waypoint)
+        selectedWaypoints = list(self.table.selection())
+        if not selectedWaypoints:
+            return
+
+        selectedIndexes = sorted((self.table.index(item) for item in selectedWaypoints), reverse=True)
+        for index in selectedIndexes:
+            itemId = self.table.get_children()[index]
+            self.table.delete(itemId)
             self.context.removeWaypointByIndex(index)
 
     def onWaypointDoubleClick(self, event):
@@ -415,10 +436,11 @@ class CavebotPage(customtkinter.CTkToplevel):
 
         if file:
             with open(file, 'r') as f:
-                self.table.delete()
                 script = json.load(f)
-                self.context.loadScript(script)
-                for waypoint in script:
-                    self.table.insert('', 'end', values=(
-                        waypoint['label'], waypoint['type'], waypoint['coordinate'], waypoint['options']))
+
+            self.clearWaypoints(confirm=False)
+            self.context.loadScript(script)
+            for waypoint in script:
+                self.table.insert('', 'end', values=(
+                    waypoint['label'], waypoint['type'], waypoint['coordinate'], waypoint['options']))
             messagebox.showinfo('Sucesso', 'Script carregado com sucesso!')

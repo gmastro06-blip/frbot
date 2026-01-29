@@ -21,6 +21,7 @@ Optional (depending on what features you use):
 From the repo root:
 
 ```bash
+py -V
 poetry install
 poetry run python main.py
 ```
@@ -29,8 +30,14 @@ If Poetry complains about the Python version, point it to Python 3.11.7:
 
 ```bash
 py -0p
-poetry env use C:\\Path\\To\\Python311\\python.exe
+poetry env use C:\\Users\\<you>\\AppData\\Local\\Programs\\Python\\Python311\\python.exe
 poetry install
+```
+
+Run unit tests:
+
+```bash
+poetry run pytest -q tests/unit
 ```
 
 ## Virtual display (optional)

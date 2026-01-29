@@ -10,15 +10,25 @@ class ClickInClosestCreatureTask(BaseTask):
         self.delayOfTimeout = 1
 
     def shouldIgnore(self, context: Context) -> bool:
-        return context['ng_cave']['targetCreature'] is not None
+        return context.get('ng_cave', {}).get('targetCreature') is not None
+
+    def did(self, context: Context) -> bool:
+        return bool(context.get('ng_cave', {}).get('isAttackingSomeCreature', False))
 
     def do(self, context: Context) -> Context:
-        if context['ng_cave']['isAttackingSomeCreature'] == False:
+        isAttacking = bool(context.get('ng_cave', {}).get('isAttackingSomeCreature', False))
+        if isAttacking == False:
             # TODO: find another way (maybe click in battle)
             # attack by mouse click when there are players on screen or ignorable creatures
-            if context['gameWindow']['players'] or context['ng_targeting']['hasIgnorableCreatures']:
-                if context['ng_cave'] and context['ng_cave']['closestCreature'] and context['ng_cave']['closestCreature']['windowCoordinate']:
-                    mouse.rightClick(context['ng_cave']['closestCreature']['windowCoordinate'])
+            hasPlayers = len(context.get('gameWindow', {}).get('players', [])) > 0
+            hasIgnorableCreatures = bool(context.get('ng_targeting', {}).get('hasIgnorableCreatures', False))
+            if hasPlayers or hasIgnorableCreatures:
+                closestCreature = context.get('ng_cave', {}).get('closestCreature')
+                windowCoordinate = None if closestCreature is None else closestCreature.get('windowCoordinate')
+                if windowCoordinate is not None:
+                    keyboard.keyDown('alt')
+                    mouse.leftClick(windowCoordinate)
+                    keyboard.keyUp('alt')
                 return context
             keyboard.press('space')
 

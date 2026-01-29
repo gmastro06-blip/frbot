@@ -1,5 +1,8 @@
 import numpy as np
-from scipy.spatial import distance
+try:
+    from scipy.spatial import distance
+except Exception:  # pragma: no cover
+    distance = None
 from src.gameplay.typings import Context
 import src.gameplay.utils as gameplayUtils
 from ...typings import Context
@@ -60,8 +63,13 @@ class WalkToTargetCreatureTask(VectorTask):
             if np.array_equal(monster['coordinate'], context['ng_cave']['targetCreature']['coordinate']) == False:
                 nonWalkableCoordinates.append(monster['coordinate'])
         walkpoints = []
-        dist = distance.cdist([context['ng_radar']['coordinate']], [
-                            context['ng_cave']['targetCreature']['coordinate']]).flatten()[0]
+        if distance is not None:
+            dist = distance.cdist([context['ng_radar']['coordinate']], [
+                                context['ng_cave']['targetCreature']['coordinate']]).flatten()[0]
+        else:
+            origin = np.asarray(context['ng_radar']['coordinate'], dtype=np.float32)
+            target = np.asarray(context['ng_cave']['targetCreature']['coordinate'], dtype=np.float32)
+            dist = float(np.linalg.norm(origin - target))
         if dist < 2:
             gameWindowHeight, gameWindowWidth = context['gameWindow']['image'].shape
             gameWindowCenter = (gameWindowWidth // 2, gameWindowHeight // 2)

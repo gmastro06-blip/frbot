@@ -1,4 +1,3 @@
-from time import sleep
 from src.gameplay.core.tasks.common.base import BaseTask
 from src.gameplay.core.tasks.common.vector import VectorTask
 from src.gameplay.core.tasks.orchestrator import TasksOrchestrator
@@ -6,6 +5,16 @@ from src.gameplay.typings import Context
 
 
 context = {}
+
+
+def _fast_forward_started_at(task, seconds: float):
+    if task is not None and getattr(task, 'startedAt', None) is not None:
+        task.startedAt -= seconds
+
+
+def _fast_forward_finished_at(task, seconds: float):
+    if task is not None and getattr(task, 'finishedAt', None) is not None:
+        task.finishedAt -= seconds
 
 
 def test_should_do_single_task():
@@ -55,7 +64,7 @@ def test_should_do_single_task_when_task_has_delayBeforeStart():
     tasksOrchestrator.do(context)
     assert tasksOrchestrator.rootTask.status == 'awaitingDelayBeforeStart'
     assert tasksOrchestrator.rootTask.statusReason is None
-    sleep(2)
+    _fast_forward_started_at(tasksOrchestrator.rootTask, 2)
     tasksOrchestrator.do(context)
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.statusReason is None
@@ -79,7 +88,7 @@ def test_should_do_single_task_when_task_has_delayAfterComplete():
     assert tasksOrchestrator.rootTask.name == 'currentTask'
     assert tasksOrchestrator.rootTask.status == 'awaitingDelayToComplete'
     assert tasksOrchestrator.rootTask.statusReason is None
-    sleep(2)
+    _fast_forward_finished_at(tasksOrchestrator.rootTask, 2)
     tasksOrchestrator.do(context)
     assert tasksOrchestrator.rootTask.name == 'currentTask'
     assert tasksOrchestrator.rootTask.status == 'completed'
@@ -102,7 +111,7 @@ def test_should_do_task_when_task_has_delayOfTimeout(mocker):
     assert tasksOrchestrator.rootTask.name == 'currentTask'
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.statusReason is None
-    sleep(3)
+    _fast_forward_started_at(baseTask, 3)
     tasksOrchestrator.do(context)
     assert tasksOrchestrator.rootTask.name == 'currentTask'
     assert tasksOrchestrator.rootTask.status == 'completed'
@@ -200,7 +209,7 @@ def test_do_vector_task_when_tasks_has_delayBeforeStart():
     assert secondTask.statusReason is None
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.statusReason is None
-    sleep(2)
+    _fast_forward_started_at(firstTask, 2)
     tasksOrchestrator.do(context)
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.currentTaskIndex == 0
@@ -229,7 +238,7 @@ def test_do_vector_task_when_tasks_has_delayBeforeStart():
     assert secondTask.status == 'awaitingDelayBeforeStart'
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.statusReason is None
-    sleep(2)
+    _fast_forward_started_at(secondTask, 2)
     tasksOrchestrator.do(context)
     assert tasksOrchestrator.rootTask.currentTaskIndex == 1
     assert tasksOrchestrator.getCurrentTask(context).name == 'secondTask'
@@ -280,7 +289,7 @@ def test_do_vector_task_when_tasks_has_delayAfterComplete():
     assert secondTask.statusReason is None
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.statusReason is None
-    sleep(2)
+    _fast_forward_finished_at(firstTask, 2)
     tasksOrchestrator.do(context)
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.currentTaskIndex == 1
@@ -309,7 +318,7 @@ def test_do_vector_task_when_tasks_has_delayAfterComplete():
     assert secondTask.statusReason is None
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.statusReason is None
-    sleep(2)
+    _fast_forward_finished_at(secondTask, 2)
     tasksOrchestrator.do(context)
     assert tasksOrchestrator.rootTask.currentTaskIndex == 1
     assert tasksOrchestrator.getCurrentTask(context).name == 'vectorTask'
@@ -353,7 +362,7 @@ def test_do_vector_task_with_when_tasks_has_delayOfTimeout(mocker):
     assert secondTask.statusReason is None
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.statusReason is None
-    sleep(2)
+    _fast_forward_started_at(firstTask, 2)
     tasksOrchestrator.do(context)
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.currentTaskIndex == 1
@@ -382,7 +391,7 @@ def test_do_vector_task_with_when_tasks_has_delayOfTimeout(mocker):
     assert secondTask.statusReason is None
     assert tasksOrchestrator.rootTask.status == 'running'
     assert tasksOrchestrator.rootTask.statusReason is None
-    sleep(2)
+    _fast_forward_started_at(secondTask, 2)
     tasksOrchestrator.do(context)
     assert tasksOrchestrator.rootTask.currentTaskIndex == 1
     assert tasksOrchestrator.getCurrentTask(context).name == 'vectorTask'
@@ -591,7 +600,7 @@ def test_call_all_tree_onTimeout(mocker):
         rootTask.tasks[0], 'onTimeout', return_value=context)
     secondTaskOnTimeoutSpy = mocker.patch.object(
         rootTask.tasks[1], 'onTimeout', return_value=context)
-    sleep(2)
+    _fast_forward_started_at(rootTask.tasks[0], 2)
     tasksOrchestrator.do(context)
     firstTaskOnTimeoutSpy.assert_called_once_with(context)
     secondTaskOnTimeoutSpy.assert_not_called()
@@ -640,7 +649,7 @@ def test_not_call_all_tree_onTimeout(mocker):
         rootTask.tasks[0], 'onTimeout', return_value=context)
     secondTaskOnTimeoutSpy = mocker.patch.object(
         rootTask.tasks[1], 'onTimeout', return_value=context)
-    sleep(2)
+    _fast_forward_started_at(rootTask.tasks[0], 2)
     tasksOrchestrator.do(context)
     firstTaskOnTimeoutSpy.assert_called_once_with(context)
     secondTaskOnTimeoutSpy.assert_not_called()

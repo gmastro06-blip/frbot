@@ -1,6 +1,15 @@
-from numba import njit
+try:
+    from numba import njit
+except Exception:  # pragma: no cover
+    def njit(*_args, **_kwargs):
+        def decorator(func):
+            return func
+        return decorator
 import numpy as np
-from scipy.spatial import distance
+try:
+    from scipy.spatial import distance
+except Exception:  # pragma: no cover
+    distance = None
 from typing import List, Union
 from src.shared.typings import Coordinate, CoordinateList, XYCoordinate
 
@@ -41,8 +50,14 @@ def getAvailableAroundCoordinates(coordinate: Coordinate, walkableFloorSqms: np.
 def getClosestCoordinate(coordinate: Coordinate, coordinates: CoordinateList) -> Coordinate:
     coordinateWithoutFloor = (coordinate[0], coordinate[1])
     coordinatesWithoutFloor = [(x[0], x[1]) for x in coordinates]
-    distancesOfCoordinates = distance.cdist(
-        [coordinateWithoutFloor], coordinatesWithoutFloor)[0]
+    if distance is not None:
+        distancesOfCoordinates = distance.cdist(
+            [coordinateWithoutFloor], coordinatesWithoutFloor)[0]
+    else:
+        # Fallback: Euclidean distance without scipy
+        coords = np.asarray(coordinatesWithoutFloor, dtype=np.float32)
+        origin = np.asarray(coordinateWithoutFloor, dtype=np.float32)
+        distancesOfCoordinates = np.sqrt(np.sum((coords - origin) ** 2, axis=1))
     closestCoordinateIndex = np.argsort(distancesOfCoordinates)[0]
     return coordinates[closestCoordinateIndex]
 
@@ -63,5 +78,14 @@ def getDirectionBetweenCoordinates(coordinate: Coordinate, nextCoordinate: Coord
 
 
 @njit(cache=True, fastmath=True)
-def getPixelFromCoordinate(coordinate: Coordinate) -> XYCoordinate:
+def _getPixelFromCoordinate_nb(coordinate: Coordinate) -> XYCoordinate:
     return coordinate[0] - 31744, coordinate[1] - 30976
+
+
+def getPixelFromCoordinate(coordinate: Coordinate) -> XYCoordinate:
+    # Numba is deprecating reflected list/set types; some callers may pass
+    # coordinates as lists (e.g. [x, y, z]). Normalize to a tuple to keep the
+    # numba-compiled path fast and warning-free.
+    if isinstance(coordinate, list):
+        coordinate = (coordinate[0], coordinate[1], coordinate[2])
+    return _getPixelFromCoordinate_nb(coordinate)

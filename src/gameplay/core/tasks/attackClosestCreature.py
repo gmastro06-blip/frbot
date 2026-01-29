@@ -13,7 +13,8 @@ class AttackClosestCreatureTask(VectorTask):
         self.runTimesWithoutCloseMonster = 0
 
     def shouldManuallyComplete(self, context: Context) -> bool:
-        nearestCreaturesCount = getNearestCreaturesCount(context['gameWindow']['monsters'])
+        monsters = context.get('gameWindow', {}).get('monsters', []) if isinstance(context, dict) else []
+        nearestCreaturesCount = getNearestCreaturesCount(monsters)
 
         if nearestCreaturesCount == 0:
             self.runTimesWithoutCloseMonster = self.runTimesWithoutCloseMonster + 1
@@ -28,7 +29,11 @@ class AttackClosestCreatureTask(VectorTask):
 
     # TODO: task should have like 5 retries until all tree is destroyed
     def onBeforeStart(self, context: Context) -> Context:
-        if context['ng_cave']['runToCreatures'] == True:
+        run_to_creatures = True
+        if isinstance(context, dict):
+            run_to_creatures = context.get('ng_cave', {}).get('runToCreatures', True) is True
+
+        if run_to_creatures:
             self.tasks = [
                 ClickInClosestCreatureTask().setParentTask(self).setRootTask(self),
                 WalkToTargetCreatureTask().setParentTask(self).setRootTask(self),

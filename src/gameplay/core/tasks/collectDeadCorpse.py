@@ -12,6 +12,7 @@ class CollectDeadCorpseTask(BaseTask):
     def __init__(self, creature: Creature):
         super().__init__()
         self.name = 'collectDeadCorpse'
+        self.delayBeforeStart = 0.85
         self.creature = creature
 
     def do(self, context: Context) -> Context:
@@ -38,36 +39,21 @@ class CollectDeadCorpseTask(BaseTask):
         return context
 
     def onComplete(self, context: Context) -> Context:
-        # TODO: por algum motivo essa funcao de pop buga, ai ele fica tentando pegar loot infinitamente
-        # TODO: verificar oque esse codigo faz e a possibilidade de voltar ele, por hora eu so limpo o array
-        # this is a matrix around corpse to loot, since under corpses will be collected, it will be removed by corpsesToLoot matrix
-        # coordinates = [
-        #     (context['ng_radar']['coordinate'][0] - 1, context['ng_radar']
-        #      ['coordinate'][1] - 1, context['ng_radar']['coordinate'][2]),
-        #     (context['ng_radar']['coordinate'][0], context['ng_radar']
-        #      ['coordinate'][1] - 1, context['ng_radar']['coordinate'][2]),
-        #     (context['ng_radar']['coordinate'][0] + 1, context['ng_radar']
-        #      ['coordinate'][1] - 1, context['ng_radar']['coordinate'][2]),
-        #     (context['ng_radar']['coordinate'][0] - 1, context['ng_radar']
-        #      ['coordinate'][1], context['ng_radar']['coordinate'][2]),
-        #     (context['ng_radar']['coordinate'][0], context['ng_radar']
-        #      ['coordinate'][1], context['ng_radar']['coordinate'][2]),
-        #     (context['ng_radar']['coordinate'][0] + 1, context['ng_radar']
-        #      ['coordinate'][1], context['ng_radar']['coordinate'][2]),
-        #     (context['ng_radar']['coordinate'][0] - 1, context['ng_radar']
-        #      ['coordinate'][1] + 1, context['ng_radar']['coordinate'][2]),
-        #     (context['ng_radar']['coordinate'][0], context['ng_radar']
-        #      ['coordinate'][1] + 1, context['ng_radar']['coordinate'][2]),
-        #     (context['ng_radar']['coordinate'][0] + 1, context['ng_radar']
-        #      ['coordinate'][1] + 1, context['ng_radar']['coordinate'][2])
-        # ]
-        # for coordinate in coordinates:
-        #     if len(context['loot']['corpsesToLoot']) == 0:
-        #         break
-        #     for index, corpseToLoot in enumerate(context['loot']['corpsesToLoot']):
-        #         if gameplayUtils.coordinatesAreEqual(coordinate, corpseToLoot['coordinate']):
-        #         context['loot']['corpsesToLoot'].pop(index)
+        radarCoordinate = context.get('ng_radar', {}).get('coordinate')
+        corpsesToLoot = context.get('loot', {}).get('corpsesToLoot', [])
+        if radarCoordinate is None or len(corpsesToLoot) == 0:
+            return context
 
-        context['loot']['corpsesToLoot'] = []
+        x, y, z = radarCoordinate
+        removed = {
+            (x - 1, y - 1, z), (x, y - 1, z), (x + 1, y - 1, z),
+            (x - 1, y, z),     (x, y, z),     (x + 1, y, z),
+            (x - 1, y + 1, z), (x, y + 1, z), (x + 1, y + 1, z),
+        }
+
+        context['loot']['corpsesToLoot'] = [
+            corpse for corpse in corpsesToLoot
+            if tuple(corpse.get('coordinate')) not in removed
+        ]
 
         return context

@@ -1,11 +1,18 @@
 import os
-
-import pyautogui
+try:
+    import pyautogui
+except Exception:  # pragma: no cover
+    pyautogui = None
 
 from .ino import sendCommandArduino
 
 
 _INPUT_BACKEND = os.environ.get('FENRIL_INPUT_BACKEND', 'pyautogui').strip().lower()
+
+
+def _require_pyautogui():
+    if pyautogui is None:
+        raise RuntimeError('pyautogui is not available; set FENRIL_INPUT_BACKEND=arduino or install pyautogui')
 
 
 def _as_key_list(first, rest):
@@ -86,6 +93,7 @@ def hotkey(*args):
     keys = _as_key_list(args[0], args[1:])
 
     if _INPUT_BACKEND != 'arduino':
+        _require_pyautogui()
         pyautogui.hotkey(*keys)
         return
 
@@ -101,6 +109,7 @@ def hotkey(*args):
 
 def keyDown(key: str):
     if _INPUT_BACKEND != 'arduino':
+        _require_pyautogui()
         pyautogui.keyDown(key)
         return
 
@@ -110,6 +119,7 @@ def keyDown(key: str):
 
 def keyUp(key: str):
     if _INPUT_BACKEND != 'arduino':
+        _require_pyautogui()
         pyautogui.keyUp(key)
         return
 
@@ -124,6 +134,7 @@ def press(*args):
     keys = _as_key_list(args[0], args[1:])
 
     if _INPUT_BACKEND != 'arduino':
+        _require_pyautogui()
         if len(keys) == 1:
             pyautogui.press(keys[0])
         else:
@@ -137,6 +148,7 @@ def press(*args):
 
 def write(phrase: str):
     if _INPUT_BACKEND != 'arduino':
+        _require_pyautogui()
         pyautogui.write(phrase)
         return
 

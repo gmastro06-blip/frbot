@@ -1,5 +1,8 @@
 import numpy as np
-from scipy.spatial import distance
+try:
+    from scipy.spatial import distance
+except Exception:  # pragma: no cover
+    distance = None
 from src.repositories.battleList.typings import CreatureList
 from src.shared.typings import Coordinate, CoordinateList, Waypoint
 from src.wiki.cities import cities
@@ -48,7 +51,12 @@ class GoToFreeDepotTask(VectorTask):
                 for visibleDepotCoordinate in visibleDepotCoordinates:
                     self.visitedOrBusyCoordinates[tuple(visibleDepotCoordinate)] = True
                 return context
-            freeDepotCoordinatesDistances = distance.cdist([coordinate], freeDepotCoordinates, 'euclidean').flatten()
+            if distance is not None:
+                freeDepotCoordinatesDistances = distance.cdist([coordinate], freeDepotCoordinates, 'euclidean').flatten()
+            else:
+                coords = np.asarray(freeDepotCoordinates, dtype=np.float32)
+                origin = np.asarray(coordinate, dtype=np.float32)
+                freeDepotCoordinatesDistances = np.sqrt(np.sum((coords - origin) ** 2, axis=1))
             closestFreeDepotCoordinateIndex = np.argmin(freeDepotCoordinatesDistances)
             self.closestFreeDepotCoordinate = freeDepotCoordinates[closestFreeDepotCoordinateIndex]
             

@@ -1,4 +1,3 @@
-from src.gameplay.typings import Context
 import src.utils.keyboard as keyboard
 from ...typings import Context
 from .common.base import BaseTask
@@ -9,8 +8,8 @@ class SayTask(BaseTask):
     def __init__(self, phrase: str):
         super().__init__()
         self.name = 'say'
-        self.delayBeforeStart = 0.5
-        self.delayAfterComplete = 0.5
+        self.delayBeforeStart = 2
+        self.delayAfterComplete = 2
         self.phrase = phrase
 
     def do(self, context: Context) -> Context:

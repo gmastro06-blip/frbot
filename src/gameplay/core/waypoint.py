@@ -1,4 +1,7 @@
-import tcod
+try:
+    import tcod
+except Exception:  # pragma: no cover
+    tcod = None
 from src.repositories.radar.config import walkableFloorsSqms
 from src.shared.typings import Coordinate, CoordinateList
 from src.utils.coordinate import getAvailableAroundCoordinates, getClosestCoordinate, getPixelFromCoordinate
@@ -7,6 +10,8 @@ from .typings import Checkpoint
 
 # TODO: add unit tests
 def generateFloorWalkpoints(coordinate: Coordinate, goalCoordinate: Coordinate, nonWalkableCoordinates: CoordinateList = []) -> CoordinateList:
+    if tcod is None:
+        raise RuntimeError('tcod is not available; cannot generate walkpoints')
     pixelCoordinate = getPixelFromCoordinate(coordinate)
     xFromTheStartOfRadar = pixelCoordinate[0] - 53
     xFromTheEndOfRadar = pixelCoordinate[0] + 53

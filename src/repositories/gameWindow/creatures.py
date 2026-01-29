@@ -1,9 +1,21 @@
 import math
-from numba import njit
+try:
+    from numba import njit
+except Exception:  # pragma: no cover
+    def njit(*_args, **_kwargs):
+        def decorator(func):
+            return func
+        return decorator
 import numpy as np
 import pathlib
-from scipy.spatial import distance
-import tcod
+try:
+    from scipy.spatial import distance
+except Exception:  # pragma: no cover
+    distance = None
+try:
+    import tcod
+except Exception:  # pragma: no cover
+    tcod = None
 from typing import List, Tuple, Union
 from src.repositories.radar.config import walkableFloorsSqms
 from src.repositories.radar.core import isCoordinateWalkable

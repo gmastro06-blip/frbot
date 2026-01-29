@@ -1,6 +1,12 @@
-from nptyping import NDArray
 import numpy as np
 from typing import Any
+
+try:
+    from nptyping import NDArray
+    _HAS_NPTYPING = True
+except Exception:  # pragma: no cover
+    NDArray = None  # type: ignore
+    _HAS_NPTYPING = False
 
 
 Creature = np.dtype([
@@ -13,4 +19,4 @@ Creature = np.dtype([
     ('gameWindowCoordinate', np.uint32, (2,)),
     ('isUnderRoof', np.bool_),
 ])
-CreatureList = NDArray[Any, Any]
+CreatureList = NDArray[Any, Any] if _HAS_NPTYPING else Any
