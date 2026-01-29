@@ -28,7 +28,7 @@ from src.repositories.gameWindow.creatures import getClosestCreature, getTargetC
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0
 
-class PilotNGThread:
+class FenrilThread:
     # TODO: add typings
     def __init__(self, context):
         self.context = context

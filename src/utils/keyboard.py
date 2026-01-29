@@ -1,7 +1,25 @@
+import os
+
+import pyautogui
+
 from .ino import sendCommandArduino
+
+
+_INPUT_BACKEND = os.environ.get('FENRIL_INPUT_BACKEND', 'pyautogui').strip().lower()
+
+
+def _as_key_list(first, rest):
+    if rest:
+        return [first, *rest]
+    if isinstance(first, (list, tuple)):
+        return list(first)
+    return [first]
 
 def getAsciiFromKey(key):
     if not key:
+        return 0
+
+    if not isinstance(key, str):
         return 0
 
     sanitized = key.lower()
@@ -62,31 +80,64 @@ def getAsciiFromKey(key):
         return 0
 
 def hotkey(*args):
-    for key in args:
+    if not args:
+        return
+
+    keys = _as_key_list(args[0], args[1:])
+
+    if _INPUT_BACKEND != 'arduino':
+        pyautogui.hotkey(*keys)
+        return
+
+    for key in keys:
         asciiKey = getAsciiFromKey(key)
         if asciiKey != 0:
             sendCommandArduino(f"keyDown,{asciiKey}")
 
-    for key in args:
+    for key in keys:
         asciiKey = getAsciiFromKey(key)
         if asciiKey != 0:
             sendCommandArduino(f"keyUp,{asciiKey}")
 
 def keyDown(key: str):
+    if _INPUT_BACKEND != 'arduino':
+        pyautogui.keyDown(key)
+        return
+
     asciiKey = getAsciiFromKey(key)
     if asciiKey != 0:
         sendCommandArduino(f"keyDown,{asciiKey}")
 
 def keyUp(key: str):
+    if _INPUT_BACKEND != 'arduino':
+        pyautogui.keyUp(key)
+        return
+
     asciiKey = getAsciiFromKey(key)
     if asciiKey != 0:
         sendCommandArduino(f"keyUp,{asciiKey}")
 
 def press(*args):
-    for key in args:
+    if not args:
+        return
+
+    keys = _as_key_list(args[0], args[1:])
+
+    if _INPUT_BACKEND != 'arduino':
+        if len(keys) == 1:
+            pyautogui.press(keys[0])
+        else:
+            pyautogui.press(keys)
+        return
+
+    for key in keys:
         asciiKey = getAsciiFromKey(key)
         if asciiKey != 0:
             sendCommandArduino(f"press,{asciiKey}")
 
 def write(phrase: str):
+    if _INPUT_BACKEND != 'arduino':
+        pyautogui.write(phrase)
+        return
+
     sendCommandArduino(f"write,{phrase}")

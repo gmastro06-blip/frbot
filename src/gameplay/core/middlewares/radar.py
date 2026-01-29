@@ -11,7 +11,7 @@ def setRadarMiddleware(context: Context) -> Context:
 
 # TODO: add unit tests
 def setWaypointIndexMiddleware(context: Context) -> Context:
-    if context['ng_cave']['waypoints']['currentIndex'] is None:
+    if context['ng_cave']['waypoints']['currentIndex'] is None and context['ng_radar']['coordinate'] is not None:
         context['ng_cave']['waypoints']['currentIndex'] = getClosestWaypointIndexFromCoordinate(
             context['ng_radar']['coordinate'], context['ng_cave']['waypoints']['items'])
     return context

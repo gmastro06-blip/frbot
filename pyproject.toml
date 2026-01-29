@@ -1,9 +1,10 @@
 [tool.poetry]
-name = "TibiaPilotNG"
+name = "fenril"
 version = "0.1.0"
-description = ""
+description = "Windows image capture and analysis application"
 authors = ["Paulo Lacerda <paulorl2810@gmail.com>", "lucasmonstro <joao.galiano.silva@gmail.com>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 dxcam = {git = "https://github.com/paulordyl/DXcam"}

@@ -99,13 +99,25 @@ def getFloorLevel(screenshot: GrayImage) -> FloorLevel | None:
 # TODO: add unit tests
 # TODO: add perf
 def getClosestWaypointIndexFromCoordinate(coordinate: Coordinate, waypoints: WaypointList) -> Union[int, None]:
+    if coordinate is None:
+        return None
+    if len(coordinate) < 3:
+        return None
+    if any(value is None for value in coordinate):
+        return None
+
     closestWaypointIndex = None
     closestWaypointDistance = 9999
     for waypointIndex, waypoint in enumerate(waypoints):
-        if waypoint['coordinate'][2] != coordinate[2]:
+        waypointCoordinate = waypoint.get('coordinate') if isinstance(waypoint, dict) else None
+        if waypointCoordinate is None or len(waypointCoordinate) < 3:
+            continue
+        if any(value is None for value in waypointCoordinate):
+            continue
+        if waypointCoordinate[2] != coordinate[2]:
             continue
         waypointDistance = distance.cdist(
-            [(waypoint['coordinate'][0], waypoint['coordinate'][1])], [(coordinate[0], coordinate[1])]).flatten()[0]
+            [(waypointCoordinate[0], waypointCoordinate[1])], [(coordinate[0], coordinate[1])]).flatten()[0]
         if waypointDistance < closestWaypointDistance:
             closestWaypointIndex = waypointIndex
             closestWaypointDistance = waypointDistance

@@ -5,7 +5,7 @@ def test_should_call_hotkey(mocker):
     hotkeys = ['a', 'b']
     hotkeySpy =  mocker.patch('pyautogui.hotkey')
     hotkey(hotkeys)
-    hotkeySpy.assert_called_once_with(hotkeys)
+    hotkeySpy.assert_called_once_with(*hotkeys)
 
 def test_should_call_keyDown(mocker):
     hotkey = 'a'
@@ -19,7 +19,7 @@ def test_should_call_keyUp(mocker):
     keyUp(hotkey)
     keyUpSpy.assert_called_once_with(hotkey)
 
-def test_should_call_hotkey(mocker):
+def test_should_call_press(mocker):
     hotkeys = ['a', 'b']
     pressSpy =  mocker.patch('pyautogui.press')
     press(hotkeys)

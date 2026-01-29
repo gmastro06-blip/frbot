@@ -11,6 +11,7 @@ class ConfigPage(customtkinter.CTkToplevel):
     def __init__(self, context):
         super().__init__()
         self.context = context
+        self._window_options: dict[str, tuple[int, str]] = {}
 
         self.title(genRanStr())
         self.resizable(False, False)
@@ -29,6 +30,15 @@ class ConfigPage(customtkinter.CTkToplevel):
             self.windowsFrame, values=self.getGameWindows(), state='readonly',
             command=self.onChangeWindow)
         self.windowsCombobox.grid(row=1, column=0, sticky='ew', padx=10, pady=10)
+
+        # Try to keep the current selection (if any) visible in the combobox.
+        current_window = self.context.context.get('window')
+        if current_window is not None and hasattr(current_window, '_hWnd'):
+            current_hwnd = getattr(current_window, '_hWnd')
+            for label, (hwnd, _title) in self._window_options.items():
+                if hwnd == current_hwnd:
+                    self.windowsCombobox.set(label)
+                    break
 
         self.button = customtkinter.CTkButton(
             self.windowsFrame, text='Atualizar', command=self.refreshWindows,
@@ -194,22 +204,61 @@ class ConfigPage(customtkinter.CTkToplevel):
         self.saveConfigFrame.columnconfigure(1, weight=1)
 
     def getGameWindows(self):
-        def enum_windows_callback(hwnd, results):
-            if win32gui.IsWindowVisible(hwnd):
-                window_title = win32gui.GetWindowText(hwnd)
-                if re.search(r"Windowed", window_title, re.IGNORECASE):
-                    results.append(window_title)
-        results = []
-        win32gui.EnumWindows(enum_windows_callback, results)
-        return results
+        self._window_options.clear()
+
+        tibia_labels: list[str] = []
+        windowed_labels: list[str] = []
+        other_labels: list[str] = []
+
+        def enum_windows_callback(hwnd, _param):
+            if not win32gui.IsWindowVisible(hwnd):
+                return
+
+            title = (win32gui.GetWindowText(hwnd) or '').strip()
+            if not title:
+                return
+            # Avoid selecting our own UI window(s)
+            if title.lower() == 'fenril':
+                return
+
+            label = f"{title} [0x{hwnd:08X}]"
+            self._window_options[label] = (hwnd, title)
+
+            if re.search(r"\bTibia\b", title, re.IGNORECASE):
+                tibia_labels.append(label)
+            elif re.search(r"Windowed", title, re.IGNORECASE):
+                windowed_labels.append(label)
+            else:
+                other_labels.append(label)
+
+        win32gui.EnumWindows(enum_windows_callback, None)
+
+        # Prefer Tibia/Windowed windows, but fall back to all windows if none match.
+        preferred = tibia_labels + windowed_labels
+        if preferred:
+            return preferred
+        return other_labels
 
     def refreshWindows(self):
         self.windowsCombobox['values'] = self.getGameWindows()
 
     def onChangeWindow(self, _):
-        selectedWindow = self.windowsCombobox.get()
-        self.context.context['window'] = gw.getWindowsWithTitle(selectedWindow)[
-            0]
+        selected_label = self.windowsCombobox.get()
+        selected = self._window_options.get(selected_label)
+        if selected is None:
+            messagebox.showerror('Erro', 'Janela selecionada inválida. Clique em Atualizar e tente novamente.')
+            return
+
+        hwnd, title = selected
+        try:
+            self.context.context['window'] = gw.Win32Window(hwnd)
+        except Exception:
+            # Fallback for environments where Win32Window construction might fail
+            matches = gw.getWindowsWithTitle(title)
+            if not matches:
+                messagebox.showerror('Erro', 'Não foi possível encontrar a janela. Clique em Atualizar e tente novamente.')
+                return
+            self.context.context['window'] = matches[0]
         
     def onChangeShovelHotkey(self, event):
         key = event.char
@@ -282,8 +331,8 @@ class ConfigPage(customtkinter.CTkToplevel):
 
     def saveCfg(self):
         file = filedialog.asksaveasfilename(
-            defaultextension=".pilotng",
-            filetypes=[("PilotNG Cfg", "*.pilotng"), ("Todos os arquivos", "*.*")]
+            defaultextension=".fenril",
+            filetypes=[("fenril Cfg", "*.fenril"), ("Todos os arquivos", "*.*")]
         )
 
         if file:
@@ -302,8 +351,8 @@ class ConfigPage(customtkinter.CTkToplevel):
 
     def loadCfg(self):
         file = filedialog.askopenfilename(
-            defaultextension=".pilotng",
-            filetypes=[("PilotNG Cfg", "*.pilotng"), ("Todos os arquivos", "*.*")]
+            defaultextension=".fenril",
+            filetypes=[("fenril Cfg", "*.fenril"), ("Todos os arquivos", "*.*")]
         )
 
         if file:

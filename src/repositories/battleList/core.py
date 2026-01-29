@@ -49,7 +49,7 @@ def getCreatures(content: GrayImage) -> CreatureList:
         creaturesAfterCheck = checkDust(content, creatures)
         return creaturesAfterCheck
     else:
-        return []
+        return np.array([], dtype=Creature)
 
 
 # PERF: [0.019119499999998624, 4.020000000082291e-05]
