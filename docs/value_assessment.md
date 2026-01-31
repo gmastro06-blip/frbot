@@ -32,11 +32,23 @@ This project’s runtime contract is: **do not operate unless the capture+input 
   - If the digests do not change, the system aborts with evidence.
 - **Why it matters**: verifying only “no exception was thrown” is not verification; observable impact is closer to a real operational check.
 
+### 5) Typed intents + per-intent evidence verification
+- **Value**: the engine emits typed intents (cavebot/healing/targeting/looting/deposit/trade), and the runtime verifies each emitted input via a capture recapture.
+- **Evidence**:
+  - Engine returns `EngineOutput(intents=...)` with at most one intent per tick.
+  - Runtime executes at most one intent per tick and verifies `EvidenceExpectation` using objective post-conditions:
+    - ROI digest deltas when configured
+    - Observation deltas (e.g. HP increases, flags become true/false, position changes)
+  - If evidence is not observed, the system aborts with persistent fatal evidence.
+- **Why it matters**: this prevents “we pressed a key” from being mistaken as “we achieved an effect.”
+
 ## What is NOT claimed as value (yet)
 
 - **Bot effectiveness** (speed, accuracy, profit): not evidenced here.
 - **Safety against bans / detection**: not evidenced here.
 - **Completeness of gameplay logic**: not evidenced here.
+- **Out-of-the-box real-mode operation**: requires ROI calibration/config; not auto-detected.
+- **Real-mode cavebot navigation**: waypoint navigation requires objective position extraction; not implemented in real mode.
 
 ## Current acceptance criteria (what must remain true)
 

@@ -20,5 +20,7 @@ class MockCapture(CaptureAdapter):
 
     def grab(self) -> Frame:
         ts = time.monotonic_ns()
-        digest = hashlib.sha256(str(ts).encode('utf-8')).hexdigest()
-        return Frame(width=1, height=1, monotonic_ts_ns=ts, digest_hex=digest)
+        # Deterministic "screen" bytes: 1x1 RGB.
+        rgb = (ts.to_bytes(8, 'little', signed=False))[:3]
+        digest = hashlib.sha256(rgb).hexdigest()
+        return Frame(width=1, height=1, monotonic_ts_ns=ts, digest_hex=digest, rgb=rgb)

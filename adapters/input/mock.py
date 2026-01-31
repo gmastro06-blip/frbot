@@ -18,6 +18,11 @@ class MockInput(InputAdapter):
     def press_noop(self) -> None:
         return
 
+    def press_key(self, key: str) -> None:
+        # Deterministic no-op by default. Tests that need round-trip evidence
+        # should use the mock-world adapters.
+        return
+
     def click(self, x: int, y: int) -> None:
         # Deterministic no-op.
         return

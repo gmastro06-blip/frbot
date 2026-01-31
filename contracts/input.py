@@ -21,5 +21,8 @@ class InputAdapter(Protocol):
     def press_noop(self) -> None:
         """Emit a configurable no-op key press used for verification."""
 
+    def press_key(self, key: str) -> None:
+        """Press/release a single key (e.g. 'F1', 'a', '1')."""
+
     def click(self, x: int, y: int) -> None:
         """Perform an input action. Must only run after successful preflight."""

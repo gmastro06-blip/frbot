@@ -12,6 +12,18 @@ class Frame:
     height: int
     monotonic_ts_ns: int
     digest_hex: str
+    # Raw RGB bytes (len == width * height * 3) when available.
+    # Core engine must not interpret pixels; runtime/evidence may.
+    rgb: bytes = b''
+
+
+    # Cavebot-only movement evidence.
+    minimap_detected: bool = False
+    # Raw RGB bytes for the minimap crop (len == minimap_width * minimap_height * 3).
+    minimap_rgb: bytes = b''
+    minimap_width: int = 0
+    minimap_height: int = 0
+    minimap_digest_hex: str = ''
 
 
 @dataclass(frozen=True, slots=True)
