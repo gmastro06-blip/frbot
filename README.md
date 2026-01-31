@@ -1,62 +1,64 @@
-# fenril
+# frbot (rewrite)
 
-Windows-first image capture + analysis application.
+Minimal, contract-driven runtime.
 
-This repository focuses on grabbing frames (e.g. via DXGI capture), processing them with OpenCV/Numpy, optional OCR via Tesseract, and presenting/controlling workflows via a UI.
+This repository has been rewritten to enforce:
 
-## Requirements
+- No dynamic dict state in runtime.
+- No GUI/capture automation as a central dependency.
+- Fail-fast startup: abort in <1s if environment/contracts are not satisfied.
+- Persistent evidence on failure (diagnostics/fatal.log).
 
-- Windows 10/11
-- Python 3.11.7 (the project is pinned to this version in pyproject)
-- Poetry
+## Repo structure (non-negotiable)
 
-Optional (depending on what features you use):
+- contracts/  → dataclasses + invariants
+- core/       → pure logic (no IO, no GUI, no sleeps)
+- adapters/   → untrusted external integration points (capture/input)
+- runtime/    → state machine + abort paths
+- diagnostics/→ persistent logging
 
-- Tesseract OCR (for text recognition)
-- OBS (for consistent, controlled capture setups)
-- Virtual display driver (only if you need a second “virtual monitor”)
+## Running
 
-## Setup
-
-From the repo root:
+Default is strict and will abort (no real adapters are provided in this rewrite):
 
 ```bash
-py -V
-poetry install
 poetry run python main.py
 ```
 
-If Poetry complains about the Python version, point it to Python 3.11.7:
+Deterministic mock mode (headless, testable):
 
 ```bash
-py -0p
-poetry env use C:\\Users\\<you>\\AppData\\Local\\Programs\\Python\\Python311\\python.exe
-poetry install
+set FRBOT_MODE=mock
+poetry run python main.py
 ```
 
-Run unit tests:
+Mock verification toggles (to force abort paths):
 
-```bash
-poetry run pytest -q tests/unit
-```
+- `FRBOT_MOCK_CAPTURE_OK=0` → abort: capture not verified
+- `FRBOT_MOCK_INPUT_OK=0` → abort: input not verified
 
-## Virtual display (optional)
+Logs:
 
-Some capture setups work best with a dedicated secondary display. If you use a virtual display driver, install it from the vendor package and run its installer commands from an elevated terminal (Run as Administrator).
+- diagnostics/runtime.log
+- diagnostics/fatal.log
 
-Example (paths will vary):
+Real mode prerequisites (not vendored in this repo):
 
-```bash
-cd C:\\DIRECTORY\\OF\\EXTRACTED\\FOLDER
-deviceinstaller64 install usbmmidd.inf usbmmidd
-deviceinstaller64 enableidd 1
-```
+- `pip install mss pynput`
 
-## OBS note (optional)
+### Smoke test
 
-If you capture a window/game/app through OBS, disabling cursor capture helps keep frames stable (the cursor can occlude UI elements and change pixels).
+Run: `./smoke.ps1`
 
-## Contributing
+Contract:
 
-Issues and pull requests are welcome.
-- FOLLOW ENEMY OR GO TO BOX TO KILL MONSTERS (DEPENDS THE CHAR LEVEL) ✔️
+- `FRBOT_MODE=real` must abort and produce `diagnostics/fatal.log`.
+- `FRBOT_MODE=mock` must exit cleanly with code `0`.
+
+## What is deliberately NOT implemented
+
+- Real screen capture (DXGI/dxcam) adapters
+- Real GUI automation inputs (pyautogui / focus-dependent clicking)
+- OCR/OBS/virtual display dependencies
+
+Rationale: these are non-deterministic and not verifiable by default; the runtime refuses to start without verified adapters.

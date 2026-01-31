@@ -1,17 +1,11 @@
-from src.gameplay.context import context
-from src.gameplay.threads.fenril import FenrilThread
-from src.gameplay.threads.ui import UIThread
-from src.gameplay.threads.alert import AlertThread
-from src.ui.context import Context
+from __future__ import annotations
 
-def main():
-    contextInstance = Context(context)
-    uiThreadInstance = UIThread(contextInstance)
-    uiThreadInstance.start()
-    alertThreadInstance = AlertThread(contextInstance)
-    alertThreadInstance.start()
-    fenrilThreadInstance = FenrilThread(contextInstance)
-    fenrilThreadInstance.mainloop()
+from runtime.runner import run
+
+
+def main() -> int:
+    return run()
+
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

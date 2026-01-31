@@ -27,3 +27,15 @@ var/
 .idea/
 .vscode/
 venv
+.venv/
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Runtime artifacts (must never be committed)
+diagnostics/*.log
+logs/

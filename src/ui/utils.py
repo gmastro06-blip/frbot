@@ -1,2 +1,0 @@
-def genRanStr():
-  return 'fenril'
