@@ -153,6 +153,7 @@ def execute_looting_tick(
 
     # Emit exactly one input.
     try:
+        binding.assert_bound()
         if intent.kind == 'press_key':
             input_.press_key(str(intent.key or ''))
         else:

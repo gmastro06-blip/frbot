@@ -1,27 +1,22 @@
 from __future__ import annotations
 
-from contracts.engine import Observation, TickInput
-from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
+from contracts.engine import EngineInput
+from contracts.runtime import Tile
 from core.engine import tick
 
 
 def test_engine_aborts_on_stale_capture() -> None:
-    ctx = RuntimeContext(
-        config=RuntimeConfig(mode='mock'),
-        status=RuntimeStatus(state=RuntimeState.RUNNING),
-        telemetry=RuntimeTelemetry(),
+    inp = EngineInput(
+        now_ts_ms=1_000,
+        capture_age_ms=10_000,
+        max_capture_age_ms=500,
+        tick_count=0,
+        current_position=Tile(x=0, y=0, z=7, walkable=True),
+        target_tile=None,
+        last_positions=(),
     )
 
-    out = tick(
-        ctx,
-        TickInput(
-            now_ts_ns=1_000_000_000,
-            frame_ts_ns=0,
-            capture_age_ms=10_000,
-            max_capture_age_ms=500,
-            observation=Observation(),
-        ),
-    )
+    out = tick(inp, enable_cavebot=False)
 
     assert not out.ok
     assert out.abort_reason == 'capture stale'

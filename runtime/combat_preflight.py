@@ -4,7 +4,7 @@ import os
 from typing import TypeAlias
 
 from adapters.capture.mock_world_any import MockWorldAnyCapture
-from adapters.capture.mss_window_real import MssWindowRealCapture
+from adapters.capture.mss_bound_window_real import MssBoundWindowRealCapture
 from adapters.input.mock_world import MockWorldInput
 from adapters.input.win32_hwnd import Win32HwndKeyboard
 from adapters.mock_world import MockBattleListRow, MockWorld
@@ -20,7 +20,7 @@ from runtime.healing_runner import _read_hp_mp
 from runtime.combat_semantics import read_target_hp_percent
 
 
-CaptureAdapter: TypeAlias = MssWindowRealCapture | MockWorldAnyCapture
+CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MockWorldAnyCapture
 InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
 
@@ -96,19 +96,12 @@ def combat_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter,
         if not bvr.ok:
             raise PreflightFailed('combat_ambiguous_result')
 
-        snap = binding_real.snapshot()
-        region = {
-            'left': int(snap.rect.left),
-            'top': int(snap.rect.top),
-            'width': int(snap.rect.width),
-            'height': int(snap.rect.height),
-        }
-
         try:
-            capture_real = MssWindowRealCapture(region=region)
+            capture_real = MssBoundWindowRealCapture(binding=binding_real)
         except ImportError as exc:
             raise PreflightFailed(str(exc)) from exc
 
+        snap = binding_real.snapshot()
         try:
             input_real = Win32HwndKeyboard(hwnd=int(snap.hwnd))
         except Exception as exc:
@@ -124,6 +117,11 @@ def combat_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter,
             raise PreflightFailed(cap_v.reason or 'capture not verified')
         if not inp_v.ok:
             raise PreflightFailed(inp_v.reason or 'input not verified')
+
+        try:
+            binding_real.assert_bound()
+        except Exception:
+            raise PreflightFailed('combat_ambiguous_result')
 
         f = capture_real.grab()
 

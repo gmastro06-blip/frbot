@@ -4,7 +4,7 @@ import os
 from typing import TypeAlias
 
 from adapters.capture.mock_world_any import MockWorldAnyCapture
-from adapters.capture.mss_window_real import MssWindowRealCapture
+from adapters.capture.mss_bound_window_real import MssBoundWindowRealCapture
 from adapters.input.mock_world import MockWorldInput
 from adapters.input.win32_hwnd import Win32HwndKeyboard
 from adapters.mock_world import MockBattleListRow, MockWorld
@@ -18,7 +18,7 @@ from runtime.battle_list_semantics import detect_battle_list
 from runtime.config_loader import load_rois
 
 
-CaptureAdapter: TypeAlias = MssWindowRealCapture | MockWorldAnyCapture
+CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MockWorldAnyCapture
 InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
 
@@ -76,19 +76,12 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
         if not bvr.ok:
             raise PreflightFailed('targeting_window_binding_lost')
 
-        snap = binding_real.snapshot()
-        region = {
-            'left': int(snap.rect.left),
-            'top': int(snap.rect.top),
-            'width': int(snap.rect.width),
-            'height': int(snap.rect.height),
-        }
-
         try:
-            capture_real = MssWindowRealCapture(region=region)
+            capture_real = MssBoundWindowRealCapture(binding=binding_real)
         except ImportError as exc:
             raise PreflightFailed(str(exc)) from exc
 
+        snap = binding_real.snapshot()
         try:
             input_real = Win32HwndKeyboard(hwnd=int(snap.hwnd))
         except Exception as exc:
@@ -104,6 +97,11 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
             raise PreflightFailed(cap_v.reason or 'capture not verified')
         if not inp_v.ok:
             raise PreflightFailed(inp_v.reason or 'input not verified')
+
+        try:
+            binding_real.assert_bound()
+        except Exception:
+            raise PreflightFailed('targeting_window_binding_lost')
 
         before = capture_real.grab()
         # Battle List bbox must be within captured HWND region.

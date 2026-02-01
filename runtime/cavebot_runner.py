@@ -153,6 +153,11 @@ def execute_cavebot_tick(
             abort_reason='cavebot_no_progress',
         )
 
+    try:
+        binding.assert_bound()
+    except Exception as exc:
+        raise PreflightFailed('cavebot_window_binding_lost') from exc
+
     input_.press_key(str(intent.key))
     ctx.cavebot.gate_inputs_sent += 1
 

@@ -137,6 +137,7 @@ def execute_intent(
     click_y = int(clicked_entry.screen_bbox.y + (clicked_entry.screen_bbox.height // 2))
 
     try:
+        binding.assert_bound()
         input_.click(click_x, click_y)
     except Exception as exc:
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc

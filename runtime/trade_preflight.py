@@ -15,8 +15,7 @@ from contracts.errors import PreflightFailed
 from contracts.input import InputStatus
 from contracts.runtime import RuntimeContext, RuntimeState
 from runtime.config_loader import load_rois
-from runtime.depot_semantics import read_depot_container
-from runtime.inventory_semantics import read_inventory
+from runtime.trade_semantics import detect_npc_window, read_trade_inventory
 
 
 CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MockWorldAnyCapture
@@ -31,14 +30,14 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
-def deposit_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, WindowBindingAdapter]:
-    """Deposit gate preflight.
+def trade_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, WindowBindingAdapter]:
+    """Trade gate preflight.
 
     Invariants:
     - Strong window binding
-    - Inventory ROI exists and is semantically readable
-    - Depot container ROI exists and is semantically readable
-    - Depot must be open (explicit semantic bit)
+    - Required ROIs exist
+    - NPC trade window is semantically detected and matches expected NPC id
+    - Trade inventory is semantically readable
 
     Preflight must not create runtime.log.
     """
@@ -49,27 +48,26 @@ def deposit_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
     loaded = load_rois(ctx)
     ctx.rois = dict(loaded.rois)
 
-    inv_roi = ctx.rois.get(ctx.config.inventory_text_roi)
-    depot_roi = ctx.rois.get(ctx.config.depot_container_roi)
+    inv_roi = ctx.rois.get(ctx.config.trade_inventory_roi)
+    npc_roi = ctx.rois.get(ctx.config.trade_npc_roi)
+    action_roi = ctx.rois.get(ctx.config.trade_action_roi)
+    if inv_roi is None or npc_roi is None or action_roi is None:
+        raise PreflightFailed('trade_unverified_action')
 
-    if inv_roi is None or depot_roi is None:
-        raise PreflightFailed('deposit_inventory_unreadable')
+    # Reset trade state.
+    ctx.trade.attempts_used = 0
+    ctx.trade.inputs_sent = 0
+    ctx.trade.last_npc = None
+    ctx.trade.last_inventory_before = None
+    ctx.trade.last_inventory_after = None
 
     mode = ctx.config.mode.strip().lower()
-
-    # Reset deposit state.
-    ctx.deposit.attempts_used = 0
-    ctx.deposit.inputs_sent = 0
-    ctx.deposit.last_inventory_before = None
-    ctx.deposit.last_inventory_after = None
-    ctx.deposit.last_depot_before = None
-    ctx.deposit.last_depot_after = None
 
     if mode == 'real':
         binding_real = Win32WindowBinding(hwnd=int(ctx.config.window_hwnd), title_substring=ctx.config.window_title_substring)
         bvr = binding_real.verify()
         if not bvr.ok:
-            raise PreflightFailed('deposit_window_binding_lost')
+            raise PreflightFailed('trade_window_binding_lost')
 
         try:
             capture_real = MssBoundWindowRealCapture(binding=binding_real)
@@ -77,6 +75,7 @@ def deposit_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
             raise PreflightFailed(str(exc)) from exc
 
         snap = binding_real.snapshot()
+
         try:
             input_real = Win32HwndKeyboard(hwnd=int(snap.hwnd))
         except Exception as exc:
@@ -95,20 +94,21 @@ def deposit_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
         try:
             binding_real.assert_bound()
         except Exception:
-            raise PreflightFailed('deposit_window_binding_lost')
+            raise PreflightFailed('trade_window_binding_lost')
 
         f = capture_real.grab()
+        npc = detect_npc_window(f, npc_roi)
+        if npc is None:
+            raise PreflightFailed('trade_npc_not_detected')
+        if int(npc.npc_id) != int(ctx.config.trade_expected_npc_id):
+            raise PreflightFailed('trade_wrong_npc')
 
-        inv = read_inventory(f, inv_roi)
+        inv = read_trade_inventory(f, inv_roi)
         if inv is None:
-            raise PreflightFailed('deposit_inventory_unreadable')
+            raise PreflightFailed('trade_unverified_action')
 
-        depot = read_depot_container(f, depot_roi)
-        if depot is None:
-            raise PreflightFailed('deposit_unreadable_state')
-
-        if not bool(depot.open):
-            raise PreflightFailed('deposit_depot_not_open')
+        ctx.trade.last_npc = npc
+        ctx.trade.last_inventory_before = inv
 
         ctx.status.state = RuntimeState.READY
         return capture_real, input_real, binding_real
@@ -117,31 +117,35 @@ def deposit_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
     binding_mock = MockWindowBinding()
     bvr = binding_mock.verify()
     if not bvr.ok:
-        raise PreflightFailed('deposit_window_binding_lost')
+        raise PreflightFailed('trade_window_binding_lost')
 
     cap_ok = os.environ.get('FRBOT_MOCK_CAPTURE_OK', '1') == '1'
     inp_ok = os.environ.get('FRBOT_MOCK_INPUT_OK', '1') == '1'
 
-    deposit_key = str(ctx.config.deposit_key)
-    key_kinds = {deposit_key: 'deposit'} if deposit_key else {}
-
     world = MockWorld.create(
         rois=ctx.rois,
-        key_kinds=key_kinds,
         minimap_noise=False,
         battle_list_rows=(),
         battle_list_selected_row=None,
         battle_list_row_height=16,
         click_behavior='normal',
-        inventory_gold_count=int(os.environ.get('FRBOT_MOCK_INV_GOLD', '5') or '5'),
-        inventory_capacity_used=int(os.environ.get('FRBOT_MOCK_INV_CAP_USED', '5') or '5'),
     )
-    world.depot_item_count = int(os.environ.get('FRBOT_MOCK_DEPOT_COUNT', '0') or '0')
-    world.depot_open = not _env_bool('MOCK_DEPOSIT_DEPOT_CLOSED', False)
-    world.mock_deposit_success = _env_bool('MOCK_DEPOSIT_SUCCESS', False)
-    world.mock_deposit_no_delta = _env_bool('MOCK_DEPOSIT_NO_DELTA', False)
-    world.mock_deposit_partial = _env_bool('MOCK_DEPOSIT_PARTIAL', False)
-    world.mock_deposit_inventory_unreadable = _env_bool('MOCK_DEPOSIT_INVENTORY_UNREADABLE', False)
+
+    world.trade_npc_present = _env_bool('MOCK_TRADE_NPC_PRESENT', True)
+    world.trade_npc_id = int(ctx.config.trade_expected_npc_id) + 1 if _env_bool('MOCK_TRADE_WRONG_NPC', False) else int(ctx.config.trade_expected_npc_id)
+    world.trade_npc_open = True
+    world.trade_action = str(ctx.config.trade_action)
+
+    world.trade_gold = int(os.environ.get('FRBOT_MOCK_TRADE_GOLD', '100') or '100')
+    world.trade_item_count = int(os.environ.get('FRBOT_MOCK_TRADE_ITEMS', '0') or '0')
+    world.trade_capacity_used = int(os.environ.get('FRBOT_MOCK_TRADE_CAP_USED', '0') or '0')
+
+    world.mock_trade_buy_ok = _env_bool('MOCK_TRADE_BUY_OK', False)
+    world.mock_trade_sell_ok = _env_bool('MOCK_TRADE_SELL_OK', False)
+    world.mock_trade_no_delta = _env_bool('MOCK_TRADE_NO_DELTA', False)
+    world.mock_trade_gold_only = _env_bool('MOCK_TRADE_GOLD_ONLY', False)
+    world.mock_trade_item_only = _env_bool('MOCK_TRADE_ITEM_ONLY', False)
+
     world.on_noop()
 
     capture_mock = MockWorldAnyCapture(world=world, verified=cap_ok)
@@ -159,21 +163,22 @@ def deposit_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
         raise PreflightFailed('input not verified')
 
     f = capture_mock.grab()
+    npc = detect_npc_window(f, npc_roi)
+    if npc is None:
+        raise PreflightFailed('trade_npc_not_detected')
+    if int(npc.npc_id) != int(ctx.config.trade_expected_npc_id):
+        raise PreflightFailed('trade_wrong_npc')
 
-    inv = read_inventory(f, inv_roi)
+    inv = read_trade_inventory(f, inv_roi)
     if inv is None:
-        raise PreflightFailed('deposit_inventory_unreadable')
+        raise PreflightFailed('trade_unverified_action')
 
-    depot = read_depot_container(f, depot_roi)
-    if depot is None:
-        raise PreflightFailed('deposit_unreadable_state')
-
-    if not bool(depot.open):
-        raise PreflightFailed('deposit_depot_not_open')
+    ctx.trade.last_npc = npc
+    ctx.trade.last_inventory_before = inv
 
     ctx.status.state = RuntimeState.READY
     return capture_mock, input_mock, binding_mock
 
 
 def run(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, WindowBindingAdapter]:
-    return deposit_preflight(ctx)
+    return trade_preflight(ctx)

@@ -4,7 +4,7 @@ import os
 from typing import TypeAlias
 
 from adapters.capture.mock_world import MockWorldCapture
-from adapters.capture.mss_real import MssRealCapture
+from adapters.capture.mss_bound_window_real import MssBoundMinimapRealCapture
 from adapters.input.mock_world import MockWorldInput
 from adapters.input.win32_hwnd import Win32HwndKeyboard
 from adapters.mock_world import MockWorld
@@ -17,7 +17,7 @@ from contracts.runtime import RuntimeContext, RuntimeState
 from runtime.config_loader import load_rois
 from runtime.minimap_semantics import detect_player_marker, marker_config_from_env
 
-CaptureAdapter: TypeAlias = MssRealCapture | MockWorldCapture
+CaptureAdapter: TypeAlias = MssBoundMinimapRealCapture | MockWorldCapture
 InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
 
@@ -43,12 +43,6 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
             raise PreflightFailed('window_binding_lost')
 
         snap = binding_real.snapshot()
-        region = {
-            'left': int(snap.rect.left),
-            'top': int(snap.rect.top),
-            'width': int(snap.rect.width),
-            'height': int(snap.rect.height),
-        }
 
         loaded = load_rois(ctx)
         ctx.rois = dict(loaded.rois)
@@ -57,7 +51,7 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
             raise PreflightFailed('minimap_not_detected')
 
         try:
-            capture_real = MssRealCapture(minimap_roi=minimap_roi, region=region)
+            capture_real = MssBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=binding_real)
         except ImportError as exc:
             raise PreflightFailed(str(exc)) from exc
 
@@ -78,6 +72,10 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
             raise PreflightFailed(inp_v.reason or 'input not verified')
 
         # Must be able to see minimap evidence + player marker in real mode.
+        try:
+            binding_real.assert_bound()
+        except Exception:
+            raise PreflightFailed('window_binding_lost')
         before = capture_real.grab()
         if not before.minimap_detected:
             raise PreflightFailed('minimap_not_detected')

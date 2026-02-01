@@ -215,6 +215,17 @@ class RuntimeConfig:
     # Deposit ROI names.
     depot_container_roi: str = 'depot_container'
 
+    # Trade gate config.
+    trade_max_attempts: int = 3
+    trade_max_ticks: int = 20
+    trade_action: Literal['buy', 'sell', 'deposit'] = 'buy'
+    trade_expected_npc_id: int = 1
+
+    # Trade ROI names.
+    trade_inventory_roi: str = 'trade_inventory'
+    trade_npc_roi: str = 'trade_npc'
+    trade_action_roi: str = 'trade_action'
+
     def __post_init__(self) -> None:
         mode = self.mode.strip().lower()
         if mode not in {'real', 'mock'}:
@@ -246,6 +257,13 @@ class RuntimeConfig:
             raise ContractViolation('deposit_max_ticks must be in [1, 10000]')
         if str(self.deposit_key).strip() == '':
             raise ContractViolation('deposit_key must be non-empty')
+
+        if self.trade_max_attempts <= 0 or self.trade_max_attempts > 20:
+            raise ContractViolation('trade_max_attempts must be in [1, 20]')
+        if self.trade_max_ticks <= 0 or self.trade_max_ticks > 10_000:
+            raise ContractViolation('trade_max_ticks must be in [1, 10000]')
+        if int(self.trade_expected_npc_id) <= 0:
+            raise ContractViolation('trade_expected_npc_id must be > 0')
 
         if self.max_attempts_per_target <= 0 or self.max_attempts_per_target > 5:
             raise ContractViolation('max_attempts_per_target must be in [1, 5]')
@@ -367,6 +385,9 @@ class RuntimeContext:
     # Deposit state.
     deposit: 'DepositState' = field(default_factory=lambda: DepositState())
 
+    # Trade state.
+    trade: 'TradeState' = field(default_factory=lambda: TradeState())
+
     # Targeting state.
     targeting: TargetingState = field(default_factory=TargetingState)
 
@@ -408,6 +429,35 @@ class CombatState:
 class InventorySnapshot:
     slot_counts: dict[str, int]
     capacity_used: Optional[int] = None
+
+
+@dataclass(frozen=True, slots=True)
+class NpcIdentity:
+    npc_id: int
+    open: bool
+
+
+@dataclass(frozen=True, slots=True)
+class TradeTelemetry:
+    npc: Optional[NpcIdentity] = None
+    inventory_before: Optional[InventorySnapshot] = None
+    inventory_after: Optional[InventorySnapshot] = None
+    gold_before: Optional[int] = None
+    gold_after: Optional[int] = None
+    items_before: Optional[int] = None
+    items_after: Optional[int] = None
+    capacity_before: Optional[int] = None
+    capacity_after: Optional[int] = None
+
+
+@dataclass(slots=True)
+class TradeState:
+    attempts_used: int = 0
+    inputs_sent: int = 0
+    last_npc: Optional[NpcIdentity] = None
+    last_inventory_before: Optional[InventorySnapshot] = None
+    last_inventory_after: Optional[InventorySnapshot] = None
+    last_telemetry: TradeTelemetry = field(default_factory=TradeTelemetry)
 
 
 @dataclass(slots=True)

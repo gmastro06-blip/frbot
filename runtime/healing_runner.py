@@ -105,6 +105,7 @@ def execute_heal_intent(
         return False
 
     try:
+        binding.assert_bound()
         input_.press_key(str(intent.key))
     except Exception as exc:
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc

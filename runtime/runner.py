@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+#  BASELINE STABLE 
+# Do not modify this loop/invariants without a contract review.
+# New features must be added as independent gates (new preflight/runner/entrypoint).
+# See BASELINE.md.
+
 import os
 import time
 

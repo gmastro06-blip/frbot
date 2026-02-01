@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+#  BASELINE STABLE 
+# Do not modify control-flow/contracts here without a contract review.
+# Extend only by adding new independent gates. See BASELINE.md.
+
 import os
 
 from runtime.runner import run
@@ -34,6 +38,10 @@ def main() -> int:
         from deposit_entrypoint import run_deposit_only
 
         return run_deposit_only()
+    if _mode() == 'trade':
+        from trade_entrypoint import run_trade_only
+
+        return run_trade_only()
     return run()
 
 

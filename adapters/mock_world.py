@@ -118,6 +118,27 @@ class MockWorld:
 	mock_loot_inventory_read_fail: bool = False
 	mock_loot_premium: bool = True
 
+	# Trade mock state.
+	trade_npc_present: bool = True
+	trade_npc_id: int = 1
+	trade_npc_open: bool = True
+	trade_action: str = 'buy'
+	trade_gold: int = 0
+	trade_item_count: int = 0
+	trade_capacity_used: int = 0
+
+	# Deterministic trade test controls.
+	# - buy_ok: buy action produces gold- and item+
+	# - sell_ok: sell action produces gold+ and item-
+	# - no_delta: no changes at all
+	# - gold_only: gold changes but items do not
+	# - item_only: items change but gold does not
+	mock_trade_buy_ok: bool = False
+	mock_trade_sell_ok: bool = False
+	mock_trade_no_delta: bool = False
+	mock_trade_gold_only: bool = False
+	mock_trade_item_only: bool = False
+
 	_noise_bit: int = 0
 
 	@classmethod
@@ -161,6 +182,18 @@ class MockWorld:
 		mock_loot_container_opens: bool = False,
 		mock_loot_inventory_read_fail: bool = False,
 		mock_loot_premium: bool = True,
+		trade_npc_present: bool = True,
+		trade_npc_id: int = 1,
+		trade_npc_open: bool = True,
+		trade_action: str = 'buy',
+		trade_gold: int = 0,
+		trade_item_count: int = 0,
+		trade_capacity_used: int = 0,
+		mock_trade_buy_ok: bool = False,
+		mock_trade_sell_ok: bool = False,
+		mock_trade_no_delta: bool = False,
+		mock_trade_gold_only: bool = False,
+		mock_trade_item_only: bool = False,
 	) -> 'MockWorld':
 		# Choose the smallest frame that contains all ROIs.
 		max_x = 1
@@ -214,6 +247,18 @@ class MockWorld:
 			mock_loot_container_opens=bool(mock_loot_container_opens),
 			mock_loot_inventory_read_fail=bool(mock_loot_inventory_read_fail),
 			mock_loot_premium=bool(mock_loot_premium),
+			trade_npc_present=bool(trade_npc_present),
+			trade_npc_id=max(1, int(trade_npc_id)),
+			trade_npc_open=bool(trade_npc_open),
+			trade_action=str(trade_action or 'buy'),
+			trade_gold=int(trade_gold),
+			trade_item_count=int(trade_item_count),
+			trade_capacity_used=int(trade_capacity_used),
+			mock_trade_buy_ok=bool(mock_trade_buy_ok),
+			mock_trade_sell_ok=bool(mock_trade_sell_ok),
+			mock_trade_no_delta=bool(mock_trade_no_delta),
+			mock_trade_gold_only=bool(mock_trade_gold_only),
+			mock_trade_item_only=bool(mock_trade_item_only),
 		)
 
 		# If a battle list row is pre-selected, expose a consistent locked target frame.
@@ -255,6 +300,31 @@ class MockWorld:
 		view[0:2] = int(0xBEEF).to_bytes(2, 'little', signed=False)
 		view[2:4] = int(max(0, self.inventory_gold_count)).to_bytes(2, 'little', signed=False)
 		view[4:6] = int(max(0, self.inventory_capacity_used)).to_bytes(2, 'little', signed=False)
+
+	def _draw_trade_ui(self) -> None:
+		# NPC identity ROI.
+		npc_roi = self.rois.get('trade_npc')
+		if npc_roi is not None:
+			view = self._roi_bytes_view(npc_roi)
+			if view is not None and len(view) >= 6:
+				if bool(self.trade_npc_present):
+					view[0:2] = int(0xFACE).to_bytes(2, 'little', signed=False)
+					view[2:4] = int(max(1, self.trade_npc_id)).to_bytes(2, 'little', signed=False)
+					view[4:6] = int(1 if self.trade_npc_open else 0).to_bytes(2, 'little', signed=False)
+				else:
+					view[0:6] = b'\x00\x00\x00\x00\x00\x00'
+
+		# Trade inventory ROI.
+		inv_roi = self.rois.get('trade_inventory')
+		if inv_roi is None:
+			return
+		view2 = self._roi_bytes_view(inv_roi)
+		if view2 is None or len(view2) < 8:
+			return
+		view2[0:2] = int(0xB00B).to_bytes(2, 'little', signed=False)
+		view2[2:4] = int(max(0, self.trade_gold)).to_bytes(2, 'little', signed=False)
+		view2[4:6] = int(max(0, self.trade_item_count)).to_bytes(2, 'little', signed=False)
+		view2[6:8] = int(max(0, self.trade_capacity_used)).to_bytes(2, 'little', signed=False)
 
 	def _draw_combat_ui(self) -> None:
 		# Target HP bar ROI.
@@ -478,6 +548,47 @@ class MockWorld:
 						self.rgb[idx + 2] = 0
 
 	def on_click(self, x: int, y: int) -> None:
+		# Trade click interactions.
+		action_roi = self.rois.get('trade_action')
+		if action_roi is not None and _roi_bounds_ok(self.width, self.height, action_roi):
+			if x >= action_roi.x and y >= action_roi.y and x < (action_roi.x + action_roi.width) and y < (action_roi.y + action_roi.height):
+				if bool(self.mock_trade_no_delta):
+					self._draw_trade_ui()
+					return
+
+				action = (self.trade_action or 'buy').strip().lower()
+				if action == 'buy':
+					if bool(self.mock_trade_item_only):
+						self.trade_item_count += 1
+					elif bool(self.mock_trade_gold_only):
+						self.trade_gold = max(0, int(self.trade_gold) - 1)
+					elif bool(self.mock_trade_buy_ok):
+						self.trade_gold = max(0, int(self.trade_gold) - 1)
+						self.trade_item_count += 1
+					self._draw_trade_ui()
+					return
+				if action == 'sell':
+					if bool(self.mock_trade_item_only):
+						self.trade_item_count = max(0, int(self.trade_item_count) - 1)
+					elif bool(self.mock_trade_gold_only):
+						self.trade_gold += 1
+					elif bool(self.mock_trade_sell_ok):
+						self.trade_gold += 1
+						self.trade_item_count = max(0, int(self.trade_item_count) - 1)
+					self._draw_trade_ui()
+					return
+				if action == 'deposit':
+					# Deposit: gold decreases OR capacity_used decreases.
+					if bool(self.mock_trade_item_only):
+						self.trade_capacity_used = max(0, int(self.trade_capacity_used) - 1)
+					else:
+						self.trade_gold = max(0, int(self.trade_gold) - 1)
+					self._draw_trade_ui()
+					return
+
+				self._draw_trade_ui()
+				return
+
 		# Looting click interactions.
 		corpse_roi = self.rois.get('loot_corpse')
 		if corpse_roi is not None and _roi_bounds_ok(self.width, self.height, corpse_roi):
@@ -584,6 +695,8 @@ class MockWorld:
 		self._draw_looting_ui()
 		# Deposit UI overlays.
 		self._draw_deposit_ui()
+		# Trade UI overlays.
+		self._draw_trade_ui()
 
 		ts = time.monotonic_ns()
 		rgb_bytes = bytes(self.rgb)
@@ -823,6 +936,7 @@ class MockWorld:
 		self._draw_healing_ui()
 		self._draw_looting_ui()
 		self._draw_deposit_ui()
+		self._draw_trade_ui()
 
 
 @dataclass(frozen=True, slots=True)
