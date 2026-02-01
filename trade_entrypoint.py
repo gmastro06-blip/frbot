@@ -6,7 +6,10 @@ import os
 from contracts.errors import PreflightFailed
 from contracts.runtime import InventorySnapshot, NpcIdentity, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
+from diagnostics.frame_dump import dump_enabled, dump_pair
+from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.last_frames import snapshot
 from runtime.trade_preflight import run as trade_preflight_run
 from runtime.trade_runner import execute_trade_tick
 
@@ -130,6 +133,12 @@ def run_trade_only() -> int:
         raise PreflightFailed('trade_unverified_action')
 
     except PreflightFailed as exc:
+        if dump_enabled():
+            before, after = snapshot('trade')
+            if before is not None or after is not None:
+                dump_pair(gate='trade', before=before, after=after, reason=str(exc))
+            else:
+                try_dump_window_frame(gate='trade', reason=str(exc))
         npc = None
         inv_b = None
         inv_a = None

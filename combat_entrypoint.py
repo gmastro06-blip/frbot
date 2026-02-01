@@ -6,7 +6,10 @@ import time
 from contracts.errors import PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
+from diagnostics.frame_dump import dump_enabled, dump_pair
+from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.last_frames import snapshot
 from rules.combat import select_combat_intent
 from runtime.combat_preflight import run as combat_preflight_run
 from runtime.combat_runner import execute_combat_intent
@@ -173,6 +176,12 @@ def run_combat_only() -> int:
         raise PreflightFailed('combat_timeout')
 
     except PreflightFailed as exc:
+        if dump_enabled():
+            before, after = snapshot('combat')
+            if before is not None or after is not None:
+                dump_pair(gate='combat', before=before, after=after, reason=str(exc))
+            else:
+                try_dump_window_frame(gate='combat', reason=str(exc))
         write_fatal(str(exc), exc)
         return 1
     except Exception as exc:

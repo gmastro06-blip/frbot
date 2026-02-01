@@ -5,7 +5,10 @@ import os
 from contracts.errors import PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
+from diagnostics.frame_dump import dump_enabled, dump_pair
+from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.last_frames import snapshot
 from runtime.cavebot_preflight import run as cavebot_preflight_run
 from runtime.cavebot_runner import CavebotTickEvidence, execute_cavebot_tick
 
@@ -163,6 +166,12 @@ def run_cavebot_only() -> int:
         raise PreflightFailed('cavebot_waypoint_stuck')
 
     except PreflightFailed as exc:
+        if dump_enabled():
+            before, after = snapshot('cavebot')
+            if before is not None or after is not None:
+                dump_pair(gate='cavebot', before=before, after=after, reason=str(exc))
+            else:
+                try_dump_window_frame(gate='cavebot', reason=str(exc))
         # Include a snapshot of relevant state directly in the fatal message.
         wp = None
         if ctx is not None:

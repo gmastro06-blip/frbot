@@ -8,6 +8,7 @@ from contracts.errors import PreflightFailed
 from contracts.input import InputAdapter
 from contracts.runtime import InventorySnapshot, NpcIdentity, RuntimeContext, TradeTelemetry
 from contracts.window import WindowBindingAdapter
+from diagnostics.last_frames import record_after, record_before
 from runtime.trade import select_trade_intent
 from runtime.trade_semantics import TradeDelta, compute_trade_delta, detect_npc_window, is_trade_success, read_trade_inventory
 
@@ -65,6 +66,7 @@ def execute_trade_tick(
         )
 
     before = capture.grab()
+    record_before('trade', before)
 
     npc = detect_npc_window(before, npc_roi)
     if npc is None:
@@ -112,6 +114,7 @@ def execute_trade_tick(
     ctx.trade.inputs_sent += 1
 
     after = capture.grab()
+    record_after('trade', after)
 
     inv_after = read_trade_inventory(after, inv_roi)
     if inv_after is None:

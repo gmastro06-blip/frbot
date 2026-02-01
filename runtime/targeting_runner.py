@@ -11,6 +11,7 @@ from contracts.targeting import IntentTarget
 from contracts.window import WindowBindingAdapter
 from diagnostics.fatal import write_fatal
 from diagnostics.logger import configure_logger
+from diagnostics.last_frames import record_after, record_before
 from rules.targeting import select_targeting_intent
 from runtime.battle_list_semantics import crop_roi_rgb, detect_battle_list
 from runtime.config_loader import load_rois
@@ -121,6 +122,7 @@ def execute_intent(
         raise PreflightFailed('battle_list_not_detected')
 
     before = capture.grab()
+    record_before('targeting', before)
     obs = detect_battle_list(before, battle_roi)
     if obs is None:
         raise PreflightFailed('battle_list_not_detected')
@@ -143,6 +145,7 @@ def execute_intent(
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
 
     after = capture.grab()
+    record_after('targeting', after)
     obs2 = detect_battle_list(after, battle_roi)
     if obs2 is None:
         raise PreflightFailed('battle_list_not_detected')

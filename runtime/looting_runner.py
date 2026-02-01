@@ -9,6 +9,7 @@ from contracts.evidence import Roi
 from contracts.input import InputAdapter
 from contracts.runtime import InventorySnapshot, RuntimeContext
 from contracts.window import WindowBindingAdapter
+from diagnostics.last_frames import record_after, record_before
 from runtime.inventory_semantics import InventoryDelta, diff_inventory, is_loot_success, read_inventory
 from runtime.looting_engine import LootingTickInput, select_looting_intent
 
@@ -87,6 +88,7 @@ def execute_looting_tick(
         raise PreflightFailed('looting_window_binding_lost') from exc
 
     before = capture.grab()
+    record_before('looting', before)
 
     inv_roi = ctx.rois.get(ctx.config.inventory_text_roi)
     if inv_roi is None:
@@ -182,6 +184,7 @@ def execute_looting_tick(
     ctx.looting.attempts_used += 1
 
     after = capture.grab()
+    record_after('looting', after)
 
     inv_after = read_inventory(after, inv_roi)
     if inv_after is None:

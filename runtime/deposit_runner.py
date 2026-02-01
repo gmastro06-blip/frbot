@@ -8,6 +8,7 @@ from contracts.errors import PreflightFailed
 from contracts.input import InputAdapter
 from contracts.runtime import DepotSnapshot, InventorySnapshot, RuntimeContext
 from contracts.window import WindowBindingAdapter
+from diagnostics.last_frames import record_after, record_before
 from runtime.deposit import DepositTickInput, tick
 from runtime.depot_semantics import DepotDelta, compute_depot_delta, read_depot_container
 from runtime.inventory_semantics import InventoryDelta, compute_inventory_delta, is_deposit_success, read_inventory
@@ -66,6 +67,7 @@ def execute_deposit_tick(
         )
 
     before = capture.grab()
+    record_before('deposit', before)
 
     inv_before = read_inventory(before, inv_roi)
     if inv_before is None:
@@ -128,6 +130,7 @@ def execute_deposit_tick(
     ctx.deposit.attempts_used += 1
 
     after = capture.grab()
+    record_after('deposit', after)
 
     inv_after = read_inventory(after, inv_roi)
     if inv_after is None:

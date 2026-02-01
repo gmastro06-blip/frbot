@@ -9,6 +9,7 @@ from contracts.errors import PreflightFailed
 from contracts.input import InputAdapter
 from contracts.runtime import RuntimeContext
 from contracts.window import WindowBindingAdapter
+from diagnostics.last_frames import record_after, record_before
 from runtime.battle_list_semantics import crop_roi_rgb, detect_battle_list
 from runtime.combat_semantics import detect_damage_feedback, read_target_hp_percent
 from runtime.healing_runner import _read_hp_mp
@@ -133,6 +134,7 @@ def execute_combat_intent(
         raise PreflightFailed('combat_ambiguous_result')
 
     before = capture.grab()
+    record_before('combat', before)
 
     # Hard invariants before casting.
     locked_name = _get_locked_target_name(ctx, before)
@@ -160,6 +162,7 @@ def execute_combat_intent(
     ctx.combat.inputs_sent += 1
 
     after = capture.grab()
+    record_after('combat', after)
 
     # Must still be locked after attack.
     locked_name_after = _get_locked_target_name(ctx, after)

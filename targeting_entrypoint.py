@@ -6,7 +6,10 @@ import time
 from contracts.errors import PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
+from diagnostics.frame_dump import dump_enabled, dump_pair
+from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.last_frames import snapshot
 from rules.targeting import select_targeting_intent
 from runtime.battle_list_semantics import detect_battle_list
 from runtime.targeting_preflight import run as targeting_preflight_run
@@ -144,6 +147,12 @@ def run_targeting_only() -> int:
         raise PreflightFailed('target_not_acquired')
 
     except PreflightFailed as exc:
+        if dump_enabled():
+            before, after = snapshot('targeting')
+            if before is not None or after is not None:
+                dump_pair(gate='targeting', before=before, after=after, reason=str(exc))
+            else:
+                try_dump_window_frame(gate='targeting', reason=str(exc))
         write_fatal(str(exc), exc)
         return 1
     except Exception as exc:

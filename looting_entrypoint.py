@@ -6,7 +6,10 @@ import os
 from contracts.errors import PreflightFailed
 from contracts.runtime import InventorySnapshot, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
+from diagnostics.frame_dump import dump_enabled, dump_pair
+from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.last_frames import snapshot
 from runtime.looting_preflight import run as looting_preflight_run
 from runtime.looting_runner import execute_looting_tick
 
@@ -142,6 +145,12 @@ def run_looting_only() -> int:
         raise PreflightFailed('looting_stuck')
 
     except PreflightFailed as exc:
+        if dump_enabled():
+            before, after = snapshot('looting')
+            if before is not None or after is not None:
+                dump_pair(gate='looting', before=before, after=after, reason=str(exc))
+            else:
+                try_dump_window_frame(gate='looting', reason=str(exc))
         inv = None
         if ctx is not None:
             inv = getattr(getattr(ctx, 'looting', None), 'last_inventory', None)

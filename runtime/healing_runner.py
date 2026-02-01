@@ -9,6 +9,7 @@ from contracts.healing import HealIntent
 from contracts.input import InputAdapter
 from contracts.runtime import RuntimeContext
 from contracts.window import WindowBindingAdapter
+from diagnostics.last_frames import record_after, record_before
 from runtime.healing_semantics import detect_cooldown_marker, parse_rgb_triplet, read_bar_percent, read_percent_with_consistency, read_text_percent
 
 
@@ -98,6 +99,7 @@ def execute_heal_intent(
         raise PreflightFailed('healing_window_binding_lost')
 
     before = capture.grab()
+    record_before('healing', before)
     before_hp, before_mp, src = _read_hp_mp(ctx, before)
 
     # Cooldown must be observable before casting.
@@ -111,6 +113,7 @@ def execute_heal_intent(
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
 
     after = capture.grab()
+    record_after('healing', after)
     after_hp, after_mp, _ = _read_hp_mp(ctx, after)
 
     hp_up = (after_hp - before_hp) >= float(intent.expected.hp_increase_min)

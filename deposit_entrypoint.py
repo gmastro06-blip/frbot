@@ -6,7 +6,10 @@ import os
 from contracts.errors import PreflightFailed
 from contracts.runtime import DepotSnapshot, InventorySnapshot, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
+from diagnostics.frame_dump import dump_enabled, dump_pair
+from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.last_frames import snapshot
 from runtime.deposit_preflight import run as deposit_preflight_run
 from runtime.deposit_runner import execute_deposit_tick
 
@@ -124,6 +127,12 @@ def run_deposit_only() -> int:
         raise PreflightFailed('deposit_timeout')
 
     except PreflightFailed as exc:
+        if dump_enabled():
+            before, after = snapshot('deposit')
+            if before is not None or after is not None:
+                dump_pair(gate='deposit', before=before, after=after, reason=str(exc))
+            else:
+                try_dump_window_frame(gate='deposit', reason=str(exc))
         inv_b = None
         inv_a = None
         dep_b = None

@@ -8,6 +8,7 @@ from contracts.errors import PreflightFailed
 from contracts.input import InputAdapter
 from contracts.runtime import RuntimeContext, Waypoint
 from contracts.window import WindowBindingAdapter
+from diagnostics.last_frames import record_after, record_before
 from runtime.cavebot import CavebotTickInput, tick
 from runtime.cavebot_semantics import ProgressResult, compute_progress, detect_player_marker, is_progress_valid
 
@@ -112,6 +113,7 @@ def execute_cavebot_tick(
         raise PreflightFailed('cavebot_window_binding_lost') from exc
 
     before = capture.grab()
+    record_before('cavebot', before)
 
     marker_before = detect_player_marker(
         before,
@@ -162,6 +164,7 @@ def execute_cavebot_tick(
     ctx.cavebot.gate_inputs_sent += 1
 
     after = capture.grab()
+    record_after('cavebot', after)
 
     progress, status = _progress_from_frames(ctx, before, after, waypoint)
 

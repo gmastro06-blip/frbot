@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 
 import pytest
 
@@ -12,6 +13,12 @@ from healing_entrypoint import run_healing_only
 from looting_entrypoint import run_looting_only
 from targeting_entrypoint import run_targeting_only
 from trade_entrypoint import run_trade_only
+
+
+def _reset_diagnostics(tmp_path: Path) -> None:
+    diagnostics_dir = tmp_path / 'diagnostics'
+    if diagnostics_dir.exists():
+        shutil.rmtree(diagnostics_dir, ignore_errors=True)
 
 
 def _write_rois(tmp_path: Path, rois: dict[str, dict[str, int]]) -> str:
@@ -40,9 +47,7 @@ def test_runtime_log_created_only_after_preflight_failure_cases(tmp_path: Path, 
     assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
 
     # Reset diagnostics between runs.
-    if (tmp_path / 'diagnostics').exists():
-        for f in (tmp_path / 'diagnostics').glob('*'):
-            f.unlink(missing_ok=True)  # type: ignore[arg-type]
+    _reset_diagnostics(tmp_path)
 
     # --- HEALING: missing hp/mp ROIs -> preflight abort
     monkeypatch.setenv('FRBOT_MODE', 'healing')
@@ -54,9 +59,7 @@ def test_runtime_log_created_only_after_preflight_failure_cases(tmp_path: Path, 
     assert run_healing_only() == 1
     assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
 
-    if (tmp_path / 'diagnostics').exists():
-        for f in (tmp_path / 'diagnostics').glob('*'):
-            f.unlink(missing_ok=True)  # type: ignore[arg-type]
+    _reset_diagnostics(tmp_path)
 
     # --- COMBAT: missing required ROIs -> preflight abort
     monkeypatch.setenv('FRBOT_MODE', 'combat')
@@ -77,9 +80,7 @@ def test_runtime_log_created_only_after_preflight_failure_cases(tmp_path: Path, 
     assert run_combat_only() == 1
     assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
 
-    if (tmp_path / 'diagnostics').exists():
-        for f in (tmp_path / 'diagnostics').glob('*'):
-            f.unlink(missing_ok=True)  # type: ignore[arg-type]
+    _reset_diagnostics(tmp_path)
 
     # --- CAVEBOT: missing minimap ROI -> preflight abort
     monkeypatch.setenv('FRBOT_MODE', 'cavebot')
@@ -94,9 +95,7 @@ def test_runtime_log_created_only_after_preflight_failure_cases(tmp_path: Path, 
     assert run_cavebot_only() == 1
     assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
 
-    if (tmp_path / 'diagnostics').exists():
-        for f in (tmp_path / 'diagnostics').glob('*'):
-            f.unlink(missing_ok=True)  # type: ignore[arg-type]
+    _reset_diagnostics(tmp_path)
 
     # --- LOOTING: missing inventory_text ROI -> preflight abort
     monkeypatch.setenv('FRBOT_MODE', 'looting')
@@ -111,9 +110,7 @@ def test_runtime_log_created_only_after_preflight_failure_cases(tmp_path: Path, 
     assert run_looting_only() == 1
     assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
 
-    if (tmp_path / 'diagnostics').exists():
-        for f in (tmp_path / 'diagnostics').glob('*'):
-            f.unlink(missing_ok=True)  # type: ignore[arg-type]
+    _reset_diagnostics(tmp_path)
 
     # --- DEPOSIT: missing inventory_text/depot_container -> preflight abort
     monkeypatch.setenv('FRBOT_MODE', 'deposit')
@@ -131,9 +128,7 @@ def test_runtime_log_created_only_after_preflight_failure_cases(tmp_path: Path, 
     assert run_deposit_only() == 1
     assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
 
-    if (tmp_path / 'diagnostics').exists():
-        for f in (tmp_path / 'diagnostics').glob('*'):
-            f.unlink(missing_ok=True)  # type: ignore[arg-type]
+    _reset_diagnostics(tmp_path)
 
     # --- TRADE: missing trade ROIs -> preflight abort
     monkeypatch.setenv('FRBOT_MODE', 'trade')
