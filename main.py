@@ -5,7 +5,9 @@ from __future__ import annotations
 # Extend only by adding new independent gates. See BASELINE.md.
 
 import os
+import sys
 
+from diagnostics.fatal import write_fatal
 from runtime.runner import run
 
 
@@ -14,6 +16,19 @@ def _mode() -> str:
 
 
 def main() -> int:
+    # Windows-only (PROD-EMERGENCY): abort immediately with fatal.log.
+    if sys.platform != 'win32':
+        write_fatal('unsupported_platform', details={'platform': str(sys.platform)})
+        return 1
+
+    # Fixed profile: always PROD-EMERGENCY; ignore external overrides.
+    os.environ['FRBOT_PROFILE'] = 'prod_emergency'
+
+    # Hard-disabled feature modes (no routes, no execution).
+    if _mode() in {'combat', 'looting', 'deposit', 'trade'}:
+        write_fatal('feature_disabled', details={'feature': _mode()})
+        return 1
+
     if _mode() == 'targeting':
         from targeting_entrypoint import run_targeting_only
 
@@ -26,22 +41,6 @@ def main() -> int:
         from healing_entrypoint import run_healing_only
 
         return run_healing_only()
-    if _mode() == 'combat':
-        from combat_entrypoint import run_combat_only
-
-        return run_combat_only()
-    if _mode() == 'looting':
-        from looting_entrypoint import run_looting_only
-
-        return run_looting_only()
-    if _mode() == 'deposit':
-        from deposit_entrypoint import run_deposit_only
-
-        return run_deposit_only()
-    if _mode() == 'trade':
-        from trade_entrypoint import run_trade_only
-
-        return run_trade_only()
     return run()
 
 

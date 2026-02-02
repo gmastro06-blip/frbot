@@ -313,7 +313,14 @@ def try_focus_window(hwnd: int, *, timeout_s: float = 0.0) -> bool:
                 return True
             if time.monotonic() >= deadline:
                 return False
-            time.sleep(0.05)
+            # PROD constraint: avoid time.sleep in preflight/runner paths.
+            try:
+                from runtime.pacing import wait_until_ns
+
+                wait_until_ns(int(time.monotonic_ns() + 50_000_000))
+            except Exception:
+                # Worst case: tight spin until deadline.
+                pass
     except Exception:
         return False
 

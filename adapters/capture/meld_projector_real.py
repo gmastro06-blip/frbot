@@ -132,7 +132,12 @@ def _dxcam_grab_rgb_with_warmup(
             last_meta = {'reason': 'grab_exception', 'error': f'{type(exc).__name__}: {exc}'}
             traces.append({'i': int(i), 'ok': False, 'meta': dict(last_meta)})
             if sleep_s_f:
-                time.sleep(sleep_s_f)
+                try:
+                    from runtime.pacing import wait_until_ns
+
+                    wait_until_ns(int(time.monotonic_ns() + int(float(sleep_s_f) * 1_000_000_000)))
+                except Exception:
+                    pass
             continue
 
         rgb, w, h, meta = _to_rgb_bytes(frame)
@@ -142,7 +147,12 @@ def _dxcam_grab_rgb_with_warmup(
         if ok:
             return rgb, int(w), int(h), dict(meta), traces
         if sleep_s_f:
-            time.sleep(sleep_s_f)
+            try:
+                from runtime.pacing import wait_until_ns
+
+                wait_until_ns(int(time.monotonic_ns() + int(float(sleep_s_f) * 1_000_000_000)))
+            except Exception:
+                pass
 
     return b'', 0, 0, dict(last_meta), traces
 

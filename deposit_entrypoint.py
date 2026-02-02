@@ -13,6 +13,7 @@ from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from runtime.deposit_preflight import run as deposit_preflight_run
 from runtime.deposit_runner import execute_deposit_tick
+from runtime.profile import enforce_feature_allowed
 
 
 def _env_str(name: str, default: str) -> str:
@@ -95,6 +96,7 @@ def run_deposit_only() -> int:
     ctx: RuntimeContext | None = None
 
     try:
+        enforce_feature_allowed('deposit')
         cfg = _load_deposit_config_from_env()
         ctx = RuntimeContext(
             config=cfg,

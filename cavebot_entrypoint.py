@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
@@ -12,6 +13,7 @@ from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from runtime.cavebot_preflight import run as cavebot_preflight_run
 from runtime.cavebot_runner import CavebotTickEvidence, execute_cavebot_tick
+from runtime.profile import cap_ticks, is_prod_emergency
 
 
 def _env_str(name: str, default: str) -> str:
@@ -109,11 +111,15 @@ def run_cavebot_only() -> int:
     - No sleeps; determinism is enforced by guardrails.
     """
 
-    max_total_ticks = _env_int('FRBOT_CAVEBOT_MAX_TICKS', 200)
+    max_total_ticks = cap_ticks(_env_int('FRBOT_CAVEBOT_MAX_TICKS', 200))
 
     ctx: RuntimeContext | None = None
 
     try:
+        if sys.platform != 'win32':
+            write_fatal('unsupported_platform', details={'platform': str(sys.platform)})
+            return 1
+
         cfg = _load_cavebot_config_from_env()
         ctx = RuntimeContext(
             config=cfg,
@@ -181,6 +187,8 @@ def run_cavebot_only() -> int:
                 ctx.cavebot.gate_ticks_in_waypoint = 0
                 # Next tick continues to next waypoint.
 
+        if is_prod_emergency():
+            raise PreflightFailed('session_tick_budget_exhausted')
         raise PreflightFailed('cavebot_waypoint_stuck')
 
     except PreflightFailed as exc:

@@ -7,7 +7,23 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-_GATES: tuple[str, ...] = ('targeting', 'healing', 'combat', 'cavebot', 'looting', 'deposit', 'trade')
+_ALL_GATES: tuple[str, ...] = ('targeting', 'healing', 'combat', 'cavebot', 'looting', 'deposit', 'trade')
+
+
+def _profile() -> str:
+    return _env_str('FRBOT_PROFILE', '').lower()
+
+
+def _gates_for_profile() -> tuple[tuple[str, ...], list[str], list[str]]:
+    """Return (required_gates, enabled_features, disabled_features)."""
+
+    if _profile() == 'prod_emergency':
+        enabled = ['capture_real', 'targeting_basic', 'cavebot_basic', 'healing_basic']
+        disabled = ['combat', 'looting', 'deposit', 'trade']
+        # Only require evidence for the allowed gates.
+        return ('targeting', 'cavebot', 'healing'), enabled, disabled
+
+    return _ALL_GATES, [], []
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,7 +151,16 @@ def main() -> int:
         print('Exit code: 2')
         return 2
 
+    required_gates, enabled_features, disabled_features = _gates_for_profile()
     _print_header(mode=pre.mode, frames_dir=pre.frames_dir, config_path=pre.config_path)
+
+    if enabled_features or disabled_features:
+        print('Profile:')
+        print(f"  FRBOT_PROFILE={_env_str('FRBOT_PROFILE','')}")
+        if enabled_features:
+            print(f"  ENABLED: {', '.join(enabled_features)}")
+        if disabled_features:
+            print(f"  DISABLED: {', '.join(disabled_features)}")
 
     if pre.mode == 'mock':
         ok, out = _run_pytest_subset()
@@ -174,7 +199,7 @@ def main() -> int:
 
     gate_table: dict[str, str] = {}
     first_unverified: str | None = None
-    for g in _GATES:
+    for g in required_gates:
         raw = inv.per_gate_status.get(g, 'MISSING')
         st = _map_gate_status(str(raw))
         gate_table[g] = st

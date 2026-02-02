@@ -13,6 +13,7 @@ from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from runtime.looting_preflight import run as looting_preflight_run
 from runtime.looting_runner import execute_looting_tick
+from runtime.profile import enforce_feature_allowed
 
 
 def _env_str(name: str, default: str) -> str:
@@ -106,6 +107,7 @@ def run_looting_only() -> int:
     ctx: RuntimeContext | None = None
 
     try:
+        enforce_feature_allowed('looting')
         cfg = _load_looting_config_from_env()
         ctx = RuntimeContext(
             config=cfg,

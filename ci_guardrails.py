@@ -109,10 +109,10 @@ def check_entrypoints_preflight_before_logger(*, root: Path | None = None) -> li
 
 
 def check_sleep_only_tick_pacing(*, root: Path | None = None) -> list[Violation]:
-    """Disallow time.sleep except for tick pacing (time.sleep(tick_period)).
+    """Disallow time.sleep in runtime and entrypoints.
 
     Scope: entrypoints and runtime code only.
-    (Adapters may legitimately sleep for hardware IO; tests may sleep as well.)
+    (Adapters may legitimately sleep for hardware IO; tests/tools may sleep as well.)
     """
 
     root = root or _repo_root()
@@ -144,19 +144,14 @@ def check_sleep_only_tick_pacing(*, root: Path | None = None) -> list[Violation]
             if not (is_time_sleep or is_sleep):
                 continue
 
-            allowed = False
-            if len(call.args) == 1 and isinstance(call.args[0], ast.Name) and call.args[0].id == 'tick_period':
-                allowed = True
-
-            if not allowed:
-                lineno = int(getattr(call, 'lineno', 0) or 0)
-                violations.append(
-                    Violation(
-                        rule='sleep_only_tick_pacing',
-                        file=_rel(path),
-                        detail=f"time.sleep usage not allowed (line {lineno})",
-                    )
+            lineno = int(getattr(call, 'lineno', 0) or 0)
+            violations.append(
+                Violation(
+                    rule='sleep_only_tick_pacing',
+                    file=_rel(path),
+                    detail=f"time.sleep usage not allowed (line {lineno})",
                 )
+            )
 
     return violations
 

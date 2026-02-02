@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
 
 from contracts.errors import ContractViolation, PreflightFailed
@@ -15,6 +16,8 @@ from rules.targeting import select_targeting_intent
 from runtime.battle_list_semantics import detect_battle_list
 from runtime.targeting_preflight import run as targeting_preflight_run
 from runtime.targeting_runner import execute_intent
+from runtime.profile import cap_ticks
+from runtime.pacing import wait_until_ns
 
 
 def _env_str(name: str, default: str) -> str:
@@ -85,9 +88,13 @@ def run_targeting_only() -> int:
     - Terminates in finite time (max_total_ticks).
     """
 
-    max_total_ticks = _env_int('FRBOT_TARGETING_MAX_TICKS', 30)
+    max_total_ticks = cap_ticks(_env_int('FRBOT_TARGETING_MAX_TICKS', 30))
 
     try:
+        if sys.platform != 'win32':
+            write_fatal('unsupported_platform', details={'platform': str(sys.platform)})
+            return 1
+
         cfg = _load_targeting_config_from_env()
         ctx = RuntimeContext(
             config=cfg,
@@ -101,7 +108,9 @@ def run_targeting_only() -> int:
         logger = configure_logger()
         ctx.status.state = RuntimeState.RUNNING
 
-        tick_period = 1.0 / max(1e-6, float(ctx.config.tick_hz))
+        tick_hz = max(1e-6, float(ctx.config.tick_hz))
+        tick_period_ns = int(1_000_000_000 / float(tick_hz))
+        next_tick_ns = time.monotonic_ns()
 
         for tick_index in range(int(max_total_ticks)):
             # Binding hard gate each tick.
@@ -153,7 +162,8 @@ def run_targeting_only() -> int:
                 log_json(logger, event='success', gate='targeting', target=str(ctx.targeting.target.target_name))
                 return 0
 
-            time.sleep(tick_period)
+            next_tick_ns += int(tick_period_ns)
+            wait_until_ns(int(next_tick_ns))
 
         raise PreflightFailed('target_not_acquired')
 

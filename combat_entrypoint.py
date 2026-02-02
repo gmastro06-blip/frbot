@@ -14,6 +14,8 @@ from diagnostics.last_frames import snapshot
 from rules.combat import select_combat_intent
 from runtime.combat_preflight import run as combat_preflight_run
 from runtime.combat_runner import execute_combat_intent
+from runtime.profile import enforce_feature_allowed
+from runtime.pacing import wait_until_ns
 
 
 def _env_str(name: str, default: str) -> str:
@@ -101,6 +103,7 @@ def run_combat_only() -> int:
     max_total_ticks = _env_int('FRBOT_COMBAT_MAX_TICKS', 30)
 
     try:
+        enforce_feature_allowed('combat')
         cfg = _load_combat_config_from_env()
         ctx = RuntimeContext(
             config=cfg,
@@ -114,7 +117,9 @@ def run_combat_only() -> int:
         logger = configure_logger()
         ctx.status.state = RuntimeState.RUNNING
 
-        tick_period = 1.0 / max(1e-6, float(ctx.config.tick_hz))
+        tick_hz = max(1e-6, float(ctx.config.tick_hz))
+        tick_period_ns = int(1_000_000_000 / float(tick_hz))
+        next_tick_ns = time.monotonic_ns()
 
         for tick_index in range(int(max_total_ticks)):
             try:
@@ -193,7 +198,8 @@ def run_combat_only() -> int:
                 )
                 return 0
 
-            time.sleep(tick_period)
+            next_tick_ns += int(tick_period_ns)
+            wait_until_ns(int(next_tick_ns))
 
         raise PreflightFailed('combat_timeout')
 

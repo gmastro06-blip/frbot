@@ -199,7 +199,12 @@ class CamMinimapRealCapture(CaptureAdapter):
                 bgr = self._read_bgr()
                 rgb, w, h = self._bgr_to_rgb_bytes(bgr)
                 last_rgb = rgb
-                time.sleep(0.03)
+                try:
+                    from runtime.pacing import wait_until_ns
+
+                    wait_until_ns(int(time.monotonic_ns() + 30_000_000))
+                except Exception:
+                    pass
 
             if not last_rgb or w <= 0 or h <= 0:
                 return VerificationResult(ok=False, reason="frame_empty")

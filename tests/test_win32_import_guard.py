@@ -4,7 +4,7 @@ import os
 
 
 def test_win32_module_import_is_safe_on_non_windows() -> None:
-	# CI runs on Linux. Importing the module must not attempt to load user32.
+	# Importing the module must not attempt to load user32 on non-Windows.
 	import adapters.windows.win32 as w
 
 	if os.name != 'nt':

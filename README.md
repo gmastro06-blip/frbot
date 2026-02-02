@@ -2,12 +2,98 @@
 
 Minimal, contract-driven runtime.
 
+Windows-only (PROD-EMERGENCY).
+
 This repository has been rewritten to enforce:
 
 - No dynamic dict state in runtime.
 - No GUI/capture automation as a central dependency.
 - Fail-fast startup: abort in <1s if environment/contracts are not satisfied.
 - Persistent evidence on failure (diagnostics/fatal.log).
+
+## PROD-EMERGENCY (72h)
+
+Emergency safety profile designed for **production-safe** operation under strict constraints:
+
+- No irreversible actions without evidence (evidence-or-abort).
+- No infinite loops (bounded ticks per session).
+- Auditable (explicit abort reasons + frame dumps on abort).
+- Fail fast (prefer abort over acting wrong).
+
+### Scope (hard cut)
+
+Enabled (only if REAL evidence passes):
+
+- REAL capture (HWND / OBS Projector)
+- Targeting (battle list semantics)
+- Cavebot BASIC (minimap + marker tracking)
+- Healing BASIC (critical single-spell intent)
+
+Hard-disabled in `FRBOT_PROFILE=prod_emergency`:
+
+- Combat loop automatic
+- Looting
+- Deposit
+- Trade
+
+Additionally, these feature modes are not runnable in PROD-EMERGENCY (hard abort with `feature_disabled`):
+
+- `FRBOT_MODE=combat`
+- `FRBOT_MODE=looting`
+- `FRBOT_MODE=deposit`
+- `FRBOT_MODE=trade`
+
+### Profile switch
+
+Set:
+
+- `FRBOT_PROFILE=prod_emergency`
+
+Emergency guardrails applied:
+
+- Tick budget is capped to 300 (`session_tick_budget_exhausted` on exhaustion)
+- Any `window_binding_lost` aborts immediately
+- Runtime abort attempts to dump a frame to `diagnostics/frames_emergency/`
+
+### Minimal ROI config
+
+`rois_prod.json` is the frozen minimal ROI set for PROD-EMERGENCY:
+
+- `minimap`
+- `battle_list`
+- `hp_text`
+
+If your capture resolution/layout differs, recalibrate and regenerate a matching runtime ROI config.
+
+### Emergency certification
+
+Mock (CI-friendly):
+
+```powershell
+$env:FRBOT_MODE = "mock"
+poetry run python tools/audit_emergency.py
+```
+
+Real (OBS Projector example):
+
+```powershell
+$env:FRBOT_MODE = "real"
+$env:FRBOT_PROFILE = "prod_emergency"
+$env:FRBOT_CAPTURE_BACKEND = "obs-projector"
+$env:FRBOT_CAPTURE_TARGET = "projector"
+$env:FRBOT_CONFIG_PATH = "rois_prod.json"
+$env:FRBOT_PROJECTOR_WINDOW_TITLE = "Proyector en ventana (Fuente) - Tibia_Fuente"
+$env:FRBOT_PROJECTOR_REQUIRE_FOREGROUND = "1"
+$env:FRBOT_TRY_ALL_OUTPUTS = "1"
+$env:FRBOT_MAX_OUTPUTS = "6"
+poetry run python tools/audit_emergency.py
+```
+
+One-command launcher (recommended):
+
+```powershell
+./scripts/run_prod_emergency.ps1
+```
 
 ## Repo structure (non-negotiable)
 
@@ -21,7 +107,7 @@ This repository has been rewritten to enforce:
 
 Default is strict and will abort (no real adapters are provided in this rewrite):
 
-```bash
+```powershell
 poetry run python main.py
 ```
 

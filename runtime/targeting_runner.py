@@ -18,6 +18,7 @@ from runtime.battle_list_semantics import crop_roi_rgb, detect_battle_list
 from runtime.config_loader import load_rois
 from runtime.env import parse_window_hwnd_env
 from runtime.targeting_preflight import targeting_preflight
+from runtime.pacing import wait_until_ns
 
 
 def _load_config_from_env() -> RuntimeConfig:
@@ -245,8 +246,10 @@ def run() -> int:
         logger = configure_logger()
         ctx.status.state = RuntimeState.RUNNING
 
-        tick_period = 1.0 / ctx.config.tick_hz
+        tick_hz = max(1e-6, float(ctx.config.tick_hz))
+        tick_period_ns = int(1_000_000_000 / float(tick_hz))
         start_ns = time.monotonic_ns()
+        next_tick_ns = start_ns
 
         while True:
             targeting_tick(ctx, capture, input_, binding)
@@ -266,7 +269,8 @@ def run() -> int:
             if (time.monotonic_ns() - start_ns) >= 1_000_000_000:
                 return 0
 
-            time.sleep(tick_period)
+            next_tick_ns += int(tick_period_ns)
+            wait_until_ns(int(next_tick_ns))
 
     except PreflightFailed as exc:
         write_fatal(str(exc), exc)

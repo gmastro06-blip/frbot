@@ -9,6 +9,11 @@ from contracts.capture import Frame
 
 
 def dump_enabled() -> bool:
+    # PROD-EMERGENCY: always dump on abort for auditability.
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        return True
+
     raw = os.environ.get('FRBOT_DUMP_FRAMES', '')
     if raw is None:
         return False

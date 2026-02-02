@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 @pytest.fixture(autouse=True)
 def _test_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     # Keep tests deterministic and isolated from developer machine env.
+    monkeypatch.delenv('FRBOT_PROFILE', raising=False)
     monkeypatch.setenv('FRBOT_MINIMAP_ROI', 'minimap')
     monkeypatch.setenv('FRBOT_ENABLE_CAVEBOT', '1')
     monkeypatch.setenv('FRBOT_PLAYER_MARKER_RGB', '255,0,255')

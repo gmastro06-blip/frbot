@@ -6,6 +6,7 @@ from __future__ import annotations
 # See BASELINE.md.
 
 import os
+import sys
 import time
 
 from contracts.errors import ContractViolation, PreflightFailed
@@ -19,6 +20,8 @@ from runtime.bot_config_loader import load_bot_config
 from runtime.env import parse_window_hwnd_env
 from runtime.preflight import preflight
 from runtime.minimap_semantics import SemanticTracker, detect_player_marker, marker_config_from_env, semantic_progress_ok
+from runtime.profile import cap_ticks, default_session_seconds, is_prod_emergency
+from runtime.pacing import wait_until_ns
 
 
 def _load_config_from_env() -> RuntimeConfig:
@@ -63,6 +66,10 @@ def _load_config_from_env() -> RuntimeConfig:
 
 def run() -> int:
     try:
+        if sys.platform != 'win32':
+            write_fatal('unsupported_platform', details={'platform': str(sys.platform)})
+            return 1
+
         cfg = _load_config_from_env()
         ctx = RuntimeContext(
             config=cfg,
@@ -96,7 +103,8 @@ def run() -> int:
         # If preflight returned, we are READY with verified adapters.
         ctx.status.state = RuntimeState.RUNNING
 
-        tick_period = 1.0 / ctx.config.tick_hz
+        tick_hz = max(1e-6, float(ctx.config.tick_hz))
+        tick_period_ns = int(1_000_000_000 / float(tick_hz))
         max_age_ms = int(os.environ.get('FRBOT_FRAME_MAX_AGE_MS', '500'))
         start_ns = time.monotonic_ns()
 
@@ -116,6 +124,11 @@ def run() -> int:
         last_positions: list = []
 
         # Deterministic loop: runs 1s, and logs progress persistently.
+        session_seconds = default_session_seconds(float(os.environ.get('FRBOT_SESSION_SECONDS', '1.0') or '1.0'))
+        session_deadline_ns = start_ns + int(max(0.0, float(session_seconds)) * 1_000_000_000)
+        max_ticks = cap_ticks(int(os.environ.get('FRBOT_MAX_TICKS', '0') or '0'))
+
+        next_tick_ns = start_ns
         while True:
             # Even if we are not about to emit input, we do not proceed without a bound window.
             try:
@@ -251,11 +264,16 @@ def run() -> int:
                 now_ts_ns=int(now_ns),
             )
 
-            if (time.monotonic_ns() - start_ns) >= 1_000_000_000:
+            # Emergency guardrails: bounded session by both time and ticks.
+            if max_ticks > 0 and int(ctx.telemetry.tick_count) >= int(max_ticks):
+                raise PreflightFailed('session_tick_budget_exhausted')
+
+            if time.monotonic_ns() >= int(session_deadline_ns):
                 log_json(logger, event='completed', gate='runtime', tick_count=int(ctx.telemetry.tick_count))
                 return 0
 
-            time.sleep(tick_period)
+            next_tick_ns += int(tick_period_ns)
+            wait_until_ns(int(next_tick_ns))
 
     except ContractViolation as exc:
         if 'Unsupported mode:' in str(exc):
@@ -264,6 +282,15 @@ def run() -> int:
         write_fatal('runtime crashed', exc)
         return 1
     except PreflightFailed as exc:
+        # PROD-EMERGENCY: always attempt to dump a single frame for auditability.
+        # This must never create runtime.log; it uses preflight-only capture.
+        if is_prod_emergency():
+            try:
+                from diagnostics.emergency_capture import try_dump_window_frame
+
+                try_dump_window_frame(gate='runtime', reason=str(exc))
+            except Exception:
+                pass
         write_fatal(str(exc), exc)
         return 1
     except Exception as exc:

@@ -18,10 +18,9 @@ class LoadedConfig:
 _REQUIRED_REAL_ROIS: tuple[str, ...] = (
 	'minimap',
 	'battle_list',
-	'hp_mp',
-	'inventory',
-	'npc_dialog',
-	'trade',
+	'hp_text',
+	'mp_text',
+	'heal_cooldown',
 )
 
 

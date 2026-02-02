@@ -107,6 +107,8 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
     mode = ctx.config.mode.strip().lower()
 
     if mode == 'real':
+        if os.name != 'nt':
+            raise PreflightFailed('unsupported_platform')
         backend = (os.environ.get('FRBOT_CAPTURE_BACKEND', 'mss') or 'mss').strip().lower()
 
         # Allow projector mode to bind against the OBS Projector window (not Tibia).

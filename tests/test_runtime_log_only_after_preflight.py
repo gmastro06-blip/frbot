@@ -61,24 +61,12 @@ def test_runtime_log_created_only_after_preflight_failure_cases(tmp_path: Path, 
 
     _reset_diagnostics(tmp_path)
 
-    # --- COMBAT: missing required ROIs -> preflight abort
+    # --- COMBAT: hard-disabled -> abort, no runtime.log
     monkeypatch.setenv('FRBOT_MODE', 'combat')
-    monkeypatch.setenv('FRBOT_COMBAT_BACKEND', 'mock')
-    monkeypatch.setenv('FRBOT_ENABLE_COMBAT', '1')
-    monkeypatch.setenv('FRBOT_COMBAT_MAX_TICKS', '1')
-    monkeypatch.setenv('FRBOT_TICK_HZ', '100')
-    monkeypatch.setenv('FRBOT_ATTACK_KEY', 'F2')
-    monkeypatch.setenv('FRBOT_MOCK_BATTLE_LIST_ROWS', 'Orc:1:1')
-    monkeypatch.setenv('FRBOT_MOCK_BATTLE_SELECTED_ROW', '0')
-    monkeypatch.setenv('FRBOT_MOCK_HP_CURRENT', '80')
-    monkeypatch.setenv('FRBOT_MOCK_HP_MAX', '100')
-    monkeypatch.setenv('FRBOT_MOCK_MP_CURRENT', '80')
-    monkeypatch.setenv('FRBOT_MOCK_MP_MAX', '100')
-    monkeypatch.setenv('FRBOT_MOCK_TARGET_HP_CURRENT', '100')
-    monkeypatch.setenv('FRBOT_MOCK_TARGET_HP_MAX', '100')
-    monkeypatch.setenv('FRBOT_CONFIG_PATH', _write_rois(tmp_path, {}))
     assert run_combat_only() == 1
     assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
+    fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
+    assert 'feature_disabled' in fatal
 
     _reset_diagnostics(tmp_path)
 
@@ -97,60 +85,27 @@ def test_runtime_log_created_only_after_preflight_failure_cases(tmp_path: Path, 
 
     _reset_diagnostics(tmp_path)
 
-    # --- LOOTING: missing inventory_text ROI -> preflight abort
+    # --- LOOTING: hard-disabled -> abort, no runtime.log
     monkeypatch.setenv('FRBOT_MODE', 'looting')
-    monkeypatch.setenv('FRBOT_LOOTING_BACKEND', 'mock')
-    monkeypatch.setenv('FRBOT_TICK_HZ', '100')
-    monkeypatch.setenv('FRBOT_LOOTING_MAX_TICKS', '1')
-    monkeypatch.setenv('FRBOT_LOOTING_MAX_ATTEMPTS', '1')
-    monkeypatch.setenv('FRBOT_QUICK_LOOT_KEY', 'R')
-    monkeypatch.setenv('FRBOT_LOOTING_MODE', 'premium')
-    monkeypatch.setenv('MOCK_LOOT_PREMIUM', 'true')
-    monkeypatch.setenv('FRBOT_CONFIG_PATH', _write_rois(tmp_path, {}))
     assert run_looting_only() == 1
     assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
+    fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
+    assert 'feature_disabled' in fatal
 
     _reset_diagnostics(tmp_path)
 
-    # --- DEPOSIT: missing inventory_text/depot_container -> preflight abort
+    # --- DEPOSIT: hard-disabled -> abort, no runtime.log
     monkeypatch.setenv('FRBOT_MODE', 'deposit')
-    monkeypatch.setenv('FRBOT_DEPOSIT_BACKEND', 'mock')
-    monkeypatch.setenv('FRBOT_TICK_HZ', '100')
-    monkeypatch.setenv('FRBOT_DEPOSIT_KEY', 'D')
-    monkeypatch.setenv('FRBOT_DEPOSIT_MAX_TICKS', '1')
-    monkeypatch.setenv('FRBOT_DEPOSIT_MAX_ATTEMPTS', '1')
-    monkeypatch.setenv('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text')
-    monkeypatch.setenv('FRBOT_DEPOT_CONTAINER_ROI', 'depot_container')
-    monkeypatch.setenv('FRBOT_MOCK_INV_GOLD', '5')
-    monkeypatch.setenv('FRBOT_MOCK_INV_CAP_USED', '5')
-    monkeypatch.setenv('FRBOT_MOCK_DEPOT_COUNT', '0')
-    monkeypatch.setenv('FRBOT_CONFIG_PATH', _write_rois(tmp_path, {}))
     assert run_deposit_only() == 1
     assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
+    fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
+    assert 'feature_disabled' in fatal
 
     _reset_diagnostics(tmp_path)
 
-    # --- TRADE: missing trade ROIs -> preflight abort
+    # --- TRADE: hard-disabled -> abort, no runtime.log
     monkeypatch.setenv('FRBOT_MODE', 'trade')
-    monkeypatch.setenv('FRBOT_TRADE_BACKEND', 'mock')
-    monkeypatch.setenv('FRBOT_TICK_HZ', '100')
-    monkeypatch.setenv('FRBOT_TRADE_ACTION', 'buy')
-    monkeypatch.setenv('FRBOT_TRADE_MAX_TICKS', '1')
-    monkeypatch.setenv('FRBOT_TRADE_MAX_ATTEMPTS', '1')
-    monkeypatch.setenv('FRBOT_TRADE_EXPECTED_NPC_ID', '7')
-    monkeypatch.setenv('FRBOT_TRADE_INVENTORY_ROI', 'trade_inventory')
-    monkeypatch.setenv('FRBOT_TRADE_NPC_ROI', 'trade_npc')
-    monkeypatch.setenv('FRBOT_TRADE_ACTION_ROI', 'trade_action')
-    monkeypatch.setenv('FRBOT_MOCK_TRADE_GOLD', '100')
-    monkeypatch.setenv('FRBOT_MOCK_TRADE_ITEMS', '0')
-    monkeypatch.setenv('FRBOT_MOCK_TRADE_CAP_USED', '10')
-    monkeypatch.setenv('MOCK_TRADE_NPC_PRESENT', 'true')
-    monkeypatch.setenv('MOCK_TRADE_WRONG_NPC', 'false')
-    monkeypatch.setenv('MOCK_TRADE_BUY_OK', 'false')
-    monkeypatch.setenv('MOCK_TRADE_SELL_OK', 'false')
-    monkeypatch.setenv('MOCK_TRADE_NO_DELTA', 'false')
-    monkeypatch.setenv('MOCK_TRADE_GOLD_ONLY', 'false')
-    monkeypatch.setenv('MOCK_TRADE_ITEM_ONLY', 'false')
-    monkeypatch.setenv('FRBOT_CONFIG_PATH', _write_rois(tmp_path, {}))
     assert run_trade_only() == 1
     assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
+    fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
+    assert 'feature_disabled' in fatal
