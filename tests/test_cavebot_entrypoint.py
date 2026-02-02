@@ -74,7 +74,7 @@ def test_cavebot_progress_success(tmp_path: Path, monkeypatch: MonkeyPatch) -> N
     assert run_cavebot_only() == 0
 
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
-    assert 'inputs_sent=1' in runtime_log
+    assert '"inputs_sent":1' in runtime_log
 
 
 def test_cavebot_abort_no_progress(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -107,8 +107,8 @@ def test_cavebot_abort_no_progress(tmp_path: Path, monkeypatch: MonkeyPatch) -> 
     assert 'cavebot_no_progress' in fatal
 
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
-    assert 'inputs_sent=1' in runtime_log
-    assert 'inputs_sent=2' not in runtime_log
+    assert '"inputs_sent":1' in runtime_log
+    assert '"inputs_sent":2' not in runtime_log
 
 
 def test_cavebot_abort_wrong_direction(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -197,8 +197,8 @@ def test_cavebot_no_spam_inputs(tmp_path: Path, monkeypatch: MonkeyPatch) -> Non
 
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
     # With marker static, we retry deterministically up to max attempts.
-    assert 'inputs_sent=3' in runtime_log
-    assert 'inputs_sent=4' not in runtime_log
+    assert '"inputs_sent":3' in runtime_log
+    assert '"inputs_sent":4' not in runtime_log
 
 
 def test_cavebot_waypoint_attempt_limit(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:

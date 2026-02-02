@@ -1,0 +1,86 @@
+{
+  "input": {
+    "rois_json": {
+      "path": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\obs_projector_rois.json",
+      "sha256": "5ab0ec0fe128e4f5d6cafb6a821b0c0c20cc4cccdbc330326d75114f52fe6a97",
+      "bytes": 1661
+    },
+    "image": {
+      "path": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\diagnostics\\obs_projector_full.ppm",
+      "sha256": "c98d6fa9f1a1c4290f9f04799847e71da4fa9451e7670a516f7e89effd7df2db",
+      "bytes": 6220817,
+      "width": 1920,
+      "height": 1080,
+      "aspect_ratio": {
+        "w": 16,
+        "h": 9
+      },
+      "pixel_format": "RGB",
+      "container_format": "PPM"
+    }
+  },
+  "validation": {
+    "source": "OBS Projector",
+    "roi_mode": "absolute_px",
+    "reference_resolution": {
+      "width": 1920,
+      "height": 1080,
+      "aspect_ratio": {
+        "w": 16,
+        "h": 9
+      }
+    },
+    "drift_ok": true,
+    "mode": "real",
+    "required_rois": [
+      "minimap",
+      "battle_list",
+      "hp_mp",
+      "inventory",
+      "npc_dialog",
+      "trade"
+    ]
+  },
+  "mapping": {
+    "rename_map": {
+      "battlelist": "battle_list"
+    },
+    "roi_names_in": [
+      "mpup",
+      "hpup",
+      "minimap",
+      "battlelist",
+      "statusbar",
+      "ring",
+      "Anumlet",
+      "hpdown",
+      "Mpdown",
+      "trade",
+      "hp_mp",
+      "inventory",
+      "npc_dialog"
+    ],
+    "roi_names_out": [
+      "mpup",
+      "hpup",
+      "minimap",
+      "battle_list",
+      "statusbar",
+      "ring",
+      "Anumlet",
+      "hpdown",
+      "Mpdown",
+      "trade",
+      "hp_mp",
+      "inventory",
+      "npc_dialog"
+    ]
+  },
+  "output": {
+    "runtime_config": {
+      "path": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\obs_projector_rois_runtime.json",
+      "sha256": "d69af069fdbd5ad2bb4f64a76305f5df8157014b1d544e7932628fc42c733f14",
+      "bytes": 1332
+    }
+  }
+}

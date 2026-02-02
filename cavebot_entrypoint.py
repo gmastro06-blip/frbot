@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os
 
-from contracts.errors import PreflightFailed
+from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_enabled, dump_pair
 from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from runtime.cavebot_preflight import run as cavebot_preflight_run
 from runtime.cavebot_runner import CavebotTickEvidence, execute_cavebot_tick
@@ -20,6 +21,14 @@ def _env_str(name: str, default: str) -> str:
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
+    if name == 'FRBOT_WINDOW_HWND' and raw is not None and str(raw).strip() != '':
+        s = str(raw).strip()
+        if s.lower().startswith('0x') and len(s) > 2 and set(s[2:].lower()) == {'x'}:
+            return int(default)
+        try:
+            return int(s, 0)
+        except Exception as exc:
+            raise PreflightFailed('window_hwnd_invalid') from exc
     try:
         return int(raw) if raw is not None else int(default)
     except Exception:
@@ -122,7 +131,14 @@ def run_cavebot_only() -> int:
             wp = ctx.cavebot.current_gate_waypoint()
             if wp is None:
                 # Nothing left to do.
-                logger.info('SUCCESS cavebot_route_complete inputs_sent=%d', int(ctx.cavebot.gate_inputs_sent))
+                log_json(
+                    logger,
+                    event='success',
+                    gate='cavebot',
+                    status='SUCCESS',
+                    result='cavebot_route_complete',
+                    inputs_sent=int(ctx.cavebot.gate_inputs_sent),
+                )
                 return 0
 
             outcome = execute_cavebot_tick(
@@ -140,16 +156,18 @@ def run_cavebot_only() -> int:
             if evidence.progress is not None:
                 progress_mag = str(int(evidence.progress.delta_mag_px))
 
-            logger.info(
-                'tick_index=%d waypoint_id=%s marker_before=%s marker_after=%s progress_px=%s attempts_used=%d inputs_sent=%d abort_reason=%s',
-                int(tick_index),
-                str(wp.waypoint_id),
-                _fmt_marker(evidence.marker_before),
-                _fmt_marker(evidence.marker_after),
-                progress_mag,
-                int(ctx.cavebot.gate_attempts_used),
-                int(ctx.cavebot.gate_inputs_sent),
-                str(outcome.abort_reason or 'none'),
+            log_json(
+                logger,
+                event='tick',
+                gate='cavebot',
+                tick_index=int(tick_index),
+                waypoint_id=str(wp.waypoint_id),
+                marker_before=_fmt_marker(evidence.marker_before),
+                marker_after=_fmt_marker(evidence.marker_after),
+                progress_px=progress_mag,
+                attempts_used=int(ctx.cavebot.gate_attempts_used),
+                inputs_sent=int(ctx.cavebot.gate_inputs_sent),
+                abort_reason=str(outcome.abort_reason or 'none'),
             )
 
             ctx.telemetry.tick_count += 1
@@ -187,6 +205,12 @@ def run_cavebot_only() -> int:
             f"inputs_sent={getattr(getattr(ctx, 'cavebot', None), 'gate_inputs_sent', -1) if ctx is not None else -1}"
         )
         write_fatal(msg, exc)
+        return 1
+    except ContractViolation as exc:
+        if 'Unsupported mode:' in str(exc):
+            write_fatal('invalid_mode', exc)
+            return 1
+        write_fatal('runtime crashed', exc)
         return 1
     except Exception as exc:
         write_fatal('runtime crashed', exc)

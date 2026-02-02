@@ -15,6 +15,7 @@ def test_loop_with_visual_noise_aborts(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setenv('FRBOT_TICK_HZ', '120')
     monkeypatch.setenv('FRBOT_MOCK_CAPTURE_OK', '1')
     monkeypatch.setenv('FRBOT_MOCK_INPUT_OK', '1')
+    monkeypatch.delenv('FRBOT_CONFIG_PATH', raising=False)
 
     # Noise present but movement keys become no-ops: would previously loop if hashes were accepted.
     monkeypatch.setenv('FRBOT_MOCK_STUCK', '1')

@@ -10,7 +10,7 @@ from contracts.window import WindowBindingAdapter, WindowBindingStatus, WindowRe
 @dataclass
 class _Bound:
     hwnd: int
-    rect: WindowRect
+    title_substring: str
 
 
 class Win32WindowBinding(WindowBindingAdapter):
@@ -32,11 +32,8 @@ class Win32WindowBinding(WindowBindingAdapter):
         if hwnd <= 0 or not is_window(hwnd):
             raise RuntimeError('window_binding_lost')
 
-        rect = get_client_rect_in_screen(hwnd)
-        if rect.width <= 0 or rect.height <= 0:
-            raise RuntimeError('window_binding_lost')
-
-        return _Bound(hwnd=hwnd, rect=rect)
+        # Do not freeze a rect: window can move/resize; capture must follow.
+        return _Bound(hwnd=hwnd, title_substring=self._title_substring)
 
     def verify(self) -> VerificationResult:
         try:
@@ -54,7 +51,8 @@ class Win32WindowBinding(WindowBindingAdapter):
             b = self._resolve()
         else:
             b = self._bound
-        return WindowBindingStatus(backend=self.name, verified=True, hwnd=int(b.hwnd), rect=b.rect)
+        rect = get_client_rect_in_screen(int(b.hwnd))
+        return WindowBindingStatus(backend=self.name, verified=True, hwnd=int(b.hwnd), rect=rect)
 
     def assert_bound(self) -> None:
         if self._bound is None:
@@ -69,6 +67,7 @@ class Win32WindowBinding(WindowBindingAdapter):
             if self._title_substring.strip().lower() not in (title_now or '').lower():
                 raise RuntimeError('window_binding_lost')
 
+        # Rect must be valid at the time of use.
         rect_now = get_client_rect_in_screen(int(self._bound.hwnd))
-        if rect_now != self._bound.rect:
+        if rect_now.width <= 0 or rect_now.height <= 0:
             raise RuntimeError('window_binding_lost')

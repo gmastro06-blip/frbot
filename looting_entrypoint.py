@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 import os
 
-from contracts.errors import PreflightFailed
+from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import InventorySnapshot, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_enabled, dump_pair
 from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from runtime.looting_preflight import run as looting_preflight_run
 from runtime.looting_runner import execute_looting_tick
@@ -21,6 +22,14 @@ def _env_str(name: str, default: str) -> str:
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
+    if name == 'FRBOT_WINDOW_HWND' and raw is not None and str(raw).strip() != '':
+        s = str(raw).strip()
+        if s.lower().startswith('0x') and len(s) > 2 and set(s[2:].lower()) == {'x'}:
+            return int(default)
+        try:
+            return int(s, 0)
+        except Exception as exc:
+            raise PreflightFailed('window_hwnd_invalid') from exc
     try:
         return int(raw) if raw is not None else int(default)
     except Exception:
@@ -131,7 +140,7 @@ def run_looting_only() -> int:
                 'abort_reason': (str(outcome.abort_reason) if outcome.abort_reason is not None else None),
             }
 
-            logger.info(json.dumps(payload, separators=(',', ':'), sort_keys=True))
+            log_json(logger, event='tick', gate='looting', **payload)
 
             ctx.telemetry.tick_count += 1
 
@@ -139,7 +148,7 @@ def run_looting_only() -> int:
                 raise PreflightFailed(str(outcome.abort_reason))
 
             if outcome.looted:
-                logger.info(json.dumps({'status': 'SUCCESS', 'items_looted': int(ctx.looting.items_looted)}, separators=(',', ':'), sort_keys=True))
+                log_json(logger, event='success', gate='looting', status='SUCCESS', items_looted=int(ctx.looting.items_looted))
                 return 0
 
         raise PreflightFailed('looting_stuck')
@@ -157,6 +166,12 @@ def run_looting_only() -> int:
 
         msg = f"abort_reason={exc} last_inventory={json.dumps(_serialize_inventory(inv), separators=(',', ':'), sort_keys=True)}"
         write_fatal(msg, exc)
+        return 1
+    except ContractViolation as exc:
+        if 'Unsupported mode:' in str(exc):
+            write_fatal('invalid_mode', exc)
+            return 1
+        write_fatal('runtime crashed', exc)
         return 1
     except Exception as exc:
         write_fatal('runtime crashed', exc)

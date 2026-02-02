@@ -1,0 +1,1 @@
+{"reason": "window_binding_lost", "expected_hwnd": "0x6c0af0", "expected_title": "Proyector en ventana (Fuente) - Tibia_Fuente", "expected_is_window": true, "expected_visible": true, "expected_minimized": false, "foreground_hwnd": "0x0", "foreground_title": "", "foreground_error": null}

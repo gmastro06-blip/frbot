@@ -1,0 +1,32 @@
+{
+  "rois": {
+    "battle_list": { "x": 356, "y": 103, "width": 175, "height": 296 },
+    "target_frame": { "x": 159, "y": 26, "width": 159, "height": 52 },
+    "target_hp_bar": { "x": 159, "y": 83, "width": 159, "height": 6 },
+    "combat_cooldown": { "x": 159, "y": 93, "width": 10, "height": 10 },
+    "combat_feedback": { "x": 174, "y": 93, "width": 10, "height": 10 },
+
+    "hp_bar": { "x": 138, "y": 19, "width": 74, "height": 8 },
+    "mp_bar": { "x": 138, "y": 31, "width": 74, "height": 8 },
+    "hp_mp": { "x": 138, "y": 19, "width": 74, "height": 19 },
+    "hp_text": { "x": 138, "y": 10, "width": 74, "height": 8 },
+    "mp_text": { "x": 138, "y": 40, "width": 74, "height": 8 },
+    "heal_cooldown": { "x": 222, "y": 19, "width": 10, "height": 10 },
+
+    "minimap": { "x": 894, "y": 30, "width": 108, "height": 113 },
+
+    "inventory": { "x": 404, "y": 103, "width": 128, "height": 296 },
+    "inventory_text": { "x": 404, "y": 103, "width": 128, "height": 20 },
+    "loot_container_open": { "x": 404, "y": 133, "width": 128, "height": 70 },
+    "loot_corpse": { "x": 404, "y": 213, "width": 128, "height": 70 },
+    "loot_take": { "x": 404, "y": 293, "width": 128, "height": 70 },
+    "depot_container": { "x": 85, "y": 129, "width": 372, "height": 258 },
+
+    "npc_dialog": { "x": 85, "y": 129, "width": 372, "height": 258 },
+
+    "trade": { "x": 85, "y": 129, "width": 372, "height": 258 },
+    "trade_npc": { "x": 95, "y": 139, "width": 170, "height": 238 },
+    "trade_inventory": { "x": 275, "y": 139, "width": 170, "height": 238 },
+    "trade_action": { "x": 315, "y": 347, "width": 130, "height": 35 }
+  }
+}

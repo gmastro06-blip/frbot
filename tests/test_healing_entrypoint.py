@@ -93,7 +93,7 @@ def test_healing_entrypoint_abort_unstable_heal_unverified(tmp_path: Path, monke
 
     # Guardrail: attempts do not exceed max.
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
-    assert 'attempts_used=2' in runtime_log
+    assert '"attempts_used":2' in runtime_log
 
 
 def test_healing_entrypoint_respects_max_ticks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

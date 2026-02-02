@@ -1,0 +1,7 @@
+FRBOT CALIBRATE — REAL CLIENT (Tibia 15x)
+{
+    "step":  "calibrate_all_real",
+    "exit_code":  1,
+    "reason":  "bootstrap_failed",
+    "ts":  "2026-02-01T20:56:05.9564986+01:00"
+}

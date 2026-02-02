@@ -1,0 +1,4 @@
+You already created a DXCamera Instance for Device 0--Output 1!
+Returning the existed instance...
+To change capture parameters you can manually delete the old object using `del obj`.
+{"source": "OBS Projector", "window_title": "Proyector en ventana (Fuente) - Tibia_Fuente", "monitor": "unknown", "validated": true}

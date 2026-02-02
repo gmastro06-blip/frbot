@@ -4,9 +4,16 @@ import argparse
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+# When executed as a script (python diagnostics/real_mode_audit.py), sys.path[0] is
+# diagnostics/, not the repo root. Ensure repo-root imports like `contracts.*` work.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from contracts.capture import Frame
 from contracts.evidence import Roi
@@ -26,6 +33,15 @@ class Pair:
     reason: str
     before: FrameBundle
     after: FrameBundle
+
+
+@dataclass(frozen=True, slots=True)
+class RealModeAuditResult:
+    passed: bool
+    blocking_reasons: list[str]
+    per_gate_results: dict
+    exit_code: int
+    report_lines: tuple[str, ...]
 
 
 _FILENAME_RE = re.compile(
@@ -165,13 +181,16 @@ def _parse_pairs(frames_dir: Path) -> list[Pair]:
         if b_full is None and a_full is None:
             continue
 
+        b_mini = sides['before'].get('minimap')
+        a_mini = sides['after'].get('minimap')
+
         before = FrameBundle(
             full=(read_ppm(b_full) if b_full is not None else None),
-            minimap=(read_ppm(sides['before'].get('minimap')) if sides['before'].get('minimap') is not None else None),
+            minimap=(read_ppm(b_mini) if b_mini is not None else None),
         )
         after = FrameBundle(
             full=(read_ppm(a_full) if a_full is not None else None),
-            minimap=(read_ppm(sides['after'].get('minimap')) if sides['after'].get('minimap') is not None else None),
+            minimap=(read_ppm(a_mini) if a_mini is not None else None),
         )
 
         out.append(Pair(gate=gate, stamp=stamp, reason=reason, before=before, after=after))
@@ -179,42 +198,94 @@ def _parse_pairs(frames_dir: Path) -> list[Pair]:
     return out
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description='Evidence-only REAL-mode audit (frames + ROIs)')
-    ap.add_argument('--frames', default='diagnostics/frames', help='frames directory (PPM)')
-    ap.add_argument('--config', default=os.environ.get('FRBOT_CONFIG_PATH', ''), help='ROI config (json with rois{})')
-    ap.add_argument('--max-pairs', type=int, default=50)
-    args = ap.parse_args()
+def run_real_mode_audit(*, frames_dir: Path, config_path: Path | None, max_pairs: int = 50) -> RealModeAuditResult:
+    """Run evidence-only REAL-mode audit (frames + ROIs).
 
-    frames_dir = Path(str(args.frames))
+    Side-effect free: does not print.
+    """
+
+    blocking: list[str] = []
+    per_gate: dict = {}
+    lines: list[str] = []
+
     if not frames_dir.exists():
-        print('DECISION: REAL-MODE NO APTO')
-        print('REASON: NO_EVIDENCE_FRAMES (diagnostics/frames missing)')
-        print('ACTION: run a gate with FRBOT_DUMP_FRAMES=1 and ensure preflight reaches at least one grab')
-        return 2
+        lines.append('DECISION: REAL-MODE NO APTO')
+        lines.append('REASON: NO_EVIDENCE_FRAMES (diagnostics/frames missing)')
+        lines.append('ACTION: run a gate with FRBOT_DUMP_FRAMES=1 and ensure preflight reaches at least one grab')
+        blocking.append('NO_EVIDENCE_FRAMES')
+        return RealModeAuditResult(
+            passed=False,
+            blocking_reasons=blocking,
+            per_gate_results=per_gate,
+            exit_code=2,
+            report_lines=tuple(lines),
+        )
 
-    config_path = str(args.config or '').strip()
-    if not config_path:
-        print('DECISION: REAL-MODE NO APTO')
-        print('REASON: NO_CONFIG (FRBOT_CONFIG_PATH missing)')
-        return 2
+    if config_path is None:
+        lines.append('DECISION: REAL-MODE NO APTO')
+        lines.append('REASON: NO_CONFIG (FRBOT_CONFIG_PATH missing)')
+        blocking.append('NO_CONFIG')
+        return RealModeAuditResult(
+            passed=False,
+            blocking_reasons=blocking,
+            per_gate_results=per_gate,
+            exit_code=2,
+            report_lines=tuple(lines),
+        )
 
-    rois = _load_rois(config_path)
+    if not config_path.exists():
+        lines.append('DECISION: REAL-MODE NO APTO')
+        lines.append('REASON: NO_CONFIG (FRBOT_CONFIG_PATH missing)')
+        blocking.append('NO_CONFIG')
+        return RealModeAuditResult(
+            passed=False,
+            blocking_reasons=blocking,
+            per_gate_results=per_gate,
+            exit_code=2,
+            report_lines=tuple(lines),
+        )
+
+    try:
+        rois = _load_rois(str(config_path))
+    except Exception as exc:
+        lines.append('DECISION: REAL-MODE NO APTO')
+        lines.append(f'REASON: INVALID_CONFIG ({type(exc).__name__}: {exc})')
+        blocking.append(f'INVALID_CONFIG:{type(exc).__name__}')
+        return RealModeAuditResult(
+            passed=False,
+            blocking_reasons=blocking,
+            per_gate_results=per_gate,
+            exit_code=2,
+            report_lines=tuple(lines),
+        )
 
     pairs = _parse_pairs(frames_dir)
     if not pairs:
-        print('DECISION: REAL-MODE NO APTO')
-        print('REASON: NO_PARSEABLE_FRAMES (filenames not recognized)')
-        return 2
+        lines.append('DECISION: REAL-MODE NO APTO')
+        lines.append('REASON: NO_PARSEABLE_FRAMES (filenames not recognized)')
+        blocking.append('NO_PARSEABLE_FRAMES')
+        return RealModeAuditResult(
+            passed=False,
+            blocking_reasons=blocking,
+            per_gate_results=per_gate,
+            exit_code=2,
+            report_lines=tuple(lines),
+        )
 
-    pairs = pairs[: int(args.max_pairs)]
-
+    pairs = pairs[: int(max_pairs)]
     idle_pairs = [p for p in pairs if 'idle' in p.reason.lower()]
     if not idle_pairs:
-        print('DECISION: REAL-MODE NO APTO')
-        print('REASON: INSUFFICIENT_EVIDENCE (no idle BEFORE/AFTER frames)')
-        print('ACTION: capture idle frames (no input) with FRBOT_DUMP_FRAMES=1 before any gate input')
-        return 2
+        lines.append('DECISION: REAL-MODE NO APTO')
+        lines.append('REASON: INSUFFICIENT_EVIDENCE (no idle BEFORE/AFTER frames)')
+        lines.append('ACTION: capture idle frames (no input) with FRBOT_DUMP_FRAMES=1 before any gate input')
+        blocking.append('INSUFFICIENT_EVIDENCE:no_idle')
+        return RealModeAuditResult(
+            passed=False,
+            blocking_reasons=blocking,
+            per_gate_results=per_gate,
+            exit_code=2,
+            report_lines=tuple(lines),
+        )
 
     critical_rois = {
         'minimap': rois.get('minimap'),
@@ -256,11 +327,19 @@ def main() -> int:
             continue
 
     if calibration_fail:
-        print('DECISION: REAL-MODE NO APTO')
-        print('CLASSIFICATION: CALIBRATION_FAIL')
+        lines.append('DECISION: REAL-MODE NO APTO')
+        lines.append('CLASSIFICATION: CALIBRATION_FAIL')
         for item in calibration_fail:
-            print(f'FAIL: {item}')
-        return 2
+            lines.append(f'FAIL: {item}')
+        blocking.extend(calibration_fail)
+        per_gate['calibration_fail'] = list(calibration_fail)
+        return RealModeAuditResult(
+            passed=False,
+            blocking_reasons=blocking,
+            per_gate_results=per_gate,
+            exit_code=2,
+            report_lines=tuple(lines),
+        )
 
     suspicious: list[str] = []
     ip = idle_pairs[0]
@@ -270,15 +349,47 @@ def main() -> int:
             suspicious.append(f'idle_full_frame_changed ratio={full_ratio:.4f}')
 
     if suspicious:
-        print('DECISION: REAL-MODE NO APTO')
-        print('CLASSIFICATION: POSSIBLE_INTERFERENCE_CLIENT')
+        lines.append('DECISION: REAL-MODE NO APTO')
+        lines.append('CLASSIFICATION: POSSIBLE_INTERFERENCE_CLIENT')
         for s in suspicious:
-            print(f'EVIDENCE: {s}')
-        return 2
+            lines.append(f'EVIDENCE: {s}')
+        blocking.extend(suspicious)
+        per_gate['suspicious'] = list(suspicious)
+        return RealModeAuditResult(
+            passed=False,
+            blocking_reasons=blocking,
+            per_gate_results=per_gate,
+            exit_code=2,
+            report_lines=tuple(lines),
+        )
 
-    print('DECISION: REAL-MODE APTO CON CONDICIONES')
-    print('CONDITIONS: run each gate and validate semantic evidence per gate using dumped BEFORE/AFTER pairs')
-    return 0
+    lines.append('DECISION: REAL-MODE APTO CON CONDICIONES')
+    lines.append('CONDITIONS: run each gate and validate semantic evidence per gate using dumped BEFORE/AFTER pairs')
+    per_gate['calibration_ok'] = True
+    return RealModeAuditResult(
+        passed=True,
+        blocking_reasons=[],
+        per_gate_results=per_gate,
+        exit_code=0,
+        report_lines=tuple(lines),
+    )
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description='Evidence-only REAL-mode audit (frames + ROIs)')
+    ap.add_argument('--frames', default='diagnostics/frames', help='frames directory (PPM)')
+    ap.add_argument('--config', default=os.environ.get('FRBOT_CONFIG_PATH', ''), help='ROI config (json with rois{})')
+    ap.add_argument('--max-pairs', type=int, default=50)
+    args = ap.parse_args()
+
+    frames_dir = Path(str(args.frames))
+    config_raw = str(args.config or '').strip()
+    config_path = Path(config_raw) if config_raw else None
+
+    res = run_real_mode_audit(frames_dir=frames_dir, config_path=config_path, max_pairs=int(args.max_pairs))
+    for line in res.report_lines:
+        print(line)
+    return int(res.exit_code)
 
 
 if __name__ == '__main__':

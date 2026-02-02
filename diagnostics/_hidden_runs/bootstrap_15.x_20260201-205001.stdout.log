@@ -1,0 +1,11 @@
+{
+  "dependency": "mss",
+  "hint": "Install real capture deps: pip install mss (or poetry add mss).",
+  "reason": "missing_dependency"
+}
+{
+    "step":  "calibrate_all_real",
+    "exit_code":  2,
+    "reason":  "bootstrap_failed",
+    "ts":  "2026-02-01T20:50:09.6276856+01:00"
+}

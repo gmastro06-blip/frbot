@@ -134,6 +134,30 @@ Real mode also requires an ROI config file:
 
 Calibration checklist: `docs/ROI_CALIBRATION.md`
 
+### Real calibration (Tibia 15.x) — strict foreground-safe
+
+`tools/calibrate_all_real.py` enforces a strict security invariant:
+
+- The Tibia window HWND must be the *foreground* window at verification time.
+
+This is correct and non-negotiable. A common operational issue is that launching from an interactive terminal/IDE makes the terminal foreground, which triggers a hard stop.
+
+Recommended launcher (does not create a visible console window):
+
+```powershell
+./tools/run_calibration_hidden.ps1
+```
+
+Deterministic HWND mode (skips title search):
+
+- Set `FRBOT_WINDOW_HWND` to a decimal or hex value (e.g. `0x000E1234`).
+
+Required inputs:
+
+- `FRBOT_REAL_FRAMES_DIR` (absolute path)
+- `FRBOT_CONFIG_PATH` (absolute path)
+- `FRBOT_WINDOW_HWND` or `FRBOT_WINDOW_TITLE`
+
 Bot config (waypoints):
 
 - `FRBOT_BOT_CONFIG_PATH` points to a legacy `file.json`-style config containing waypoints.

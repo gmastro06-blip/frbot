@@ -1,0 +1,1 @@
+{"source": "OBS Projector", "window_title": "Proyector en ventana (Fuente) - Tibia_Fuente", "monitor": "unknown", "validated": true}

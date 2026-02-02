@@ -20,5 +20,6 @@ def test_mock_mode_runs(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setenv('FRBOT_TICK_HZ', '50')
     monkeypatch.setenv('FRBOT_MOCK_CAPTURE_OK', '1')
     monkeypatch.setenv('FRBOT_MOCK_INPUT_OK', '1')
+    monkeypatch.delenv('FRBOT_CONFIG_PATH', raising=False)
     code = run()
     assert code == 0

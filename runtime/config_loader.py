@@ -15,6 +15,16 @@ class LoadedConfig:
 	rois: Dict[str, Roi]
 
 
+_REQUIRED_REAL_ROIS: tuple[str, ...] = (
+	'minimap',
+	'battle_list',
+	'hp_mp',
+	'inventory',
+	'npc_dialog',
+	'trade',
+)
+
+
 def _default_mock_rois() -> Dict[str, Roi]:
 	# Fits within a 16x16 mock frame.
 	return {
@@ -30,20 +40,29 @@ def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 	if path_raw:
 		path = Path(path_raw)
 		if not path.exists():
-			raise PreflightFailed(f'config_path does not exist: {path_raw!r}')
+			raise PreflightFailed('config_invalid_schema')
 		try:
 			data = json.loads(path.read_text(encoding='utf-8'))
 		except Exception as exc:
-			raise PreflightFailed(f'failed to read config_path: {type(exc).__name__}: {exc}') from exc
+			raise PreflightFailed('config_invalid_schema') from exc
 
-		rois_node = data.get('rois') if isinstance(data, dict) else None
+		# Canonical schema (single allowed):
+		# {"rois": {"name": {"x": int, "y": int, "width": int, "height": int}, ...}}
+		if not isinstance(data, dict):
+			raise PreflightFailed('config_invalid_schema')
+
+		# Eliminate ambiguous configs: only 'rois' is allowed at top-level.
+		if set(data.keys()) != {'rois'}:
+			raise PreflightFailed('config_invalid_schema')
+
+		rois_node = data.get('rois')
 		if not isinstance(rois_node, dict):
-			raise PreflightFailed('config missing required object: rois')
+			raise PreflightFailed('config_invalid_schema')
 
 		rois: Dict[str, Roi] = {}
 		for name, roi_raw in rois_node.items():
 			if not isinstance(name, str) or not isinstance(roi_raw, dict):
-				continue
+				raise PreflightFailed('config_invalid_schema')
 			try:
 				rois[name] = Roi(
 					name=name,
@@ -53,7 +72,13 @@ def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 					height=int(roi_raw['height']),
 				)
 			except Exception as exc:
-				raise PreflightFailed(f'invalid roi {name!r}: {type(exc).__name__}: {exc}') from exc
+				raise PreflightFailed('config_invalid_schema') from exc
+
+		# REAL-mode certification requires a minimal, fixed ROI inventory.
+		if mode == 'real':
+			for req in _REQUIRED_REAL_ROIS:
+				if req not in rois:
+					raise PreflightFailed('config_invalid_schema')
 
 		return LoadedConfig(rois=rois)
 
@@ -61,4 +86,4 @@ def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 	if mode == 'mock':
 		return LoadedConfig(rois=_default_mock_rois())
 
-	raise PreflightFailed('real mode requires FRBOT_CONFIG_PATH (or RuntimeConfig.config_path)')
+	raise PreflightFailed('config_invalid_schema')

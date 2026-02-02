@@ -115,8 +115,8 @@ def test_combat_abort_unverified_evidence_is_abort_first(tmp_path: Path, monkeyp
     assert run_combat_only() == 1
 
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
-    assert 'inputs_sent=1' in runtime_log
-    assert 'inputs_sent=2' not in runtime_log
+    assert '"inputs_sent":1' in runtime_log
+    assert '"inputs_sent":2' not in runtime_log
 
 
 def test_looting_premium_unverified_evidence_is_abort_first(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:

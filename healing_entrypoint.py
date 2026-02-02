@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 import time
 
-from contracts.errors import PreflightFailed
+from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_enabled, dump_pair
 from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from rules.healing import select_heal_intent
 from runtime.healing_preflight import run as healing_preflight_run
@@ -22,6 +23,14 @@ def _env_str(name: str, default: str) -> str:
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
+    if name == 'FRBOT_WINDOW_HWND' and raw is not None and str(raw).strip() != '':
+        s = str(raw).strip()
+        if s.lower().startswith('0x') and len(s) > 2 and set(s[2:].lower()) == {'x'}:
+            return int(default)
+        try:
+            return int(s, 0)
+        except Exception as exc:
+            raise PreflightFailed('window_hwnd_invalid') from exc
     try:
         return int(raw) if raw is not None else int(default)
     except Exception:
@@ -129,23 +138,34 @@ def run_healing_only() -> int:
 
             # Deterministic success: if no heal is required and HP is readable, exit.
             if res.intent is None and float(hp) > float(ctx.config.heal_hp_threshold):
-                logger.info('SUCCESS no_heal_needed hp=%0.3f mp=%0.3f source=%s', float(hp), float(mp), str(src))
+                log_json(
+                    logger,
+                    event='success',
+                    gate='healing',
+                    status='SUCCESS',
+                    result='no_heal_needed',
+                    hp=float(hp),
+                    mp=float(mp),
+                    source=str(src),
+                )
                 return 0
 
             healed = False
             if res.intent is not None:
                 if not ok_to_cast:
                     # Cooldown is observable and active: abort (no casts).
-                    logger.info(
-                        'tick_index=%d hp=%0.3f mp=%0.3f source=%s intent=%s attempts_used=%d cooldown_ok=%s healed=%s',
-                        int(tick_index),
-                        float(hp),
-                        float(mp),
-                        str(src),
-                        'HealIntent',
-                        int(ctx.healing.attempt_count),
-                        bool(ok_to_cast),
-                        False,
+                    log_json(
+                        logger,
+                        event='tick',
+                        gate='healing',
+                        tick_index=int(tick_index),
+                        hp=float(hp),
+                        mp=float(mp),
+                        source=str(src),
+                        intent='HealIntent',
+                        attempts_used=int(ctx.healing.attempt_count),
+                        cooldown_ok=bool(ok_to_cast),
+                        healed=False,
                     )
                     raise PreflightFailed('heal_on_cooldown')
 
@@ -154,33 +174,46 @@ def run_healing_only() -> int:
                 except PreflightFailed as exc:
                     # Emit a final per-tick audit line before aborting.
                     if str(exc) == 'heal_unverified':
-                        logger.info(
-                            'tick_index=%d hp=%0.3f mp=%0.3f source=%s intent=%s attempts_used=%d cooldown_ok=%s healed=%s',
-                            int(tick_index),
-                            float(hp),
-                            float(mp),
-                            str(src),
-                            'HealIntent',
-                            int(ctx.healing.attempt_count),
-                            True,
-                            False,
+                        log_json(
+                            logger,
+                            event='tick',
+                            gate='healing',
+                            tick_index=int(tick_index),
+                            hp=float(hp),
+                            mp=float(mp),
+                            source=str(src),
+                            intent='HealIntent',
+                            attempts_used=int(ctx.healing.attempt_count),
+                            cooldown_ok=True,
+                            healed=False,
                         )
                     raise
 
                 if healed:
-                    logger.info('SUCCESS healed hp=%0.3f mp=%0.3f source=%s', float(hp), float(mp), str(src))
+                    log_json(
+                        logger,
+                        event='success',
+                        gate='healing',
+                        status='SUCCESS',
+                        result='healed',
+                        hp=float(hp),
+                        mp=float(mp),
+                        source=str(src),
+                    )
                     return 0
 
-            logger.info(
-                'tick_index=%d hp=%0.3f mp=%0.3f source=%s intent=%s attempts_used=%d cooldown_ok=%s healed=%s',
-                int(tick_index),
-                float(hp),
-                float(mp),
-                str(src),
-                ('HealIntent' if res.intent is not None else 'None'),
-                int(ctx.healing.attempt_count),
-                bool(ok_to_cast),
-                bool(healed),
+            log_json(
+                logger,
+                event='tick',
+                gate='healing',
+                tick_index=int(tick_index),
+                hp=float(hp),
+                mp=float(mp),
+                source=str(src),
+                intent=('HealIntent' if res.intent is not None else 'None'),
+                attempts_used=int(ctx.healing.attempt_count),
+                cooldown_ok=bool(ok_to_cast),
+                healed=bool(healed),
             )
 
             ctx.telemetry.tick_count += 1
@@ -196,6 +229,12 @@ def run_healing_only() -> int:
             else:
                 try_dump_window_frame(gate='healing', reason=str(exc))
         write_fatal(str(exc), exc)
+        return 1
+    except ContractViolation as exc:
+        if 'Unsupported mode:' in str(exc):
+            write_fatal('invalid_mode', exc)
+            return 1
+        write_fatal('runtime crashed', exc)
         return 1
     except Exception as exc:
         write_fatal('runtime crashed', exc)

@@ -1,0 +1,7 @@
+﻿REAL AUDIT EXIT CODE: 0
+FRBOT_REAL_FRAMES_DIR: C:\Users\gmast\AppData\Local\Temp\frbot_real_audit_9vovk0yw\frames
+FRBOT_CONFIG_PATH: C:\Users\gmast\AppData\Local\Temp\frbot_real_audit_9vovk0yw\rois.json
+
+MARKER
+PYOK
+runtime.log: PRESENT

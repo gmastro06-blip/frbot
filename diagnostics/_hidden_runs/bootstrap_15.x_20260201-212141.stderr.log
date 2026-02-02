@@ -1,0 +1,7 @@
+ConvertFrom-Json : Primitivo JSON no v lido: Traceback.
+En C:\Users\gmast\Documents\GitHub\frbot\tools\bootstrap_real_evidence.ps1: 233 Car cter: 42
++ $win = (Invoke-PythonSnippet $winInfo) | ConvertFrom-Json
++                                          ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [ConvertFrom-Json], ArgumentException
+    + FullyQualifiedErrorId : System.ArgumentException,Microsoft.PowerShell.Commands.ConvertFromJsonCommand
+ 

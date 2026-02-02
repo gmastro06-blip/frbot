@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, cast
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,9 +29,9 @@ def _rel(path: Path) -> str:
         return path.as_posix()
 
 
-def _parse(path: Path) -> ast.AST:
+def _parse(path: Path) -> ast.Module:
     src = path.read_text(encoding='utf-8')
-    return ast.parse(src, filename=_rel(path))
+    return cast(ast.Module, ast.parse(src, filename=_rel(path)))
 
 
 def _iter_calls(node: ast.AST) -> Iterable[ast.Call]:
@@ -279,8 +280,7 @@ def check_execute_one_input(*, root: Path | None = None) -> list[Violation]:
         if not _is_python_file(path):
             continue
 
-        src = path.read_text(encoding='utf-8')
-        tree = ast.parse(src, filename=_rel(path))
+        tree = _parse(path)
 
         for node in tree.body:
             if not isinstance(node, ast.FunctionDef):
@@ -356,6 +356,74 @@ def check_engine_one_intent_per_tick_guard_present(*, root: Path | None = None) 
     return []
 
 
+def check_ci_runs_mock_auditor(*, root: Path | None = None) -> list[Violation]:
+    """Ensure CI actually runs the auditor in mock mode.
+
+    This makes "CI green" a meaningful signal: if the auditor regresses and exits
+    non-zero, the workflow must fail.
+    """
+
+    root = root or _repo_root()
+    path = root / '.github' / 'workflows' / 'ci.yml'
+    if not path.exists():
+        return [
+            Violation(rule='ci_runs_audit_all_mock', file=_rel(path), detail='missing workflow')
+        ]
+
+    text = path.read_text(encoding='utf-8', errors='replace')
+    required = [
+        'audit-mock:',
+        'python tools/audit_all.py',
+        'FRBOT_MODE: mock',
+    ]
+
+    violations: list[Violation] = []
+    for needle in required:
+        if needle not in text:
+            violations.append(
+                Violation(rule='ci_runs_audit_all_mock', file=_rel(path), detail=f"missing '{needle}'")
+            )
+
+    # Ensure the audit-mock job is not marked as continue-on-error.
+    if 'audit-mock:' in text:
+        segment = text.split('audit-mock:', 1)[1]
+        m = re.search(r'\n\s{2}[A-Za-z0-9_-]+:\s*\n', segment)
+        job_block = segment[: m.start()] if m else segment
+        if 'continue-on-error: true' in job_block:
+            violations.append(
+                Violation(rule='ci_runs_audit_all_mock', file=_rel(path), detail='audit-mock uses continue-on-error: true')
+            )
+
+    return violations
+
+
+def check_no_print_in_runtime(*, root: Path | None = None) -> list[Violation]:
+    """Disallow print() in runtime/ and *_entrypoint.py.
+
+    Tooling scripts may print, but runtime code must be evidence-only via logs.
+    """
+
+    root = root or _repo_root()
+    violations: list[Violation] = []
+
+    candidates: list[Path] = []
+    candidates.extend(sorted(root.glob('*_entrypoint.py')))
+    runtime_dir = root / 'runtime'
+    if runtime_dir.exists():
+        candidates.extend(sorted(runtime_dir.rglob('*.py')))
+
+    for path in candidates:
+        if not _is_python_file(path):
+            continue
+        text = path.read_text(encoding='utf-8', errors='replace')
+        if 'print(' in text:
+            violations.append(
+                Violation(rule='no_print_in_runtime', file=_rel(path), detail='contains print(')
+            )
+
+    return violations
+
+
 def run_all_checks(*, root: Path | None = None) -> list[Violation]:
     root = root or _repo_root()
 
@@ -365,6 +433,8 @@ def run_all_checks(*, root: Path | None = None) -> list[Violation]:
     violations.extend(check_execute_one_input(root=root))
     violations.extend(check_forbidden_hash_digest_evidence(root=root))
     violations.extend(check_engine_one_intent_per_tick_guard_present(root=root))
+    violations.extend(check_ci_runs_mock_auditor(root=root))
+    violations.extend(check_no_print_in_runtime(root=root))
 
     return violations
 

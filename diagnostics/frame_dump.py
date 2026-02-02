@@ -60,24 +60,26 @@ def dump_pair(
 
     if before is not None:
         dump_frame_ppm(before, out / f'{g}_{stamp}_{r}_before.ppm')
-        if bool(getattr(before, 'minimap_detected', False)) and getattr(before, 'minimap_rgb', b''):
+        minimap_rgb = getattr(before, 'minimap_rgb', None)
+        if bool(getattr(before, 'minimap_detected', False)) and isinstance(minimap_rgb, (bytes, bytearray, memoryview)) and len(minimap_rgb):
             mm = Frame(
                 width=int(before.minimap_width),
                 height=int(before.minimap_height),
                 monotonic_ts_ns=0,
                 digest_hex='',
-                rgb=bytes(before.minimap_rgb),
+                rgb=bytes(minimap_rgb),
             )
             dump_frame_ppm(mm, out / f'{g}_{stamp}_{r}_before_minimap.ppm')
 
     if after is not None:
         dump_frame_ppm(after, out / f'{g}_{stamp}_{r}_after.ppm')
-        if bool(getattr(after, 'minimap_detected', False)) and getattr(after, 'minimap_rgb', b''):
+        minimap_rgb = getattr(after, 'minimap_rgb', None)
+        if bool(getattr(after, 'minimap_detected', False)) and isinstance(minimap_rgb, (bytes, bytearray, memoryview)) and len(minimap_rgb):
             mm = Frame(
                 width=int(after.minimap_width),
                 height=int(after.minimap_height),
                 monotonic_ts_ns=0,
                 digest_hex='',
-                rgb=bytes(after.minimap_rgb),
+                rgb=bytes(minimap_rgb),
             )
             dump_frame_ppm(mm, out / f'{g}_{stamp}_{r}_after_minimap.ppm')

@@ -1,0 +1,6 @@
+{
+    "config":  "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\rois_15x.json",
+    "detail":  "  File \"C:\\Users\\gmast\\AppData\\Local\\Temp\\frbot_snippet_73e57d40e79b46b09b9f96314f063070.py\", line 2\r\n    sys.path.insert(0, r\"C:\\Users\\gmast\\Documents\\GitHub\\frbot\")import json\r\n                                                                ^^^^^^\r\nSyntaxError: invalid syntax\r\n",
+    "reason":  "config_invalid_schema",
+    "ts":  "2026-02-01T21:23:35.7156752+01:00"
+}

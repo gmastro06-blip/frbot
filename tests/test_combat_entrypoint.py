@@ -79,8 +79,8 @@ def test_combat_entrypoint_abort_no_evidence(tmp_path: Path, monkeypatch: Monkey
 
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
     # No spam: unverified attack aborts immediately.
-    assert 'inputs_sent=1' in runtime_log
-    assert 'inputs_sent=2' not in runtime_log
+    assert '"inputs_sent":1' in runtime_log
+    assert '"inputs_sent":2' not in runtime_log
 
 
 def test_combat_entrypoint_abort_target_not_locked(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -113,7 +113,7 @@ def test_combat_entrypoint_abort_permanent_cooldown(tmp_path: Path, monkeypatch:
     assert 'combat_on_cooldown' in fatal
 
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
-    assert 'inputs_sent=1' not in runtime_log
+    assert '"inputs_sent":1' not in runtime_log
 
 
 def test_combat_entrypoint_success_damage_ok(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -128,8 +128,8 @@ def test_combat_entrypoint_success_damage_ok(tmp_path: Path, monkeypatch: Monkey
 
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
     # Exactly 1 input on success.
-    assert 'inputs_sent=1' in runtime_log
-    assert 'inputs_sent=2' not in runtime_log
+    assert '"inputs_sent":1' in runtime_log
+    assert '"inputs_sent":2' not in runtime_log
 
 
 def test_combat_entrypoint_abort_active_cooldown_no_input(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -147,4 +147,4 @@ def test_combat_entrypoint_abort_active_cooldown_no_input(tmp_path: Path, monkey
     assert 'combat_on_cooldown' in fatal
 
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
-    assert 'inputs_sent=1' not in runtime_log
+    assert '"inputs_sent":1' not in runtime_log

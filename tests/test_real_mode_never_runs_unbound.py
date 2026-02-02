@@ -18,6 +18,13 @@ def test_real_mode_never_runs_unbound(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.delenv('FRBOT_WINDOW_TITLE', raising=False)
     monkeypatch.delenv('FRBOT_WINDOW_HWND', raising=False)
 
+    # Hermetic: developer shells may have projector/capture env set.
+    monkeypatch.delenv('FRBOT_CAPTURE_BACKEND', raising=False)
+    monkeypatch.delenv('FRBOT_CAPTURE_TARGET', raising=False)
+    monkeypatch.delenv('FRBOT_PROJECTOR_WINDOW_TITLE', raising=False)
+    monkeypatch.delenv('FRBOT_PROJECTOR_WINDOW_HWND', raising=False)
+    monkeypatch.delenv('FRBOT_PROJECTOR_REQUIRE_FOREGROUND', raising=False)
+
     code = run()
     assert code == 1
     assert fatal.exists()

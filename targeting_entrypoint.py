@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 import time
 
-from contracts.errors import PreflightFailed
+from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_enabled, dump_pair
 from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from rules.targeting import select_targeting_intent
 from runtime.battle_list_semantics import detect_battle_list
@@ -23,6 +24,14 @@ def _env_str(name: str, default: str) -> str:
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
+    if name == 'FRBOT_WINDOW_HWND' and raw is not None and str(raw).strip() != '':
+        s = str(raw).strip()
+        if s.lower().startswith('0x') and len(s) > 2 and set(s[2:].lower()) == {'x'}:
+            return int(default)
+        try:
+            return int(s, 0)
+        except Exception as exc:
+            raise PreflightFailed('window_hwnd_invalid') from exc
     try:
         return int(raw) if raw is not None else int(default)
     except Exception:
@@ -127,19 +136,21 @@ def run_targeting_only() -> int:
             if res.intent is not None:
                 execute_intent(ctx, capture=capture, input_=input_, binding=binding, intent=res.intent)
 
-            logger.info(
-                'tick_index=%d candidates_count=%d selected_target=%s attempts_used=%d locked=%s',
-                int(tick_index),
-                int(len(candidates)),
-                str(selected_name),
-                int(ctx.targeting.attempt_count),
-                bool(ctx.targeting.target.locked),
+            log_json(
+                logger,
+                event='tick',
+                gate='targeting',
+                tick_index=int(tick_index),
+                candidates_count=int(len(candidates)),
+                selected_target=str(selected_name),
+                attempts_used=int(ctx.targeting.attempt_count),
+                locked=bool(ctx.targeting.target.locked),
             )
 
             ctx.telemetry.tick_count += 1
 
             if ctx.targeting.target.locked:
-                logger.info('SUCCESS target=%s', str(ctx.targeting.target.target_name))
+                log_json(logger, event='success', gate='targeting', target=str(ctx.targeting.target.target_name))
                 return 0
 
             time.sleep(tick_period)
@@ -154,6 +165,12 @@ def run_targeting_only() -> int:
             else:
                 try_dump_window_frame(gate='targeting', reason=str(exc))
         write_fatal(str(exc), exc)
+        return 1
+    except ContractViolation as exc:
+        if 'Unsupported mode:' in str(exc):
+            write_fatal('invalid_mode', exc)
+            return 1
+        write_fatal('runtime crashed', exc)
         return 1
     except Exception as exc:
         write_fatal('runtime crashed', exc)

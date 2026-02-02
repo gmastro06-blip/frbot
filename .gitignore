@@ -38,4 +38,8 @@ htmlcov/
 
 # Runtime artifacts (must never be committed)
 diagnostics/*.log
+diagnostics/frames/
 logs/
+
+# Local real-client evidence (never commit captured game frames)
+tests/real_frames/

@@ -4,17 +4,19 @@ import os
 import time
 
 from contracts.capture import CaptureAdapter
-from contracts.errors import PreflightFailed
+from contracts.errors import ContractViolation, PreflightFailed
 from contracts.input import InputAdapter
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from contracts.targeting import IntentTarget
 from contracts.window import WindowBindingAdapter
 from diagnostics.fatal import write_fatal
 from diagnostics.logger import configure_logger
+from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import record_after, record_before
 from rules.targeting import select_targeting_intent
 from runtime.battle_list_semantics import crop_roi_rgb, detect_battle_list
 from runtime.config_loader import load_rois
+from runtime.env import parse_window_hwnd_env
 from runtime.targeting_preflight import targeting_preflight
 
 
@@ -41,7 +43,7 @@ def _load_config_from_env() -> RuntimeConfig:
         enable_targeting=env_bool('FRBOT_ENABLE_TARGETING', True),
         battle_list_roi=env_str('FRBOT_BATTLE_LIST_ROI', 'battle_list'),
         target_frame_roi=env_str('FRBOT_TARGET_FRAME_ROI', 'target_frame'),
-        window_hwnd=int(os.environ.get('FRBOT_WINDOW_HWND', '0') or '0'),
+        window_hwnd=parse_window_hwnd_env('FRBOT_WINDOW_HWND'),
         window_title_substring=env_str('FRBOT_WINDOW_TITLE', ''),
         max_attempts_per_target=int(os.environ.get('FRBOT_MAX_ATTEMPTS_PER_TARGET', '2') or '2'),
         max_time_ms_per_target=int(os.environ.get('FRBOT_MAX_TIME_MS_PER_TARGET', '2500') or '2500'),
@@ -249,13 +251,15 @@ def run() -> int:
         while True:
             targeting_tick(ctx, capture, input_, binding)
 
-            logger.info(
-                'mode=%s tick_count=%d locked=%s target=%s attempts=%d',
-                ctx.config.mode,
-                ctx.telemetry.tick_count,
-                ctx.targeting.target.locked,
-                ctx.targeting.target.target_name,
-                ctx.targeting.attempt_count,
+            log_json(
+                logger,
+                event='tick',
+                gate='targeting',
+                mode=str(ctx.config.mode),
+                tick_count=int(ctx.telemetry.tick_count),
+                locked=bool(ctx.targeting.target.locked),
+                target=str(ctx.targeting.target.target_name),
+                attempts=int(ctx.targeting.attempt_count),
             )
 
             ctx.telemetry.tick_count += 1

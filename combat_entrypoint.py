@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 import time
 
-from contracts.errors import PreflightFailed
+from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_enabled, dump_pair
 from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from rules.combat import select_combat_intent
 from runtime.combat_preflight import run as combat_preflight_run
@@ -22,6 +23,14 @@ def _env_str(name: str, default: str) -> str:
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
+    if name == 'FRBOT_WINDOW_HWND' and raw is not None and str(raw).strip() != '':
+        s = str(raw).strip()
+        if s.lower().startswith('0x') and len(s) > 2 and set(s[2:].lower()) == {'x'}:
+            return int(default)
+        try:
+            return int(s, 0)
+        except Exception as exc:
+            raise PreflightFailed('window_hwnd_invalid') from exc
     try:
         return int(raw) if raw is not None else int(default)
     except Exception:
@@ -119,16 +128,18 @@ def run_combat_only() -> int:
                 target_hp_decrease_min=float(ctx.config.combat_target_hp_decrease_min),
             )
             if res.abort_reason is not None:
-                logger.info(
-                    'tick_index=%d intent=%s attempts_used=%d intents_emitted=%d inputs_sent=%d target=%s attacked_ok=%s abort_reason=%s',
-                    int(tick_index),
-                    'CombatIntent',
-                    int(ctx.combat.attempt_count),
-                    int(ctx.combat.intents_emitted),
-                    int(ctx.combat.inputs_sent),
-                    str(ctx.targeting.target.target_name),
-                    False,
-                    str(res.abort_reason),
+                log_json(
+                    logger,
+                    event='tick',
+                    gate='combat',
+                    tick_index=int(tick_index),
+                    intent='CombatIntent',
+                    attempts_used=int(ctx.combat.attempt_count),
+                    intents_emitted=int(ctx.combat.intents_emitted),
+                    inputs_sent=int(ctx.combat.inputs_sent),
+                    target=str(ctx.targeting.target.target_name),
+                    attacked_ok=False,
+                    abort_reason=str(res.abort_reason),
                 )
                 raise PreflightFailed(res.abort_reason)
             if res.intent is None:
@@ -140,35 +151,46 @@ def run_combat_only() -> int:
                 attacked_ok = execute_combat_intent(ctx, capture=capture, input_=input_, binding=binding, intent=res.intent)
             except PreflightFailed as exc:
                 # Emit a final per-tick audit line before aborting.
-                logger.info(
-                    'tick_index=%d intent=%s attempts_used=%d intents_emitted=%d inputs_sent=%d target=%s attacked_ok=%s abort_reason=%s',
-                    int(tick_index),
-                    'CombatIntent',
-                    int(ctx.combat.attempt_count),
-                    int(ctx.combat.intents_emitted),
-                    int(ctx.combat.inputs_sent),
-                    str(ctx.targeting.target.target_name),
-                    False,
-                    str(exc),
+                log_json(
+                    logger,
+                    event='tick',
+                    gate='combat',
+                    tick_index=int(tick_index),
+                    intent='CombatIntent',
+                    attempts_used=int(ctx.combat.attempt_count),
+                    intents_emitted=int(ctx.combat.intents_emitted),
+                    inputs_sent=int(ctx.combat.inputs_sent),
+                    target=str(ctx.targeting.target.target_name),
+                    attacked_ok=False,
+                    abort_reason=str(exc),
                 )
                 raise
 
-            logger.info(
-                'tick_index=%d intent=%s attempts_used=%d intents_emitted=%d inputs_sent=%d target=%s attacked_ok=%s abort_reason=%s',
-                int(tick_index),
-                'CombatIntent',
-                int(ctx.combat.attempt_count),
-                int(ctx.combat.intents_emitted),
-                int(ctx.combat.inputs_sent),
-                str(ctx.targeting.target.target_name),
-                bool(attacked_ok),
-                'none',
+            log_json(
+                logger,
+                event='tick',
+                gate='combat',
+                tick_index=int(tick_index),
+                intent='CombatIntent',
+                attempts_used=int(ctx.combat.attempt_count),
+                intents_emitted=int(ctx.combat.intents_emitted),
+                inputs_sent=int(ctx.combat.inputs_sent),
+                target=str(ctx.targeting.target.target_name),
+                attacked_ok=bool(attacked_ok),
+                abort_reason='none',
             )
 
             ctx.telemetry.tick_count += 1
 
             if attacked_ok:
-                logger.info('SUCCESS combat_evidence_ok target=%s', str(ctx.targeting.target.target_name))
+                log_json(
+                    logger,
+                    event='success',
+                    gate='combat',
+                    status='SUCCESS',
+                    result='combat_evidence_ok',
+                    target=str(ctx.targeting.target.target_name),
+                )
                 return 0
 
             time.sleep(tick_period)
@@ -183,6 +205,12 @@ def run_combat_only() -> int:
             else:
                 try_dump_window_frame(gate='combat', reason=str(exc))
         write_fatal(str(exc), exc)
+        return 1
+    except ContractViolation as exc:
+        if 'Unsupported mode:' in str(exc):
+            write_fatal('invalid_mode', exc)
+            return 1
+        write_fatal('runtime crashed', exc)
         return 1
     except Exception as exc:
         write_fatal('runtime crashed', exc)

@@ -14,7 +14,9 @@ def configure_logger() -> logging.Logger:
 
     handler = logging.FileHandler(Path('diagnostics') / 'runtime.log', encoding='utf-8')
     handler.setLevel(logging.INFO)
-    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s %(message)s'))
+    # JSONL only: each line must be a standalone JSON object.
+    # Timestamps/levels are embedded in the JSON payload.
+    handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(handler)
 
     return logger

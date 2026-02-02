@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-#  BASELINE STABLE 
+# === BASELINE STABLE ===
 # Do not modify control-flow/contracts here without a contract review.
 # Extend only by adding new independent gates. See BASELINE.md.
 

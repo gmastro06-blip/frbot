@@ -15,6 +15,46 @@ if (!(Test-Path $diagnosticsDir)) {
 $fatalPath = Join-Path $diagnosticsDir "fatal.log"
 $runtimePath = Join-Path $diagnosticsDir "runtime.log"
 
+function Get-RuntimeEvents {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (!(Test-Path $Path)) {
+        return @()
+    }
+
+    $events = @()
+    foreach ($line in (Get-Content -Path $Path -ErrorAction Stop)) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        try {
+            $events += ($line | ConvertFrom-Json -ErrorAction Stop)
+        } catch {
+            # Keep behavior strict for CI: runtime.log must be valid JSONL.
+            throw "runtime.log contains non-JSON line: $line"
+        }
+    }
+    return $events
+}
+
+function Get-FatalPayload {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (!(Test-Path $Path)) {
+        return $null
+    }
+
+    $raw = Get-Content -Raw -Path $Path -ErrorAction Stop
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+        throw "fatal.log is empty"
+    }
+    return ($raw | ConvertFrom-Json -ErrorAction Stop)
+}
+
 # 1) REAL MODE: debe ABORTAR y escribir fatal.log
 Write-Host "`n[1/2] REAL mode (expect ABORT + fatal.log)" -ForegroundColor Yellow
 $env:FRBOT_MODE = "real"
@@ -31,9 +71,23 @@ if ($code -eq 0) {
         Write-Host "ERROR: runtime.log not found after real-mode success" -ForegroundColor Red
         exit 1
     }
-    $runtimeTextReal = Get-Content -Raw $runtimePath
-    if ($runtimeTextReal -notmatch "tick_count=") {
-        Write-Host "ERROR: runtime.log missing tick_count evidence (real)" -ForegroundColor Red
+
+    $events = Get-RuntimeEvents -Path $runtimePath
+    $tickEvents = @($events | Where-Object { $_.event -eq 'tick' })
+    if ($tickEvents.Count -lt 1) {
+        Write-Host "ERROR: runtime.log missing tick events (real)" -ForegroundColor Red
+        exit 1
+    }
+
+    $maxTick = 0
+    foreach ($evt in $tickEvents) {
+        if ($null -ne $evt.tick_count) {
+            $v = [int]$evt.tick_count
+            if ($v -gt $maxTick) { $maxTick = $v }
+        }
+    }
+    if ($maxTick -lt 1) {
+        Write-Host "ERROR: runtime.log missing tick_count >= 1 (real)" -ForegroundColor Red
         exit 1
     }
     Write-Host "OK: real mode ran with verified adapters" -ForegroundColor Green
@@ -45,9 +99,17 @@ if ($code -eq 0) {
     }
     Write-Host "OK: fatal.log present" -ForegroundColor Green
 
-    $fatalText = Get-Content -Raw $fatalPath
-    if ($fatalText -notmatch "FATAL: .+") {
-        Write-Host "ERROR: fatal.log missing reason string" -ForegroundColor Red
+    $fatal = Get-FatalPayload -Path $fatalPath
+    if ($null -eq $fatal) {
+        Write-Host "ERROR: fatal.log could not be parsed" -ForegroundColor Red
+        exit 1
+    }
+    if ($fatal.level -ne 'FATAL') {
+        Write-Host "ERROR: fatal.log payload missing level=FATAL" -ForegroundColor Red
+        exit 1
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$fatal.reason)) {
+        Write-Host "ERROR: fatal.log missing reason" -ForegroundColor Red
         exit 1
     }
 
@@ -76,17 +138,19 @@ if (!(Test-Path $runtimePath)) {
     exit 1
 }
 
-$runtimeText = Get-Content -Raw $runtimePath
-if ($runtimeText -notmatch "tick_count=") {
-    Write-Host "ERROR: runtime.log missing tick_count evidence" -ForegroundColor Red
+$events = Get-RuntimeEvents -Path $runtimePath
+$tickEvents = @($events | Where-Object { $_.event -eq 'tick' })
+if ($tickEvents.Count -lt 1) {
+    Write-Host "ERROR: runtime.log missing tick events (mock)" -ForegroundColor Red
     exit 1
 }
 
-$matches = Select-String -Path $runtimePath -Pattern "tick_count=(\d+)" -AllMatches
 $maxTick = 0
-foreach ($m in $matches.Matches) {
-    $v = [int]$m.Groups[1].Value
-    if ($v -gt $maxTick) { $maxTick = $v }
+foreach ($evt in $tickEvents) {
+    if ($null -ne $evt.tick_count) {
+        $v = [int]$evt.tick_count
+        if ($v -gt $maxTick) { $maxTick = $v }
+    }
 }
 if ($maxTick -lt 1) {
     Write-Host "ERROR: mock did not produce tick_count >= 1" -ForegroundColor Red

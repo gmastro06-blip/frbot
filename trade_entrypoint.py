@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Literal, cast
 
-from contracts.errors import PreflightFailed
+from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import InventorySnapshot, NpcIdentity, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_enabled, dump_pair
 from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
+from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from runtime.trade_preflight import run as trade_preflight_run
 from runtime.trade_runner import execute_trade_tick
@@ -21,6 +23,14 @@ def _env_str(name: str, default: str) -> str:
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
+    if name == 'FRBOT_WINDOW_HWND' and raw is not None and str(raw).strip() != '':
+        s = str(raw).strip()
+        if s.lower().startswith('0x') and len(s) > 2 and set(s[2:].lower()) == {'x'}:
+            return int(default)
+        try:
+            return int(s, 0)
+        except Exception as exc:
+            raise PreflightFailed('window_hwnd_invalid') from exc
     try:
         return int(raw) if raw is not None else int(default)
     except Exception:
@@ -33,6 +43,16 @@ def _env_float(name: str, default: float) -> float:
         return float(raw) if raw is not None else float(default)
     except Exception:
         return float(default)
+
+
+TradeAction = Literal['buy', 'sell', 'deposit']
+
+
+def _env_trade_action(name: str, default: TradeAction) -> TradeAction:
+    raw = _env_str(name, default).strip().lower()
+    if raw in ('buy', 'sell', 'deposit'):
+        return cast(TradeAction, raw)
+    return default
 
 
 def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
@@ -65,7 +85,7 @@ def _load_trade_config_from_env() -> RuntimeConfig:
 
         trade_max_attempts=_env_int('FRBOT_TRADE_MAX_ATTEMPTS', 3),
         trade_max_ticks=_env_int('FRBOT_TRADE_MAX_TICKS', 20),
-        trade_action=_env_str('FRBOT_TRADE_ACTION', 'buy').strip().lower(),
+        trade_action=_env_trade_action('FRBOT_TRADE_ACTION', 'buy'),
         trade_expected_npc_id=_env_int('FRBOT_TRADE_EXPECTED_NPC_ID', 1),
 
         trade_inventory_roi=_env_str('FRBOT_TRADE_INVENTORY_ROI', 'trade_inventory'),
@@ -121,13 +141,13 @@ def run_trade_only() -> int:
                 'inputs_sent': int(ctx.trade.inputs_sent),
             }
 
-            logger.info(json.dumps(payload, separators=(',', ':'), sort_keys=True))
+            log_json(logger, event='tick', gate='trade', **payload)
 
             if outcome.abort_reason is not None:
                 raise PreflightFailed(str(outcome.abort_reason))
 
             if outcome.success:
-                logger.info(json.dumps({'status': 'SUCCESS'}, separators=(',', ':'), sort_keys=True))
+                log_json(logger, event='success', gate='trade', status='SUCCESS')
                 return 0
 
         raise PreflightFailed('trade_unverified_action')
@@ -154,6 +174,12 @@ def run_trade_only() -> int:
             f"last_inventory_snapshot={json.dumps(_serialize_inventory(last_inv), separators=(',', ':'), sort_keys=True)}"
         )
         write_fatal(msg, exc)
+        return 1
+    except ContractViolation as exc:
+        if 'Unsupported mode:' in str(exc):
+            write_fatal('invalid_mode', exc)
+            return 1
+        write_fatal('runtime crashed', exc)
         return 1
     except Exception as exc:
         write_fatal('runtime crashed', exc)

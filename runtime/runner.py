@@ -8,13 +8,15 @@ from __future__ import annotations
 import os
 import time
 
-from contracts.errors import PreflightFailed
+from contracts.errors import ContractViolation, PreflightFailed
 from contracts.engine import EngineInput, IntentMove
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
 from diagnostics.logger import configure_logger
+from diagnostics.jsonlog import log as log_json
 from core.engine import tick as engine_tick
 from runtime.bot_config_loader import load_bot_config
+from runtime.env import parse_window_hwnd_env
 from runtime.preflight import preflight
 from runtime.minimap_semantics import SemanticTracker, detect_player_marker, marker_config_from_env, semantic_progress_ok
 
@@ -43,7 +45,7 @@ def _load_config_from_env() -> RuntimeConfig:
         enable_cavebot=env_bool('FRBOT_ENABLE_CAVEBOT', True),
         minimap_roi=env_str('FRBOT_MINIMAP_ROI', 'minimap'),
 
-        window_hwnd=int(os.environ.get('FRBOT_WINDOW_HWND', '0') or '0'),
+        window_hwnd=parse_window_hwnd_env('FRBOT_WINDOW_HWND'),
         window_title_substring=env_str('FRBOT_WINDOW_TITLE', ''),
 
         player_marker_rgb=env_str('FRBOT_PLAYER_MARKER_RGB', '255,0,255'),
@@ -237,22 +239,30 @@ def run() -> int:
                     ctx.cavebot.stuck_started_ts_ms = 0
                     ctx.cavebot.last_move_tick = int(ctx.telemetry.tick_count)
 
-            logger.info(
-                'mode=%s tick_count=%d capture_age_ms=%d tick_valid=%s frame_ts_ns=%d now_ts_ns=%d',
-                ctx.config.mode,
-                ctx.telemetry.tick_count,
-                ctx.telemetry.last_capture_age_ms,
-                ctx.telemetry.last_tick_valid,
-                frame.monotonic_ts_ns,
-                now_ns,
+            log_json(
+                logger,
+                event='tick',
+                gate='runtime',
+                mode=str(ctx.config.mode),
+                tick_count=int(ctx.telemetry.tick_count),
+                capture_age_ms=int(ctx.telemetry.last_capture_age_ms),
+                tick_valid=bool(ctx.telemetry.last_tick_valid),
+                frame_ts_ns=int(frame.monotonic_ts_ns),
+                now_ts_ns=int(now_ns),
             )
 
             if (time.monotonic_ns() - start_ns) >= 1_000_000_000:
-                logger.info('completed tick_count=%d', ctx.telemetry.tick_count)
+                log_json(logger, event='completed', gate='runtime', tick_count=int(ctx.telemetry.tick_count))
                 return 0
 
             time.sleep(tick_period)
 
+    except ContractViolation as exc:
+        if 'Unsupported mode:' in str(exc):
+            write_fatal('invalid_mode', exc)
+            return 1
+        write_fatal('runtime crashed', exc)
+        return 1
     except PreflightFailed as exc:
         write_fatal(str(exc), exc)
         return 1

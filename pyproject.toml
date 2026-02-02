@@ -1,3 +1,11 @@
+[tool.pytest.ini_options]
+testpaths = [
+	"tests",
+]
+markers = [
+	"real_frames: tests that require local real-client PPM evidence (not committed)",
+]
+
 [tool.poetry]
 name = "fenril"
 version = "0.1.0"
@@ -8,6 +16,15 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "3.11.7"
+
+# Real-mode capture backends (explicit dependencies)
+mss = "^9.0.1"
+dxcam = "^0.0.5"
+numpy = "^1.26.4"
+opencv-python = "^4.10.0.84"
+
+# Deterministic ROI calibration/overlay (PPM via Pillow)
+pillow = "^10.4.0"
 
 
 [tool.poetry.group.test.dependencies]
