@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
@@ -18,9 +19,8 @@ class LoadedConfig:
 _REQUIRED_REAL_ROIS: tuple[str, ...] = (
 	'minimap',
 	'battle_list',
-	'hp_text',
-	'mp_text',
-	'heal_cooldown',
+	'hp_mp',
+	'target_frame',
 )
 
 
@@ -33,6 +33,7 @@ def _default_mock_rois() -> Dict[str, Roi]:
 
 def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 	mode = ctx.config.mode.strip().lower()
+	profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
 
 	# If a config_path is provided, load from there.
 	path_raw = ctx.config.config_path.strip()
@@ -77,6 +78,10 @@ def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 		if mode == 'real':
 			for req in _REQUIRED_REAL_ROIS:
 				if req not in rois:
+					raise PreflightFailed('config_invalid_schema')
+			# PROD-EMERGENCY: config must contain *exactly* the required ROI keys.
+			if profile == 'prod_emergency':
+				if set(rois.keys()) != set(_REQUIRED_REAL_ROIS):
 					raise PreflightFailed('config_invalid_schema')
 
 		return LoadedConfig(rois=rois)

@@ -40,6 +40,10 @@ function HardStop([string]$Reason, [hashtable]$Extra = @{}) {
   exit 2
 }
 
+if ($env:FRBOT_PROFILE -and $env:FRBOT_PROFILE.Trim().ToLower() -eq 'prod_emergency') {
+  HardStop 'feature_disabled' @{ tool = 'bootstrap_real_evidence.ps1'; profile = $env:FRBOT_PROFILE }
+}
+
 function Invoke-PythonSnippet([string]$Code) {
   $tmp = Join-Path $env:TEMP ("frbot_snippet_{0}.py" -f ([guid]::NewGuid().ToString('n')))
   try {

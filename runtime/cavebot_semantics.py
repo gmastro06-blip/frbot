@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Optional
 
@@ -9,13 +10,29 @@ from contracts.runtime import MinimapMarker, Waypoint
 
 @dataclass(frozen=True, slots=True)
 class ProgressResult:
-    delta_x_px: int
-    delta_y_px: int
-    delta_mag_px: int
     distance_before_px: float
     distance_after_px: float
+    angle_deg: float
     moved_toward_waypoint: bool
-    in_expected_direction: bool
+
+
+def distance_to_waypoint(marker: MinimapMarker, waypoint: Waypoint) -> float:
+    dx = float(int(marker.x_px) - int(waypoint.x))
+    dy = float(int(marker.y_px) - int(waypoint.y))
+    return float((dx * dx + dy * dy) ** 0.5)
+
+
+def _angle_deg_between(ax: float, ay: float, bx: float, by: float) -> float:
+    # Return angle in degrees between vectors a and b.
+    # If either is zero-length, treat as 0 degrees (cannot assert wrong direction from no movement).
+    amag = float((ax * ax + ay * ay) ** 0.5)
+    bmag = float((bx * bx + by * by) ** 0.5)
+    if amag <= 1e-9 or bmag <= 1e-9:
+        return 0.0
+    dot = (ax * bx + ay * by) / (amag * bmag)
+    # Clamp for numeric stability.
+    dot = max(-1.0, min(1.0, float(dot)))
+    return float(math.degrees(math.acos(dot)))
 
 
 def _rgb_matches(r: int, g: int, b: int, *, target: tuple[int, int, int], tol: int) -> bool:
@@ -81,55 +98,38 @@ def detect_player_marker(
 def compute_progress(before: MinimapMarker, after: MinimapMarker, waypoint: Waypoint) -> ProgressResult:
     """Compute objective movement evidence from marker BEFORE/AFTER.
 
-    All coordinates are in minimap pixels.
+    Rules:
+    - progress is ONLY distance reduction (distance_after < distance_before)
+    - wrong direction is angle(expected_vector, real_vector) > 90 degrees
     """
 
-    dx = int(after.x_px) - int(before.x_px)
-    dy = int(after.y_px) - int(before.y_px)
-    mag = abs(dx) + abs(dy)
+    dist_before = distance_to_waypoint(before, waypoint)
+    dist_after = distance_to_waypoint(after, waypoint)
 
-    tx = int(waypoint.x)
-    ty = int(waypoint.y)
-
-    # L2 distance is used only for the "reduces distance" check.
-    dbx = float(int(before.x_px) - tx)
-    dby = float(int(before.y_px) - ty)
-    dax = float(int(after.x_px) - tx)
-    day = float(int(after.y_px) - ty)
-    dist_before = (dbx * dbx + dby * dby) ** 0.5
-    dist_after = (dax * dax + day * day) ** 0.5
+    exp_x = float(int(waypoint.x) - int(before.x_px))
+    exp_y = float(int(waypoint.y) - int(before.y_px))
+    real_x = float(int(after.x_px) - int(before.x_px))
+    real_y = float(int(after.y_px) - int(before.y_px))
+    angle = _angle_deg_between(exp_x, exp_y, real_x, real_y)
 
     moved_toward = dist_after < dist_before
-
-    expected = str(waypoint.expected_direction).strip().upper()
-    in_dir = False
-    if expected == 'E':
-        in_dir = dx > 0
-    elif expected == 'W':
-        in_dir = dx < 0
-    elif expected == 'S':
-        in_dir = dy > 0
-    elif expected == 'N':
-        in_dir = dy < 0
-
     return ProgressResult(
-        delta_x_px=dx,
-        delta_y_px=dy,
-        delta_mag_px=int(mag),
         distance_before_px=float(dist_before),
         distance_after_px=float(dist_after),
+        angle_deg=float(angle),
         moved_toward_waypoint=bool(moved_toward),
-        in_expected_direction=bool(in_dir),
     )
 
 
 def is_progress_valid(progress: ProgressResult, waypoint: Waypoint) -> bool:
     """Return True only if movement is semantically valid progress."""
 
-    if int(progress.delta_mag_px) < int(waypoint.min_pixel_delta):
-        return False
-    if not bool(progress.in_expected_direction):
-        return False
+    # ONLY distance reduction is progress.
     if not bool(progress.moved_toward_waypoint):
         return False
+
+    # Direction correctness is enforced separately by angle.
+    if float(progress.angle_deg) > 90.0:
+        return False
+
     return True

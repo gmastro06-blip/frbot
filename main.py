@@ -24,6 +24,15 @@ def main() -> int:
     # Fixed profile: always PROD-EMERGENCY; ignore external overrides.
     os.environ['FRBOT_PROFILE'] = 'prod_emergency'
 
+    # PROD-EMERGENCY STARTUP GUARDS: must be REAL + HWND-bound + foreground.
+    # (Hard-stop here, before any runners start.)
+    from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
+
+    try:
+        enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=True)
+    except Exception:
+        return 1
+
     # Hard-disabled feature modes (no routes, no execution).
     if _mode() in {'combat', 'looting', 'deposit', 'trade'}:
         write_fatal('feature_disabled', details={'feature': _mode()})

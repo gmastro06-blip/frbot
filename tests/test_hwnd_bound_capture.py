@@ -26,8 +26,10 @@ class _FakeMSS:
         self.regions.append(dict(region))
         w = max(1, int(region.get('width', 1)))
         h = max(1, int(region.get('height', 1)))
-        # Non-black buffer so grab() doesn't hard-stop.
-        buf = (b"\x00\x00\x01" * (w * h))[: w * h * 3]
+        # Non-black, non-low-entropy buffer so grab() doesn't hard-stop.
+        need = w * h * 3
+        pattern = bytes(range(256))
+        buf = (pattern * ((need // len(pattern)) + 1))[:need]
         return _FakeGrabImage(width=w, height=h, rgb=buf)
 
 

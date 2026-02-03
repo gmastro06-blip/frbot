@@ -1,0 +1,6 @@
+FRBOT CALIBRATE - REAL CLIENT (Tibia 15x)
+-----------------------------------------
+FRBOT_REAL_FRAMES_DIR: C:\Users\gmast\Documents\GitHub\frbot\diagnostics\frames_15x
+FRBOT_CONFIG_PATH: C:\Users\gmast\Documents\GitHub\frbot\rois_prod.json
+HARD STOP: capture verify failed: captured_frame_black
+FINAL VERDICT: FAIL

@@ -15,6 +15,8 @@ from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, Runti
 from diagnostics.fatal import write_fatal
 from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
+from diagnostics.frame_dump import dump_enabled, dump_pair
+from diagnostics.last_frames import record_after, record_before, snapshot
 from core.engine import tick as engine_tick
 from runtime.bot_config_loader import load_bot_config
 from runtime.env import parse_window_hwnd_env
@@ -137,6 +139,7 @@ def run() -> int:
                 raise PreflightFailed('window_binding_lost')
 
             frame = capture.grab()  # verified by preflight
+            record_before('runtime', frame)
             if not frame.minimap_detected:
                 raise PreflightFailed('minimap_not_detected')
 
@@ -218,6 +221,7 @@ def run() -> int:
                     raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
 
                 after = capture.grab()
+                record_after('runtime', after)
                 if not after.minimap_detected:
                     raise PreflightFailed('minimap_not_detected')
 
@@ -282,13 +286,16 @@ def run() -> int:
         write_fatal('runtime crashed', exc)
         return 1
     except PreflightFailed as exc:
-        # PROD-EMERGENCY: always attempt to dump a single frame for auditability.
-        # This must never create runtime.log; it uses preflight-only capture.
-        if is_prod_emergency():
+        # PROD-EMERGENCY: dump BEFORE/AFTER evidence when available.
+        if dump_enabled():
             try:
-                from diagnostics.emergency_capture import try_dump_window_frame
+                before_frame, after_frame = snapshot('runtime')
+                if before_frame is not None or after_frame is not None:
+                    dump_pair(gate='runtime', before=before_frame, after=after_frame, reason=str(exc))
+                elif is_prod_emergency():
+                    from diagnostics.emergency_capture import try_dump_window_frame
 
-                try_dump_window_frame(gate='runtime', reason=str(exc))
+                    try_dump_window_frame(gate='runtime', reason=str(exc))
             except Exception:
                 pass
         write_fatal(str(exc), exc)

@@ -14,7 +14,10 @@ from contracts.errors import PreflightFailed
 from contracts.verification import VerificationResult
 from contracts.window import WindowBindingAdapter
 from diagnostics.fatal import write_fatal
-from diagnostics.frame_dump import dump_pair
+from diagnostics.frame_dump import dump_enabled, dump_pair
+
+# Reuse luma stats logic used by MELD diagnostics.
+from adapters.capture.meld_real import _sample_luma_stats
 
 
 def _rect_to_region(binding: WindowBindingAdapter) -> dict[str, int]:
@@ -358,11 +361,11 @@ class MssBoundWindowRealCapture(CaptureAdapter):
         if isinstance(alpha, dict) and alpha.get('present') is True and alpha.get('ok') is False:
             alpha_invalid = True
 
-        black = _looks_black(bytes(rgb))
+        mean, std, all_zero = _sample_luma_stats(bytes(rgb), width=int(w), height=int(h))
+        black = _looks_black(bytes(rgb)) or bool(all_zero) or float(std) <= 0.0001
         low_entropy = entropy <= float(os.environ.get('FRBOT_BLACK_ENTROPY_MAX', '0.02') or '0.02')
 
         if black or alpha_invalid or low_entropy:
-            # Mandatory dumps for auditability.
             failing = Frame(width=w, height=h, monotonic_ts_ns=ts_ns, digest_hex=digest, rgb=bytes(rgb))
             # Immediate re-grab (no input) to provide BEFORE/AFTER evidence without continuing execution.
             img2 = sct.grab(region)
@@ -371,7 +374,7 @@ class MssBoundWindowRealCapture(CaptureAdapter):
             dig2 = hashlib.sha256(rgb2).hexdigest() if rgb2 else ''
             after = Frame(width=int(getattr(img2, 'width', 0) or 0), height=int(getattr(img2, 'height', 0) or 0), monotonic_ts_ns=ts2, digest_hex=dig2, rgb=bytes(rgb2))
 
-            reason = 'black_frame_capture'
+            reason = 'capture_invalid'
 
             details: dict[str, object] = {
                 'hwnd': hwnd,
@@ -381,6 +384,8 @@ class MssBoundWindowRealCapture(CaptureAdapter):
                 'rect_window': _rect_dict(rect_window),
                 'dpi_awareness': w32.get_dpi_awareness_status(),
                 'rgb_all_zero': bool(black),
+                'luma_mean': float(mean),
+                'luma_std': float(std),
                 'entropy_bits_per_byte': float(entropy),
                 'alpha_info': alpha,
                 'subreasons': {
@@ -420,8 +425,9 @@ class MssBoundWindowRealCapture(CaptureAdapter):
                         reason = 'dxgi_capture_blocked_by_client'
                 details['diag'] = gdi_details
 
-            dump_pair(gate='capture', before=failing, after=after, reason=reason)
-            _hard_stop(reason, details=details)
+            if dump_enabled():
+                dump_pair(gate='capture', before=failing, after=after, reason=reason)
+            _hard_stop('capture_invalid', details=details)
 
         return Frame(width=w, height=h, monotonic_ts_ns=ts_ns, digest_hex=digest, rgb=rgb)
 
@@ -574,6 +580,13 @@ class MssBoundMinimapRealCapture(CaptureAdapter):
         w = int(getattr(img, 'width', 0) or 0)
         h = int(getattr(img, 'height', 0) or 0)
         rgb = getattr(img, 'rgb', b'') or b''
+
+        mean, std, all_zero = _sample_luma_stats(bytes(rgb), width=int(w), height=int(h))
+        if _looks_black(bytes(rgb)) or bool(all_zero) or float(std) <= 0.0001:
+            failing = Frame(width=w, height=h, monotonic_ts_ns=ts_ns, digest_hex='', rgb=bytes(rgb))
+            if dump_enabled():
+                dump_pair(gate='capture', before=failing, after=None, reason='capture_invalid')
+            _hard_stop('capture_invalid', details={'hwnd': hwnd, 'foreground_hwnd': foreground_hwnd, 'region': dict(region), 'luma_mean': float(mean), 'luma_std': float(std), 'all_zero': bool(all_zero)})
         digest = hashlib.sha256(rgb).hexdigest() if rgb else ''
 
         alpha = _alpha_info(img, width=w, height=h)

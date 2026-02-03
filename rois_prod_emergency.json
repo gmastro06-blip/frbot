@@ -1,0 +1,12 @@
+{
+  "rois": {
+    "minimap": { "x": 0, "y": 0, "width": 1, "height": 1 },
+    "battle_list": { "x": 0, "y": 0, "width": 1, "height": 1 },
+    "target_frame": { "x": 0, "y": 0, "width": 1, "height": 1 },
+
+    // PROD-EMERGENCY contract: hp_mp is a combined ROI (8 bytes: hp_cur,hp_max,mp_cur,mp_max).
+    // For the mock encoder this must be height==1 and width*height*3 >= 8.
+    // Start with a 3x1 ROI (9 bytes) and set x/y to wherever your producer/overlay writes the bytes.
+    "hp_mp": { "x": 0, "y": 0, "width": 3, "height": 1 }
+  }
+}

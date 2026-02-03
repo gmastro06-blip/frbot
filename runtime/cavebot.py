@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from contracts.runtime import Waypoint
+from contracts.runtime import MinimapMarker, Waypoint
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +20,7 @@ class CavebotAbort:
 @dataclass(frozen=True, slots=True)
 class CavebotTickInput:
     waypoint: Waypoint
+    marker_before: MinimapMarker
     ticks_in_waypoint: int
     attempts_used: int
     max_attempts_per_waypoint: int
@@ -42,16 +43,15 @@ def tick(tick_input: CavebotTickInput) -> tuple[Optional[CavebotIntent], Optiona
     if tick_input.ticks_in_waypoint >= tick_input.max_ticks_per_waypoint:
         return None, CavebotAbort('cavebot_waypoint_stuck')
 
-    expected = str(wp.expected_direction).strip().upper()
-    if expected == 'N':
-        key = 'UP'
-    elif expected == 'S':
-        key = 'DOWN'
-    elif expected == 'E':
-        key = 'RIGHT'
-    elif expected == 'W':
-        key = 'LEFT'
-    else:
+    # Direction is computed from marker->waypoint vector.
+    dx = int(wp.x) - int(tick_input.marker_before.x_px)
+    dy = int(wp.y) - int(tick_input.marker_before.y_px)
+    if dx == 0 and dy == 0:
         return None, CavebotAbort('cavebot_no_progress')
+
+    if abs(dx) >= abs(dy):
+        key = 'RIGHT' if dx > 0 else 'LEFT'
+    else:
+        key = 'DOWN' if dy > 0 else 'UP'
 
     return CavebotIntent(key=key, waypoint_id=str(wp.waypoint_id)), None

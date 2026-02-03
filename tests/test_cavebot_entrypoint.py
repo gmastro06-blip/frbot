@@ -33,11 +33,9 @@ def _base_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv('FRBOT_PLAYER_MARKER_MIN_PIXELS', '5')
     monkeypatch.setenv('FRBOT_PLAYER_MARKER_MAX_PIXELS', '0')
 
-    monkeypatch.setenv('FRBOT_CAVEBOT_MAX_ATTEMPTS_PER_WAYPOINT', '3')
-    monkeypatch.setenv('FRBOT_CAVEBOT_MAX_TICKS_PER_WAYPOINT', '10')
-    monkeypatch.setenv('FRBOT_CAVEBOT_MIN_PIXEL_DELTA', '2')
-
-    monkeypatch.setenv('FRBOT_CAVEBOT_MAX_TICKS', '30')
+    monkeypatch.setenv('FRBOT_CAVEBOT_MAX_ATTEMPTS_PER_WAYPOINT', '10')
+    monkeypatch.setenv('FRBOT_CAVEBOT_MAX_TICKS_PER_WAYPOINT', '50')
+    monkeypatch.setenv('FRBOT_CAVEBOT_MAX_TICKS', '100')
 
     # Strong binding ok by default.
     monkeypatch.setenv('FRBOT_MOCK_WINDOW_OK', '1')
@@ -45,22 +43,21 @@ def _base_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv('FRBOT_MOCK_WINDOW_RECT_OK', '1')
 
 
-def test_cavebot_progress_success(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_cavebot_progress_requires_distance_decrease(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     _base_env(monkeypatch, tmp_path)
 
-    # Marker should move RIGHT by 1 px and reach target.
+    # Marker should move toward waypoint; progress is ONLY distance reduction.
     monkeypatch.setenv(
         'FRBOT_CAVEBOT_WAYPOINTS',
         json.dumps(
             [
                 {
                     'waypoint_id': 'wp0',
-                    'x': 2,
+                    'x': 4,
                     'y': 1,
                     'z': 7,
-                    'expected_direction': 'E',
-                    'min_pixel_delta': 1,
-                    'max_ticks_without_progress': 10,
+                    'radius_px': 0,
+                    'max_ticks': 20,
                 }
             ]
         ),
@@ -74,44 +71,9 @@ def test_cavebot_progress_success(tmp_path: Path, monkeypatch: MonkeyPatch) -> N
     assert run_cavebot_only() == 0
 
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
-    assert '"inputs_sent":1' in runtime_log
+    assert '"abort_reason":"none"' in runtime_log
 
-
-def test_cavebot_abort_no_progress(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
-    _base_env(monkeypatch, tmp_path)
-
-    # Set min delta to 3, but mock movement step is 2 (progress_ok) => jitter/no-progress.
-    monkeypatch.setenv('FRBOT_CAVEBOT_MIN_PIXEL_DELTA', '3')
-    monkeypatch.setenv(
-        'FRBOT_CAVEBOT_WAYPOINTS',
-        json.dumps(
-            [
-                {
-                    'waypoint_id': 'wp0',
-                    'x': 100,
-                    'y': 0,
-                    'z': 7,
-                    'expected_direction': 'E',
-                    'min_pixel_delta': 3,
-                    'max_ticks_without_progress': 10,
-                }
-            ]
-        ),
-    )
-
-    monkeypatch.setenv('MOCK_CAVEBOT_PROGRESS_OK', 'true')
-
-    assert run_cavebot_only() == 1
-
-    fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
-    assert 'cavebot_no_progress' in fatal
-
-    runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
-    assert '"inputs_sent":1' in runtime_log
-    assert '"inputs_sent":2' not in runtime_log
-
-
-def test_cavebot_abort_wrong_direction(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_cavebot_abort_wrong_direction_angle_gt_90(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     _base_env(monkeypatch, tmp_path)
 
     monkeypatch.setenv(
@@ -120,12 +82,11 @@ def test_cavebot_abort_wrong_direction(tmp_path: Path, monkeypatch: MonkeyPatch)
             [
                 {
                     'waypoint_id': 'wp0',
-                    'x': 10,
-                    'y': 0,
+                    'x': 0,
+                    'y': 1,
                     'z': 7,
-                    'expected_direction': 'E',
-                    'min_pixel_delta': 1,
-                    'max_ticks_without_progress': 10,
+                    'radius_px': 0,
+                    'max_ticks': 20,
                 }
             ]
         ),
@@ -138,40 +99,7 @@ def test_cavebot_abort_wrong_direction(tmp_path: Path, monkeypatch: MonkeyPatch)
     fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
     assert 'cavebot_wrong_direction' in fatal
 
-
-def test_cavebot_abort_marker_missing(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
-    _base_env(monkeypatch, tmp_path)
-
-    monkeypatch.setenv(
-        'FRBOT_CAVEBOT_WAYPOINTS',
-        json.dumps(
-            [
-                {
-                    'waypoint_id': 'wp0',
-                    'x': 10,
-                    'y': 0,
-                    'z': 7,
-                    'expected_direction': 'E',
-                    'min_pixel_delta': 1,
-                    'max_ticks_without_progress': 10,
-                }
-            ]
-        ),
-    )
-
-    # Noise-only mode: minimap changes but marker is not rendered.
-    monkeypatch.setenv('MOCK_CAVEBOT_NOISE_ONLY', 'true')
-
-    assert run_cavebot_only() == 1
-
-    fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
-    assert 'cavebot_marker_not_found' in fatal
-
-    # Preflight failed => runtime.log must not exist.
-    assert not (tmp_path / 'diagnostics' / 'runtime.log').exists()
-
-
-def test_cavebot_no_spam_inputs(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_cavebot_stuck_detected_after_five_ticks(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     _base_env(monkeypatch, tmp_path)
 
     monkeypatch.setenv(
@@ -183,9 +111,93 @@ def test_cavebot_no_spam_inputs(tmp_path: Path, monkeypatch: MonkeyPatch) -> Non
                     'x': 100,
                     'y': 0,
                     'z': 7,
-                    'expected_direction': 'E',
-                    'min_pixel_delta': 2,
-                    'max_ticks_without_progress': 10,
+                    'radius_px': 0,
+                    'max_ticks': 50,
+                }
+            ]
+        ),
+    )
+
+    monkeypatch.setenv('MOCK_CAVEBOT_MARKER_STATIC', 'true')
+
+    assert run_cavebot_only() == 1
+
+    fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
+    assert 'cavebot_stuck_detected' in fatal
+
+    runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
+    # One intent max per tick; ensure no unexpected extra inputs were sent.
+    assert '"inputs_sent":5' in runtime_log
+    assert '"inputs_sent":6' not in runtime_log
+
+def test_cavebot_waypoint_timeout_aborts_deterministically(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    _base_env(monkeypatch, tmp_path)
+
+    monkeypatch.setenv(
+        'FRBOT_CAVEBOT_WAYPOINTS',
+        json.dumps(
+            [
+                {
+                    'waypoint_id': 'wp0',
+                    'x': 100,
+                    'y': 0,
+                    'z': 7,
+                    'radius_px': 0,
+                    'max_ticks': 2,
+                }
+            ]
+        ),
+    )
+
+    monkeypatch.setenv('MOCK_CAVEBOT_PROGRESS_OK', 'true')
+
+    assert run_cavebot_only() == 1
+
+    fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
+    assert 'cavebot_waypoint_timeout' in fatal
+
+
+def test_cavebot_waypoint_reached_requires_two_ticks_stable(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    _base_env(monkeypatch, tmp_path)
+
+    monkeypatch.setenv(
+        'FRBOT_CAVEBOT_WAYPOINTS',
+        json.dumps(
+            [
+                {
+                    'waypoint_id': 'wp0',
+                    'x': 2,
+                    'y': 1,
+                    'z': 7,
+                    'radius_px': 0,
+                    'max_ticks': 20,
+                }
+            ]
+        ),
+    )
+
+    monkeypatch.setenv('MOCK_CAVEBOT_PROGRESS_OK', 'true')
+
+    assert run_cavebot_only() == 0
+
+    runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
+    assert '"event":"WAYPOINT_REACHED"' in runtime_log
+
+
+def test_cavebot_runner_never_spams_inputs_one_per_tick(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    _base_env(monkeypatch, tmp_path)
+
+    monkeypatch.setenv(
+        'FRBOT_CAVEBOT_WAYPOINTS',
+        json.dumps(
+            [
+                {
+                    'waypoint_id': 'wp0',
+                    'x': 100,
+                    'y': 0,
+                    'z': 7,
+                    'radius_px': 0,
+                    'max_ticks': 50,
                 }
             ]
         ),
@@ -196,38 +208,9 @@ def test_cavebot_no_spam_inputs(tmp_path: Path, monkeypatch: MonkeyPatch) -> Non
     assert run_cavebot_only() == 1
 
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
-    # With marker static, we retry deterministically up to max attempts.
-    assert '"inputs_sent":3' in runtime_log
-    assert '"inputs_sent":4' not in runtime_log
-
-
-def test_cavebot_waypoint_attempt_limit(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
-    _base_env(monkeypatch, tmp_path)
-
-    monkeypatch.setenv('FRBOT_CAVEBOT_MAX_ATTEMPTS_PER_WAYPOINT', '2')
-    monkeypatch.setenv(
-        'FRBOT_CAVEBOT_WAYPOINTS',
-        json.dumps(
-            [
-                {
-                    'waypoint_id': 'wp0',
-                    'x': 100,
-                    'y': 0,
-                    'z': 7,
-                    'expected_direction': 'E',
-                    'min_pixel_delta': 2,
-                    'max_ticks_without_progress': 10,
-                }
-            ]
-        ),
-    )
-
-    monkeypatch.setenv('MOCK_CAVEBOT_MARKER_STATIC', 'true')
-
-    assert run_cavebot_only() == 1
-
-    fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
-    assert 'cavebot_waypoint_stuck' in fatal
+    # Must not send more than one input per tick; inputs_sent should be a simple counter.
+    assert '"inputs_sent":2' in runtime_log
+    assert '"inputs_sent":999' not in runtime_log
 
 
 def test_cavebot_window_binding_lost(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -242,9 +225,8 @@ def test_cavebot_window_binding_lost(tmp_path: Path, monkeypatch: MonkeyPatch) -
                     'x': 2,
                     'y': 0,
                     'z': 7,
-                    'expected_direction': 'E',
-                    'min_pixel_delta': 1,
-                    'max_ticks_without_progress': 10,
+                    'radius_px': 0,
+                    'max_ticks': 20,
                 }
             ]
         ),

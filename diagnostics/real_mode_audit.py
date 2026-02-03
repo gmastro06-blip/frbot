@@ -287,15 +287,24 @@ def run_real_mode_audit(*, frames_dir: Path, config_path: Path | None, max_pairs
             report_lines=tuple(lines),
         )
 
-    critical_rois = {
-        'minimap': rois.get('minimap'),
-        'battle_list': rois.get('battle_list'),
-        'inventory_text': rois.get('inventory_text'),
-        'hp_bar': rois.get('hp_bar'),
-        'mp_bar': rois.get('mp_bar'),
-        'trade_npc': rois.get('trade_npc'),
-        'trade_inventory': rois.get('trade_inventory'),
-    }
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        critical_rois = {
+            'minimap': rois.get('minimap'),
+            'battle_list': rois.get('battle_list'),
+            'target_frame': rois.get('target_frame'),
+            'hp_mp': rois.get('hp_mp'),
+        }
+    else:
+        critical_rois = {
+            'minimap': rois.get('minimap'),
+            'battle_list': rois.get('battle_list'),
+            'inventory_text': rois.get('inventory_text'),
+            'hp_bar': rois.get('hp_bar'),
+            'mp_bar': rois.get('mp_bar'),
+            'trade_npc': rois.get('trade_npc'),
+            'trade_inventory': rois.get('trade_inventory'),
+        }
 
     calibration_fail: list[str] = []
     for name, roi in critical_rois.items():

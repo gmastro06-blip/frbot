@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -23,6 +24,7 @@ from core.engine import tick as engine_tick
 from runtime.bot_config_loader import load_bot_config
 from runtime.minimap_semantics import SemanticTracker, detect_player_marker, marker_config_from_env, semantic_progress_ok
 from runtime.preflight import preflight
+from runtime.pacing import sleep_s
 from runtime.runner import _load_config_from_env
 
 
@@ -105,6 +107,12 @@ def main(argv: list[str] | None = None) -> int:
     diagnostics_dir.mkdir(parents=True, exist_ok=True)
     _rotate_fatal_log(diagnostics_dir)
     _rotate_runtime_log(diagnostics_dir)
+
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        write_fatal('feature_disabled', details={'tool': 'run_runtime_smoke', 'profile': profile})
+        print(json.dumps({'ok': False, 'reason': 'feature_disabled', 'details': {'tool': 'run_runtime_smoke', 'profile': profile}}, ensure_ascii=False))
+        return 2
 
     # Deterministic behavior: this tool always runs the REAL pipeline.
     os.environ['FRBOT_MODE'] = 'real'
@@ -311,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
                 now_ts_ns=int(now_ns),
             )
 
-            time.sleep(tick_period)
+            sleep_s(float(tick_period))
 
     except ContractViolation as exc:
         if 'Unsupported mode:' in str(exc):

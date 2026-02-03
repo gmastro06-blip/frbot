@@ -100,6 +100,7 @@ def _check_real() -> _Result:
     from diagnostics.frame_dump import dump_frame_ppm
     from runtime.preflight import preflight
     from runtime.profile import is_prod_emergency
+    from runtime.env import parse_window_hwnd_env
 
     reasons: list[str] = []
 
@@ -118,7 +119,7 @@ def _check_real() -> _Result:
     elif not config_path.exists():
         reasons.append(f'FRBOT_CONFIG_PATH not found: {config_path}')
 
-    required_rois = ['minimap', 'battle_list', 'hp_text', 'mp_text', 'heal_cooldown']
+    required_rois = ['minimap', 'battle_list', 'target_frame', 'hp_mp']
 
     if reasons:
         return _Result(ok=False, verdict='NOT_READY', reasons=reasons, features_enabled=[], features_disabled=[])
@@ -131,7 +132,7 @@ def _check_real() -> _Result:
             config_path=str(config_path),
             enable_cavebot=True,
             minimap_roi=_env_str('FRBOT_MINIMAP_ROI', 'minimap') or 'minimap',
-            window_hwnd=0,
+            window_hwnd=parse_window_hwnd_env('FRBOT_WINDOW_HWND'),
             window_title_substring=_env_str('FRBOT_WINDOW_TITLE', ''),
             player_marker_rgb=_env_str('FRBOT_PLAYER_MARKER_RGB', '255,255,0'),
             player_marker_tol=_env_int('FRBOT_PLAYER_MARKER_TOL', 10),
@@ -206,11 +207,7 @@ def _check_real() -> _Result:
             enabled.append('cavebot_basic')
         if name == 'battle_list':
             enabled.append('targeting_basic')
-        if name == 'hp_text':
-            enabled.append('healing_basic')
-        if name == 'mp_text':
-            enabled.append('healing_basic')
-        if name == 'heal_cooldown':
+        if name == 'hp_mp':
             enabled.append('healing_basic')
 
     ok = not reasons

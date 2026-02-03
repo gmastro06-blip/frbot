@@ -41,9 +41,7 @@ def _write_config(path: Path) -> None:
         "minimap": {"x": 0, "y": 0, "width": 1, "height": 1},
         "battle_list": {"x": 0, "y": 0, "width": 1, "height": 1},
         "hp_mp": {"x": 0, "y": 0, "width": 1, "height": 1},
-        "inventory": {"x": 0, "y": 0, "width": 1, "height": 1},
-        "npc_dialog": {"x": 0, "y": 0, "width": 1, "height": 1},
-        "trade": {"x": 0, "y": 0, "width": 1, "height": 1},
+        "target_frame": {"x": 0, "y": 0, "width": 1, "height": 1},
     }
     path.write_text(json.dumps({"rois": rois}, indent=2, sort_keys=True), encoding="utf-8")
 
@@ -63,6 +61,7 @@ def _run_guard(repo_root: Path, env: dict[str, str]) -> subprocess.CompletedProc
 def test_phase1_guard_missing_env_is_hard_stop(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     env = dict(os.environ)
+    env["FRBOT_PROFILE"] = "prod_emergency"
     env.pop("FRBOT_REAL_FRAMES_DIR_OLD", None)
     env.pop("FRBOT_REAL_FRAMES_DIR_NEW", None)
     env.pop("FRBOT_CONFIG_PATH", None)
@@ -89,6 +88,7 @@ def test_phase1_guard_partial_evidence_is_hard_stop(tmp_path: Path) -> None:
     _write_config(cfg)
 
     env = dict(os.environ)
+    env["FRBOT_PROFILE"] = "prod_emergency"
     env["FRBOT_REAL_FRAMES_DIR_OLD"] = str(old_dir)
     env["FRBOT_REAL_FRAMES_DIR_NEW"] = str(new_dir)
     env["FRBOT_CONFIG_PATH"] = str(cfg)
@@ -114,6 +114,7 @@ def test_phase1_guard_complete_evidence_is_ready(tmp_path: Path) -> None:
     _write_config(cfg)
 
     env = dict(os.environ)
+    env["FRBOT_PROFILE"] = "prod_emergency"
     env["FRBOT_REAL_FRAMES_DIR_OLD"] = str(old_dir)
     env["FRBOT_REAL_FRAMES_DIR_NEW"] = str(new_dir)
     env["FRBOT_CONFIG_PATH"] = str(cfg)

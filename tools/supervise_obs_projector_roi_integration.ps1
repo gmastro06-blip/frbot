@@ -1,5 +1,10 @@
 $ErrorActionPreference = 'Stop'
 
+if ($env:FRBOT_PROFILE -and $env:FRBOT_PROFILE.Trim().ToLower() -eq 'prod_emergency') {
+  Write-Host (ConvertTo-Json @{ ok = $false; reason = 'feature_disabled'; details = @{ tool = 'supervise_obs_projector_roi_integration.ps1'; profile = $env:FRBOT_PROFILE } } -Depth 6)
+  exit 2
+}
+
 $repo = 'C:\Users\gmast\Documents\GitHub\frbot'
 $py = Join-Path $repo '.venv\Scripts\python.exe'
 if (-not (Test-Path $py)) { throw "venv_python_not_found: $py" }

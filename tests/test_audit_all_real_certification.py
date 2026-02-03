@@ -15,9 +15,6 @@ def _write_config(tmp_path: Path) -> Path:
 			"battle_list": {"x": 0, "y": 0, "width": 1, "height": 1},
 			"target_frame": {"x": 0, "y": 0, "width": 1, "height": 1},
 			"hp_mp": {"x": 0, "y": 0, "width": 1, "height": 1},
-			"inventory": {"x": 0, "y": 0, "width": 1, "height": 1},
-			"npc_dialog": {"x": 0, "y": 0, "width": 1, "height": 1},
-			"trade": {"x": 0, "y": 0, "width": 1, "height": 1},
 		}
 	}
 	path = tmp_path / "rois.json"
@@ -33,7 +30,11 @@ def _write_ppm(path: Path) -> None:
 
 def _run_audit(repo_root: Path, *, frames_dir: Path, config_path: Path) -> subprocess.CompletedProcess[str]:
 	env = dict(os.environ)
+	env["FRBOT_PROFILE"] = "prod_emergency"
 	env["FRBOT_MODE"] = "real"
+	# Tests should be hermetic: do not inherit local OBS capture settings.
+	env["FRBOT_CAPTURE_SOURCE"] = "client"
+	env.pop("FRBOT_OBS_PROJECTOR_TITLE", None)
 	env["FRBOT_REAL_FRAMES_DIR"] = str(frames_dir)
 	env["FRBOT_CONFIG_PATH"] = str(config_path)
 

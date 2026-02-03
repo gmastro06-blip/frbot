@@ -1,0 +1,7 @@
+{
+  "expected_hwnd": "0x31003a",
+  "expected_title": "Proyector en ventana (Fuente) - Tibia_Fuente",
+  "foreground_hwnd": "0xf0886",
+  "foreground_title": "Tibia - Onniwabanshu",
+  "reason": "obs_projector_foreground_mismatch"
+}

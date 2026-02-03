@@ -6,6 +6,8 @@ import sys
 import time
 from pathlib import Path
 
+from runtime.pacing import sleep_ms
+
 # Allow running as a script without installing the package.
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -48,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
                     w = int(w2) or w
                     h = int(h2) or h
                     break
-                time.sleep(0.05)
+                sleep_ms(50.0)
             item.update({"read_ok": bool(ok), "size": [int(w), int(h)]})
         try:
             cap.release()

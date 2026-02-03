@@ -50,6 +50,9 @@ class _FakeBinding(WindowBindingAdapter):
 def test_grab_hard_stops_on_black_frame_and_writes_fatal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
 
+    # Frame dumping is opt-in now.
+    monkeypatch.setenv('FRBOT_DUMP_FRAMES', '1')
+
     fake_sct = _FakeMSS(rgb=b'\x00')
     fake_mss_mod = types.SimpleNamespace(mss=lambda: fake_sct)
     monkeypatch.setitem(__import__('sys').modules, 'mss', fake_mss_mod)
@@ -72,25 +75,24 @@ def test_grab_hard_stops_on_black_frame_and_writes_fatal(tmp_path: Path, monkeyp
     with pytest.raises(PreflightFailed) as ei:
         cap.grab()
 
-    assert str(ei.value) in {'black_frame_capture', 'dxgi_capture_blocked_by_client'}
+    assert str(ei.value) == 'capture_invalid'
 
     fatal = tmp_path / 'diagnostics' / 'fatal.log'
     assert fatal.exists()
     payload = json.loads(fatal.read_text(encoding='utf-8'))
-    assert payload.get('reason') in {'black_frame_capture', 'dxgi_capture_blocked_by_client'}
+    assert payload.get('reason') == 'capture_invalid'
     details = payload.get('details')
     assert isinstance(details, dict)
     assert details.get('hwnd') == 123
     assert details.get('foreground_hwnd') == 123
-    assert 'entropy_bits_per_byte' in details
-    assert 'alpha_info' in details
-    assert 'rect_client' in details
     assert 'region' in details
+    # Luma stats are emitted for black/blocked capture diagnosis.
+    assert 'luma_mean' in details
+    assert 'luma_std' in details
+    assert ('all_zero' in details) or ('rgb_all_zero' in details)
 
     # Mandatory frame dump evidence.
     frames_dir = tmp_path / 'diagnostics' / 'frames'
     assert frames_dir.exists()
-    ppm_files = list(frames_dir.glob('capture_*_black_frame_capture_before.ppm')) + list(
-        frames_dir.glob('capture_*_dxgi_capture_blocked_by_client_before.ppm')
-    )
+    ppm_files = list(frames_dir.glob('capture_*_*.ppm'))
     assert ppm_files

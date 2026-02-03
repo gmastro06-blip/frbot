@@ -10,6 +10,115 @@ from pathlib import Path
 from typing import DefaultDict, Optional, TypedDict
 
 
+def _verify_cavebot_trace(frames_dir: Path) -> Optional[str]:
+    """Return None if cavebot trace is verified; otherwise a short reason string."""
+
+    trace_path = frames_dir / 'cavebot_trace.jsonl'
+    if not trace_path.exists():
+        return 'cavebot_trace_missing'
+
+    try:
+        raw = trace_path.read_text(encoding='utf-8', errors='replace').splitlines()
+    except Exception as exc:
+        return f'cavebot_trace_unreadable:{type(exc).__name__}'
+
+    events: list[dict] = []
+    for line in raw:
+        s = (line or '').strip()
+        if not s:
+            continue
+        try:
+            obj = json.loads(s)
+        except Exception:
+            return 'cavebot_trace_invalid_json'
+        if not isinstance(obj, dict):
+            return 'cavebot_trace_invalid_shape'
+        events.append(obj)
+
+    if not events:
+        return 'cavebot_trace_empty'
+
+    # Validate per-waypoint segments: strict distance decreasing + reached event.
+    seg: list[dict] = []
+    current_wp: str | None = None
+
+    def _validate_segment(segment: list[dict]) -> Optional[str]:
+        if not segment:
+            return 'cavebot_trace_no_ticks'
+        # Must contain explicit WAYPOINT_REACHED.
+        if not any(str(e.get('event', '')).upper() == 'WAYPOINT_REACHED' for e in segment):
+            return 'cavebot_trace_missing_waypoint_reached'
+
+        prev_da: float | None = None
+        stable_hits = 0
+        radius_px = None
+        for e in segment:
+            if str(e.get('event', '')).lower() == 'abort':
+                return 'cavebot_trace_contains_abort'
+            abort_reason = str(e.get('abort_reason', 'none') or 'none')
+            if abort_reason != 'none':
+                return 'cavebot_trace_abort_reason_present'
+
+            wp = e.get('waypoint')
+            if isinstance(wp, dict) and radius_px is None:
+                try:
+                    radius_px = float(wp.get('radius_px') or 0)
+                except Exception:
+                    radius_px = None
+
+            # Only validate strict decrease on ticks where input was sent.
+            input_sent = bool(e.get('input_sent', False))
+            if input_sent:
+                try:
+                    db = float(e.get('distance_before_px') or 0)
+                    da = float(e.get('distance_after_px') or 0)
+                except Exception:
+                    return 'cavebot_trace_missing_distance'
+                # Mandatory per-tick reduction.
+                if not (da < db):
+                    return 'cavebot_trace_distance_not_decreasing'
+                if prev_da is not None and not (da < prev_da):
+                    return 'cavebot_trace_series_not_strictly_decreasing'
+                prev_da = float(da)
+
+            # Stability check: require 2 consecutive ticks (input or no-input) within radius.
+            try:
+                da2 = float(e.get('distance_after_px') or 0)
+            except Exception:
+                da2 = None
+            if radius_px is not None and da2 is not None and da2 <= float(radius_px):
+                stable_hits += 1
+            else:
+                stable_hits = 0
+
+        if stable_hits < 2:
+            return 'cavebot_trace_reach_not_stable'
+        return None
+
+    for e in events:
+        wp = e.get('waypoint')
+        wp_id = None
+        if isinstance(wp, dict):
+            wp_id = wp.get('waypoint_id')
+        wp_id_s = None if wp_id is None else str(wp_id)
+
+        if current_wp is None:
+            current_wp = wp_id_s
+        if wp_id_s != current_wp:
+            r = _validate_segment(seg)
+            if r is not None:
+                return r
+            seg = []
+            current_wp = wp_id_s
+
+        seg.append(e)
+
+    r2 = _validate_segment(seg)
+    if r2 is not None:
+        return r2
+    return None
+
+
 _FILENAME_RE = re.compile(
     r'^(?P<gate>[a-z0-9-]+)_(?P<stamp>\d{8}-\d{6})_(?P<reason>.+)_(?P<side>before|after)(?P<mini>_minimap)?\.ppm$',
     re.IGNORECASE,
@@ -61,6 +170,20 @@ def _env_str(name: str, default: str) -> str:
 
 def _roi_names_for_gate(gate: str) -> tuple[str, ...]:
     # ROI-name requirements per gate, aligned to runtime env defaults.
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        if gate == 'targeting':
+            # Targeting evidence requires both battle list and target frame.
+            return (
+                _env_str('FRBOT_BATTLE_LIST_ROI', 'battle_list'),
+                _env_str('FRBOT_TARGET_FRAME_ROI', 'target_frame'),
+            )
+        if gate == 'healing':
+            # Minimal healing: combined hp_mp ROI.
+            return (_env_str('FRBOT_HP_MP_ROI', 'hp_mp'),)
+        if gate == 'cavebot':
+            return (_env_str('FRBOT_MINIMAP_ROI', 'minimap'),)
+
     if gate == 'targeting':
         return (
             _env_str('FRBOT_BATTLE_LIST_ROI', 'battle_list'),
@@ -248,6 +371,14 @@ def collect_evidence_inventory(frames_dir: Path, config_path: Path | None) -> Ev
                 status = 'UNVERIFIED'
 
         per_gate_status[g] = status
+
+    # Cavebot certification: require semantic trace (series + reached event).
+    cavebot_status = per_gate_status.get('cavebot')
+    if cavebot_status == 'PASS':
+        why = _verify_cavebot_trace(frames_dir)
+        if why is not None:
+            per_gate_status['cavebot'] = 'UNVERIFIED'
+            missing.append(why)
 
     summary = {
         'frames_dir': str(frames_dir),

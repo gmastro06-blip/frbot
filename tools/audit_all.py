@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -43,6 +44,46 @@ def _ensure_repo_root_on_syspath() -> None:
 def _env_str(name: str, default: str = '') -> str:
     raw = os.environ.get(name)
     return (default if raw is None else str(raw)).strip()
+
+
+def _capture_source() -> str:
+    v = (_env_str('FRBOT_CAPTURE_SOURCE', 'client') or 'client').strip().lower()
+    return 'obs' if v == 'obs' else 'client'
+
+
+def _obs_projector_title() -> str:
+    return _env_str('FRBOT_OBS_PROJECTOR_TITLE', '')
+
+
+def _check_obs_manifest(frames_dir: Path) -> tuple[bool, str, list[str]]:
+    """Return (ok, canonical_reason, reasons)."""
+
+    reasons: list[str] = []
+    expected_title = _obs_projector_title()
+    if not expected_title:
+        return False, 'obs_projector_not_found', ['FRBOT_OBS_PROJECTOR_TITLE missing']
+
+    mp = frames_dir / 'evidence_manifest.json'
+    if not mp.exists():
+        return False, 'obs_evidence_manifest_missing', [f'Missing manifest: {mp}']
+
+    try:
+        data = json.loads(mp.read_text(encoding='utf-8'))
+    except Exception as exc:
+        return False, 'obs_evidence_manifest_missing', [f'Manifest unreadable: {type(exc).__name__}: {exc}']
+
+    if not isinstance(data, dict):
+        return False, 'obs_evidence_manifest_missing', ['Manifest invalid shape (expected object)']
+
+    src = str(data.get('capture_source', '') or '').strip().lower()
+    if src != 'obs':
+        return False, 'obs_evidence_source_mismatch', [f"Manifest capture_source mismatch (expected obs, got {src!r})"]
+
+    man_title = str(data.get('obs_projector_title', '') or '')
+    if expected_title and man_title and expected_title != man_title:
+        return False, 'obs_evidence_source_mismatch', ['Manifest obs_projector_title mismatch']
+
+    return True, '', []
 
 
 def _check_preconditions() -> tuple[_Preconditions | None, list[str]]:
@@ -131,6 +172,7 @@ def main() -> int:
 
     from diagnostics.evidence_inventory import collect_evidence_inventory
     from diagnostics.real_mode_audit import run_real_mode_audit
+    from diagnostics.fatal import write_fatal
 
     pre, pre_reasons = _check_preconditions()
     if pre is None:
@@ -144,6 +186,29 @@ def main() -> int:
         for r in pre_reasons:
             print(f'- {r}')
         print('')
+
+        # Evidentiary hard-stop: write fatal.log with a single canonical reason.
+        canonical = None
+        for r in pre_reasons:
+            s = str(r)
+            if s.startswith('reason: '):
+                canonical = s.split('reason: ', 1)[1].strip() or None
+                break
+        if canonical is None:
+            canonical = 'preconditions_failed'
+        try:
+            write_fatal(
+                canonical,
+                details={
+                    'mode': str(mode),
+                    'preconditions': list(pre_reasons),
+                    'FRBOT_REAL_FRAMES_DIR': _env_str('FRBOT_REAL_FRAMES_DIR', ''),
+                    'FRBOT_CONFIG_PATH': _env_str('FRBOT_CONFIG_PATH', ''),
+                },
+            )
+        except Exception:
+            pass
+
         if str(mode).strip().lower() == 'real':
             print('FINAL DECISION: NOT_OPERATIONAL_REAL')
         else:
@@ -153,6 +218,31 @@ def main() -> int:
 
     required_gates, enabled_features, disabled_features = _gates_for_profile()
     _print_header(mode=pre.mode, frames_dir=pre.frames_dir, config_path=pre.config_path)
+
+    # OBS capture source enforcement: evidence must declare OBS projector origin.
+    if pre.mode == 'real' and _capture_source() == 'obs':
+        ok_obs, canon, obs_reasons = _check_obs_manifest(pre.frames_dir)
+        if not ok_obs:
+            print('')
+            print('Blocking reasons:')
+            for r in obs_reasons:
+                print(f' - {r}')
+            print('')
+            try:
+                write_fatal(
+                    canon or 'obs_evidence_manifest_missing',
+                    details={
+                        'FRBOT_CAPTURE_SOURCE': _env_str('FRBOT_CAPTURE_SOURCE', ''),
+                        'FRBOT_OBS_PROJECTOR_TITLE': _obs_projector_title(),
+                        'frames_dir': str(pre.frames_dir),
+                        'reasons': list(obs_reasons),
+                    },
+                )
+            except Exception:
+                pass
+            print('FINAL DECISION: NOT_OPERATIONAL_REAL')
+            print('Exit code: 3')
+            return 3
 
     if enabled_features or disabled_features:
         print('Profile:')

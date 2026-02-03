@@ -6,6 +6,9 @@ import sys
 import time
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
+
+from runtime.pacing import sleep_ms
 
 # Allow running as a script without installing the package.
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -77,13 +80,19 @@ def _maybe_focus_projector_window() -> None:
             pass
         if time.monotonic() >= deadline:
             return
-        time.sleep(0.05)
+        sleep_ms(50.0)
 
 
 def main() -> int:
     # Ensure diagnostics dir exists for fatal evidence.
     diagnostics_dir = REPO_ROOT / 'diagnostics'
     diagnostics_dir.mkdir(parents=True, exist_ok=True)
+
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        write_fatal('feature_disabled', details={'tool': 'run_obs_projector_preflight_once', 'profile': profile})
+        print(json.dumps({'ok': False, 'reason': 'feature_disabled', 'details': {'tool': 'run_obs_projector_preflight_once', 'profile': profile}}, ensure_ascii=False))
+        return 2
 
     # Make relative config paths deterministic regardless of cwd.
     cfg_env = (os.environ.get('FRBOT_CONFIG_PATH', '') or '').strip()
@@ -167,16 +176,17 @@ def main() -> int:
                 minimap_roi = ctx.rois.get(ctx.config.minimap_roi)
 
                 if minimap_roi is not None:
+                    cap_diag: Any = None
                     if backend == 'meld':
-                        capture = MeldBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=binding)
+                        cap_diag = MeldBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=binding)
                     elif backend in {'obs-projector', 'projector', 'meld-projector'}:
-                        capture = MeldProjectorMinimapRealCapture(minimap_roi=minimap_roi, binding=binding)
+                        cap_diag = MeldProjectorMinimapRealCapture(minimap_roi=minimap_roi, binding=binding)
                     elif backend in {'cam', 'obs', 'virtualcam'}:
-                        capture = CamMinimapRealCapture(minimap_roi=minimap_roi, binding=binding)
+                        cap_diag = CamMinimapRealCapture(minimap_roi=minimap_roi, binding=binding)
                     else:
-                        capture = MssBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=binding)
+                        cap_diag = MssBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=binding)
 
-                    f = capture.grab()
+                    f = cap_diag.grab()
                     dump_frame_ppm(f, diagnostics_dir / 'preflight_failure_full.ppm')
                     if bool(getattr(f, 'minimap_detected', False)) and len(getattr(f, 'minimap_rgb', b'')):
                         mm = Frame(

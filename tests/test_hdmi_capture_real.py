@@ -8,7 +8,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from adapters.hdmi_capture_real import HdmiCaptureReal
-import time
+from runtime.pacing import sleep_ms
 
 def main() -> int:
     cap = HdmiCaptureReal(device_index=0)
@@ -38,7 +38,7 @@ def main() -> int:
             print("⚠️ WARNING: identical frame digest")
 
         last_digest = frame.digest_hex
-        time.sleep(0.3)
+        sleep_ms(300.0)
 
     cap.close()
     print("✅ PASS")

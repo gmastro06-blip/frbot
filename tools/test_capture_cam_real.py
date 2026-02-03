@@ -21,6 +21,7 @@ from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_frame_ppm
 from runtime.config_loader import load_rois
 from runtime.runner import _load_config_from_env
+from runtime.pacing import sleep_ms
 
 
 def _hard_fail(reason: str, *, details: dict) -> int:
@@ -39,6 +40,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--frames", type=int, default=2, help="Number of frames to dump")
     ap.add_argument("--out-dir", default="diagnostics/cam", help="Output directory for dumped frames")
     args = ap.parse_args(argv)
+
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        write_fatal('feature_disabled', details={'tool': 'test_capture_cam_real', 'profile': profile})
+        print(json.dumps({'ok': False, 'reason': 'feature_disabled', 'details': {'tool': 'test_capture_cam_real', 'profile': profile}}, ensure_ascii=False))
+        return 2
 
     cfg = _load_config_from_env()
     if str(args.config).strip():
@@ -72,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if int(args.wait_seconds) > 0:
         print(json.dumps({"ok": True, "note": "waiting", "seconds": int(args.wait_seconds)}, ensure_ascii=False))
-        time.sleep(int(args.wait_seconds))
+        sleep_ms(float(int(args.wait_seconds)) * 1000.0)
 
     binding = Win32WindowBinding(hwnd=int(cfg.window_hwnd), title_substring=cfg.window_title_substring)
     require_fg = (os.environ.get('FRBOT_CAM_REQUIRE_FOREGROUND', '1') or '1').strip().lower() not in {'', '0', 'false', 'no', 'off'}
@@ -144,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
             }
         )
 
-        time.sleep(0.1)
+        sleep_ms(100.0)
 
     print(json.dumps({"ok": True, "backend": backend, "device_index": int(os.environ.get("FRBOT_CAM_DEVICE_INDEX", "0") or "0"), "dumps": dumps}, ensure_ascii=False))
     return 0

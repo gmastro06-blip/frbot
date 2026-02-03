@@ -94,7 +94,7 @@ def _fmt_progress(ev: CavebotTickEvidence) -> str:
     if ev.progress is None:
         return 'none'
     p = ev.progress
-    return f"dx={int(p.delta_x_px)} dy={int(p.delta_y_px)} mag={int(p.delta_mag_px)} db={p.distance_before_px:.2f} da={p.distance_after_px:.2f}"
+    return f"db={p.distance_before_px:.2f} da={p.distance_after_px:.2f} angle={p.angle_deg:.1f}"
 
 
 def run_cavebot_only() -> int:
@@ -160,7 +160,7 @@ def run_cavebot_only() -> int:
 
             progress_mag = 'none'
             if evidence.progress is not None:
-                progress_mag = str(int(evidence.progress.delta_mag_px))
+                progress_mag = f"{evidence.progress.distance_before_px:.2f}->{evidence.progress.distance_after_px:.2f}"
 
             log_json(
                 logger,
@@ -182,9 +182,19 @@ def run_cavebot_only() -> int:
                 raise PreflightFailed(str(outcome.abort_reason))
 
             if outcome.reached_waypoint:
+                log_json(
+                    logger,
+                    event='WAYPOINT_REACHED',
+                    gate='cavebot',
+                    tick_index=int(tick_index),
+                    waypoint_id=str(wp.waypoint_id),
+                    inputs_sent=int(ctx.cavebot.gate_inputs_sent),
+                )
                 ctx.cavebot.gate_waypoint_index += 1
                 ctx.cavebot.gate_attempts_used = 0
                 ctx.cavebot.gate_ticks_in_waypoint = 0
+                ctx.cavebot.gate_reach_streak = 0
+                ctx.cavebot_gate.telemetry.last_n_distances = []
                 # Next tick continues to next waypoint.
 
         if is_prod_emergency():

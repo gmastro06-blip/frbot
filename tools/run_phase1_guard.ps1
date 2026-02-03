@@ -22,6 +22,10 @@ function HardStop([string]$Reason, [hashtable]$Extra = @{}) {
   exit 2
 }
 
+if ($env:FRBOT_PROFILE -and $env:FRBOT_PROFILE.Trim().ToLower() -eq 'prod_emergency') {
+  HardStop 'feature_disabled' @{ tool = 'run_phase1_guard.ps1'; profile = $env:FRBOT_PROFILE }
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location -Path $repoRoot
 

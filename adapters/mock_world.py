@@ -412,6 +412,16 @@ class MockWorld:
 		self._encode_u16_pair_roi('hp_text', self.hp_current, self.hp_max)
 		self._encode_u16_pair_roi('mp_text', self.mp_current, self.mp_max)
 
+		# Combined HP/MP ROI (prod-emergency contract): 8 bytes -> hp_cur,hp_max,mp_cur,mp_max.
+		roi = self.rois.get('hp_mp')
+		if roi is not None:
+			view = self._roi_bytes_view(roi)
+			if view is not None and len(view) >= 8:
+				view[0:2] = int(max(0, self.hp_current)).to_bytes(2, 'little', signed=False)
+				view[2:4] = int(max(1, self.hp_max)).to_bytes(2, 'little', signed=False)
+				view[4:6] = int(max(0, self.mp_current)).to_bytes(2, 'little', signed=False)
+				view[6:8] = int(max(1, self.mp_max)).to_bytes(2, 'little', signed=False)
+
 		# Cooldown overlay marker ROI.
 		cooldown_roi = self.rois.get('heal_cooldown')
 		if cooldown_roi is not None and _roi_bounds_ok(self.width, self.height, cooldown_roi):

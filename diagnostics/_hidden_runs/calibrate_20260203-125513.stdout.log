@@ -1,0 +1,7 @@
+{
+  "expected_hwnd": "0x31003a",
+  "expected_title": "Proyector en ventana (Fuente) - Tibia_Fuente",
+  "foreground_hwnd": "0x20612",
+  "foreground_title": "calibrate_20260203-123630.stdout.log - frbot - Visual Studio Code",
+  "reason": "obs_projector_foreground_mismatch"
+}

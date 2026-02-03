@@ -10,42 +10,62 @@ from contracts.input import InputAdapter
 from contracts.runtime import RuntimeContext
 from contracts.window import WindowBindingAdapter
 from diagnostics.last_frames import record_after, record_before
-from runtime.healing_semantics import detect_cooldown_marker, parse_rgb_triplet, read_bar_percent, read_percent_with_consistency, read_text_percent
+from runtime.healing_semantics import (
+    PercentRead,
+    detect_cooldown_marker,
+    parse_rgb_triplet,
+    read_bar_percent,
+    read_hp_mp_text_pair,
+    read_percent_with_consistency,
+    read_text_percent,
+)
 
 
 def _read_hp_mp(ctx: RuntimeContext, frame: Frame) -> tuple[float, float, str]:
+    hp_mp_roi = ctx.rois.get(getattr(ctx.config, 'hp_mp_roi', 'hp_mp'))
+    if hp_mp_roi is not None:
+        pair = read_hp_mp_text_pair(frame, hp_mp_roi)
+        if pair is None:
+            raise PreflightFailed('hp_mp_unreadable')
+        hp, mp = pair
+        return float(hp.value), float(mp.value), 'hp_mp'
+
     hp_bar = ctx.rois.get(ctx.config.hp_bar_roi)
     hp_text = ctx.rois.get(ctx.config.hp_text_roi)
     mp_bar = ctx.rois.get(ctx.config.mp_bar_roi)
     mp_text = ctx.rois.get(ctx.config.mp_text_roi)
 
-    hp = read_percent_with_consistency(
+    hp_read: PercentRead | None = read_percent_with_consistency(
         bar=(read_bar_percent(frame, hp_bar, channel='r') if hp_bar is not None else None),
         text=(read_text_percent(frame, hp_text) if hp_text is not None else None),
         tol=float(ctx.config.heal_consistency_tol),
     )
-    mp = read_percent_with_consistency(
+    mp_read: PercentRead | None = read_percent_with_consistency(
         bar=(read_bar_percent(frame, mp_bar, channel='b') if mp_bar is not None else None),
         text=(read_text_percent(frame, mp_text) if mp_text is not None else None),
         tol=float(ctx.config.heal_consistency_tol),
     )
 
-    if hp is None or mp is None:
+    if hp_read is None or mp_read is None:
         raise PreflightFailed('hp_mp_unreadable')
 
-    if hp.source == 'bar+text' or mp.source == 'bar+text':
+    if hp_read.source == 'bar+text' or mp_read.source == 'bar+text':
         src = 'bar+text'
-    elif hp.source == 'text' or mp.source == 'text':
+    elif hp_read.source == 'text' or mp_read.source == 'text':
         src = 'text'
     else:
         src = 'bar'
 
-    return float(hp.value), float(mp.value), str(src)
+    return float(hp_read.value), float(mp_read.value), str(src)
 
 
 def _cooldown_ok_to_cast(ctx: RuntimeContext, frame: Frame) -> bool:
     roi = ctx.rois.get(ctx.config.heal_cooldown_roi)
     if roi is None:
+        # PROD-EMERGENCY contract may omit cooldown ROI.
+        profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+        if profile == 'prod_emergency':
+            return True
         raise PreflightFailed('heal_cooldown_unknown')
 
     marker = parse_rgb_triplet(os.environ.get('FRBOT_HEAL_COOLDOWN_RGB', '255,255,0') or '255,255,0', default=(255, 255, 0))

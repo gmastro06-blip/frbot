@@ -28,6 +28,7 @@ from contracts.errors import PreflightFailed
 from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_frame_ppm
 from runtime.runner import _load_config_from_env
+from runtime.pacing import sleep_ms
 
 
 def _hard_fail(reason: str, *, details: dict) -> int:
@@ -100,7 +101,7 @@ def main() -> int:
         # Best-effort focus attempt to reduce friction; binding is still strict.
         if target_hwnd > 0:
             try_focus_window(target_hwnd)
-            time.sleep(0.15)
+            sleep_ms(150.0)
 
     if float(args.wait_seconds) > 0 and target_hwnd > 0:
         deadline = time.time() + float(args.wait_seconds)
@@ -110,7 +111,7 @@ def main() -> int:
                     break
             except Exception:
                 pass
-            time.sleep(0.2)
+            sleep_ms(200.0)
 
     bvr = binding.verify()
     if not bvr.ok:

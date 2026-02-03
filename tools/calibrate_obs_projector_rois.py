@@ -640,6 +640,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument('--in-json', default='', help='When --validate-only: path to obs_projector_rois.json')
     args = ap.parse_args(argv)
 
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        try:
+            from diagnostics.fatal import write_fatal
+
+            write_fatal('feature_disabled', details={'tool': 'calibrate_obs_projector_rois', 'profile': profile})
+        except Exception:
+            pass
+        print(json.dumps({'ok': False, 'reason': 'feature_disabled', 'details': {'tool': 'calibrate_obs_projector_rois', 'profile': profile}}, ensure_ascii=False))
+        return 2
+
     image_path = Path(str(args.image)).resolve()
     out_json = Path(str(args.out_json)).resolve() if str(args.out_json).strip() else Path('obs_projector_rois.json').resolve()
     out_verify = (

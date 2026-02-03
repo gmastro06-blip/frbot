@@ -25,6 +25,7 @@ from diagnostics.frame_dump import dump_frame_ppm
 from runtime.config_loader import load_rois
 from runtime.runner import _load_config_from_env
 from runtime.env import parse_window_hwnd_env
+from runtime.pacing import sleep_ms
 
 
 class _JsonStdoutCtx(TypedDict):
@@ -163,7 +164,7 @@ def _maybe_focus_expected(hwnd: int) -> None:
                 pass
             if time.monotonic() >= deadline:
                 return
-            time.sleep(0.05)
+            sleep_ms(50.0)
     except Exception:
         pass
 
@@ -260,6 +261,12 @@ def main(argv: list[str] | None = None) -> int:
 
 def _main_inner(args: argparse.Namespace) -> int:
 
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        write_fatal('feature_disabled', details={'tool': 'test_capture_projector_real', 'profile': profile})
+        _emit_json({'ok': False, 'reason': 'feature_disabled', 'details': {'tool': 'test_capture_projector_real', 'profile': profile}})
+        return 2
+
     # Force backend expectation.
     Path('diagnostics').mkdir(parents=True, exist_ok=True)
     # Support requested env contract:
@@ -310,7 +317,7 @@ def _main_inner(args: argparse.Namespace) -> int:
         return _hard_fail('minimap_not_detected', details={'minimap_roi': str(ctx.config.minimap_roi)})
 
     if int(args.wait_seconds) > 0:
-        time.sleep(int(args.wait_seconds))
+        sleep_ms(float(int(args.wait_seconds)) * 1000.0)
 
     # If requested (or if no explicit output idx is set), probe all outputs and pick the best.
     output_idx_raw = (os.environ.get('FRBOT_PROJECTOR_OUTPUT_IDX', '') or '').strip()
@@ -452,7 +459,7 @@ def _main_inner(args: argparse.Namespace) -> int:
 
         mean, std, all_zero = _sample_luma_stats(fr.rgb, width=int(fr.width), height=int(fr.height))
         dumps.append({'i': int(i), 'full': str(full_path), 'minimap': str(mini_path), 'full_stats': {'std_luma': float(std), 'all_zero': bool(all_zero)}})
-        time.sleep(0.1)
+        sleep_ms(100.0)
 
     # Required evidence: diagnostics/obs_projector_full.ppm
     if last_full is not None:

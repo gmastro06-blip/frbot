@@ -45,6 +45,7 @@ class CavebotState:
     gate_attempts_used: int = 0
     gate_ticks_in_waypoint: int = 0
     gate_inputs_sent: int = 0
+    gate_reach_streak: int = 0
 
     def current_waypoint(self) -> Optional[Tile]:
         if not self.waypoints:
@@ -80,9 +81,8 @@ class Waypoint:
     x: int
     y: int
     z: int
-    expected_direction: Literal['N', 'S', 'E', 'W']
-    min_pixel_delta: int
-    max_ticks_without_progress: int
+    radius_px: int
+    max_ticks: int
 
 
 @dataclass(slots=True)
@@ -90,9 +90,19 @@ class CavebotTelemetry:
     waypoint_id: str = ''
     marker_before: Optional[MinimapMarker] = None
     marker_after: Optional[MinimapMarker] = None
-    progress_px: int = 0
+    distance_before_px: float = 0.0
+    distance_after_px: float = 0.0
+    angle_deg: float = 0.0
     attempts_used: int = 0
     inputs_sent: int = 0
+    last_n_distances: list[float] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class CavebotGateState:
+    """Runtime state for the Cavebot REAL/MOCK gate runner."""
+
+    telemetry: CavebotTelemetry = field(default_factory=CavebotTelemetry)
 
 
 class RuntimeState(str, Enum):
@@ -127,6 +137,7 @@ class RuntimeConfig:
     enable_combat: bool = False
 
     # Healing evidence ROI names.
+    hp_mp_roi: str = 'hp_mp'
     hp_bar_roi: str = 'hp_bar'
     mp_bar_roi: str = 'mp_bar'
     hp_text_roi: str = 'hp_text'
@@ -378,6 +389,7 @@ class RuntimeContext:
         default_factory=lambda: PositionState(x=0, y=0, z=0, source='minimap', confidence=0.0)
     )
     cavebot: CavebotState = field(default_factory=CavebotState)
+    cavebot_gate: CavebotGateState = field(default_factory=CavebotGateState)
 
     # Looting state.
     looting: 'LootingState' = field(default_factory=lambda: LootingState())

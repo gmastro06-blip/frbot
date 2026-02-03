@@ -12,7 +12,7 @@ from contracts.evidence import Roi
 from contracts.errors import PreflightFailed
 from contracts.verification import VerificationResult
 from contracts.window import WindowBindingAdapter
-from diagnostics.frame_dump import dump_frame_ppm
+from diagnostics.frame_dump import dump_enabled, dump_frame_ppm, dump_pair
 
 
 def _crop_rgb(rgb: bytes, width: int, height: int, roi: Roi) -> bytes:
@@ -428,6 +428,12 @@ class MeldBoundWindowRealCapture(CaptureAdapter):
         frame = cam.grab(region=region)
         ts_ns = time.monotonic_ns()
         rgb, w, h, _meta = _to_rgb_bytes(frame)
+        mean, std, all_zero = _sample_luma_stats(rgb, width=int(w), height=int(h))
+        if (not rgb) or bool(all_zero) or float(std) <= 0.0001:
+            failing = Frame(width=int(w), height=int(h), monotonic_ts_ns=int(ts_ns), digest_hex='', rgb=rgb)
+            if dump_enabled():
+                dump_pair(gate='capture', before=failing, after=None, reason='capture_invalid')
+            raise PreflightFailed('capture_invalid')
         digest = hashlib.sha256(rgb).hexdigest() if rgb else ''
         return Frame(width=int(w), height=int(h), monotonic_ts_ns=int(ts_ns), digest_hex=str(digest), rgb=rgb)
 
@@ -600,6 +606,12 @@ class MeldBoundMinimapRealCapture(CaptureAdapter):
 
         ts_ns = time.monotonic_ns()
         rgb, w, h, _meta = _to_rgb_bytes(frame)
+        mean, std, all_zero = _sample_luma_stats(rgb, width=int(w), height=int(h))
+        if (not rgb) or bool(all_zero) or float(std) <= 0.0001:
+            failing = Frame(width=int(w), height=int(h), monotonic_ts_ns=int(ts_ns), digest_hex='', rgb=rgb)
+            if dump_enabled():
+                dump_pair(gate='capture', before=failing, after=None, reason='capture_invalid')
+            raise PreflightFailed('capture_invalid')
         digest = hashlib.sha256(rgb).hexdigest() if rgb else ''
 
         minimap_rgb = _crop_rgb(rgb, w, h, self._minimap_roi) if rgb else b''

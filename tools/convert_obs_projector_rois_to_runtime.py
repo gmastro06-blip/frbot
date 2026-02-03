@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -213,6 +214,11 @@ def _load_obs_projector_rois(path: Path) -> tuple[dict[str, Any], list[RoiDef]]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        print(json.dumps({'ok': False, 'reason': 'feature_disabled', 'details': {'tool': 'convert_obs_projector_rois_to_runtime', 'profile': profile}}, ensure_ascii=False))
+        return 2
+
     ap = argparse.ArgumentParser(description='Convert obs_projector_rois.json into runtime ROI config schema {"rois": {...}}')
     ap.add_argument('--in-json', default='obs_projector_rois.json', help='Input ROI JSON (OBS Projector format)')
     ap.add_argument('--image', default='diagnostics/obs_projector_full.ppm', help='Reference capture used for calibration (PPM)')

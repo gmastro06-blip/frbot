@@ -5,6 +5,7 @@ import os
 from typing import TypeAlias
 
 from adapters.capture.mock_world import MockWorldCapture
+from adapters.capture.meld_real import MeldBoundMinimapRealCapture
 from adapters.capture.mss_bound_window_real import MssBoundMinimapRealCapture
 from adapters.input.mock_world import MockWorldInput
 from adapters.input.win32_hwnd import Win32HwndKeyboard
@@ -19,9 +20,12 @@ from typing import Literal
 from contracts.runtime import RuntimeContext, RuntimeState, Waypoint
 from runtime.cavebot_semantics import detect_player_marker
 from runtime.config_loader import load_rois
+from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
+from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
+from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_obs_projector_hwnd
 
 
-CaptureAdapter: TypeAlias = MssBoundMinimapRealCapture | MockWorldCapture
+CaptureAdapter: TypeAlias = MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture | MockWorldCapture
 InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
 
@@ -76,42 +80,44 @@ def _load_waypoints_from_env(ctx: RuntimeContext) -> tuple[Waypoint, ...]:
             x = int(item.get('x', 0))
             y = int(item.get('y', 0))
             z = int(item.get('z', 7))
-            expected = str(item.get('expected_direction', 'E')).strip().upper()
-            mpd = int(item.get('min_pixel_delta', int(ctx.config.cavebot_min_pixel_delta)))
-            mt = int(item.get('max_ticks_without_progress', int(ctx.config.cavebot_max_ticks_per_waypoint)))
+            radius_px = int(item.get('radius_px', 0))
+            max_ticks = int(item.get('max_ticks', 0))
+            if radius_px < 0 or max_ticks <= 0:
+                raise PreflightFailed('cavebot_waypoint_stuck')
             wps.append(
                 Waypoint(
                     waypoint_id=wid,
                     x=x,
                     y=y,
                     z=z,
-                    expected_direction=_dir(expected),
-                    min_pixel_delta=max(1, mpd),
-                    max_ticks_without_progress=max(1, mt),
+                    radius_px=int(radius_px),
+                    max_ticks=int(max_ticks),
                 )
             )
         return tuple(wps)
 
-    # Fallback: semicolon-separated: "x,y,z,dir" entries.
+    # Fallback: semicolon-separated: "x,y,z,radius_px,max_ticks" entries.
     items = [p.strip() for p in raw.split(';') if p.strip()]
     wps2: list[Waypoint] = []
     for idx, item in enumerate(items):
         bits = [b.strip() for b in item.split(',')]
-        if len(bits) < 4:
+        if len(bits) < 5:
             raise PreflightFailed('cavebot_waypoint_stuck')
         x = int(bits[0])
         y = int(bits[1])
         z = int(bits[2])
-        expected = str(bits[3]).strip().upper()
+        radius_px = int(bits[3])
+        max_ticks = int(bits[4])
+        if radius_px < 0 or max_ticks <= 0:
+            raise PreflightFailed('cavebot_waypoint_stuck')
         wps2.append(
             Waypoint(
                 waypoint_id=str(idx),
                 x=x,
                 y=y,
                 z=z,
-                expected_direction=_dir(expected),
-                min_pixel_delta=int(ctx.config.cavebot_min_pixel_delta),
-                max_ticks_without_progress=int(ctx.config.cavebot_max_ticks_per_waypoint),
+                radius_px=int(radius_px),
+                max_ticks=int(max_ticks),
             )
         )
     return tuple(wps2)
@@ -143,23 +149,47 @@ def cavebot_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
     ctx.cavebot.gate_attempts_used = 0
     ctx.cavebot.gate_ticks_in_waypoint = 0
     ctx.cavebot.gate_inputs_sent = 0
+    ctx.cavebot.gate_reach_streak = 0
+    ctx.cavebot_gate.telemetry = type(ctx.cavebot_gate.telemetry)()
 
     mode = ctx.config.mode.strip().lower()
 
     if mode == 'real':
-        binding_real = Win32WindowBinding(hwnd=int(ctx.config.window_hwnd), title_substring=ctx.config.window_title_substring)
+        enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=False)
+
+        backend = (os.environ.get('FRBOT_CAPTURE_BACKEND', 'mss') or 'mss').strip().lower()
+        profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+        if profile == 'prod_emergency' and backend not in {'mss', 'meld'}:
+            raise PreflightFailed('capture_invalid')
+
+        if capture_source() == 'obs':
+            obs_hwnd, _obs_title = resolve_obs_projector_hwnd()
+            binding_real = Win32WindowBinding(hwnd=int(obs_hwnd), title_substring=(os.environ.get('FRBOT_OBS_PROJECTOR_TITLE', '') or ''))
+        else:
+            binding_real = Win32WindowBinding(hwnd=int(ctx.config.window_hwnd), title_substring=ctx.config.window_title_substring)
         bvr = binding_real.verify()
         if not bvr.ok:
             raise PreflightFailed('cavebot_window_binding_lost')
 
-        try:
-            capture_real = MssBoundMinimapRealCapture(minimap_roi, binding=binding_real)
-        except ImportError as exc:
-            raise PreflightFailed(str(exc)) from exc
+        capture_real: MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture
+        if backend == 'meld':
+            try:
+                capture_real = MeldBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=binding_real)
+            except ImportError as exc:
+                raise PreflightFailed('capture_black_or_unavailable') from exc
+        elif backend == 'mss':
+            try:
+                capture_real = MssBoundMinimapRealCapture(minimap_roi, binding=binding_real)
+            except ImportError as exc:
+                raise PreflightFailed(str(exc)) from exc
+        else:
+            raise PreflightFailed('capture_black_or_unavailable')
 
-        snap = binding_real.snapshot()
         try:
-            input_real = Win32HwndKeyboard(hwnd=int(snap.hwnd))
+            input_hwnd = resolve_input_hwnd(hwnd=int(ctx.config.window_hwnd), title_substring=ctx.config.window_title_substring)
+            if input_hwnd <= 0:
+                raise PreflightFailed('cavebot_window_binding_lost')
+            input_real = Win32HwndKeyboard(hwnd=int(input_hwnd))
         except Exception as exc:
             raise PreflightFailed(f'failed to initialize win32 input: {type(exc).__name__}: {exc}') from exc
 
@@ -169,6 +199,10 @@ def cavebot_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
         ctx.input = InputStatus(backend=input_real.name, verified=inp_v.ok)
 
         if not cap_v.ok:
+            if profile == 'prod_emergency':
+                if capture_source() == 'obs' and (cap_v.reason or '') in {'captured_frame_black', 'capture_black_or_unavailable', 'frame_empty'}:
+                    raise PreflightFailed('captured_frame_black_obs')
+                raise PreflightFailed('capture_invalid')
             raise PreflightFailed(cap_v.reason or 'capture not verified')
         if not inp_v.ok:
             raise PreflightFailed(inp_v.reason or 'input not verified')
@@ -179,6 +213,10 @@ def cavebot_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
             raise PreflightFailed('cavebot_window_binding_lost')
 
         f = capture_real.grab()
+
+        # PROD-EMERGENCY: strict ROI contract must be in-bounds against the real capture.
+        validate_prod_emergency_real_rois_in_bounds(rois=ctx.rois, frame=f)
+
         marker = detect_player_marker(
             f,
             marker_rgb=_parse_rgb(ctx.config.player_marker_rgb),

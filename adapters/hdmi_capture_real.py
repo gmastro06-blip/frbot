@@ -5,6 +5,8 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Optional
 
+from runtime.pacing import sleep_ms
+
 
 # =========================
 # Data contracts
@@ -68,7 +70,7 @@ class HdmiCaptureReal:
             ts = int(time.time() * 1000)
             frames.append(frame)
             timestamps.append(ts)
-            time.sleep(0.05)
+            sleep_ms(50.0)
 
         cap.release()
 

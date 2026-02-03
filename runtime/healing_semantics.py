@@ -108,6 +108,33 @@ def read_text_percent(frame: Frame, roi: Roi) -> Optional[PercentRead]:
     return PercentRead(value=_clamp01(cur / float(mx)), source='text')
 
 
+def read_hp_mp_text_pair(frame: Frame, roi: Roi) -> Optional[tuple[PercentRead, PercentRead]]:
+    """Read (hp, mp) percents from a combined mock-encoded ROI.
+
+    Encoding: 8 bytes at ROI start: hp_cur u16, hp_max u16, mp_cur u16, mp_max u16.
+    Requires roi.height == 1.
+    """
+
+    if int(roi.height) != 1:
+        return None
+
+    rgb = _crop_rgb(frame, roi)
+    if len(rgb) < 8:
+        return None
+
+    hp_cur = int.from_bytes(rgb[0:2], 'little', signed=False)
+    hp_max = int.from_bytes(rgb[2:4], 'little', signed=False)
+    mp_cur = int.from_bytes(rgb[4:6], 'little', signed=False)
+    mp_max = int.from_bytes(rgb[6:8], 'little', signed=False)
+
+    if hp_max <= 0 or mp_max <= 0:
+        return None
+
+    hp = PercentRead(value=_clamp01(hp_cur / float(hp_max)), source='hp_mp')
+    mp = PercentRead(value=_clamp01(mp_cur / float(mp_max)), source='hp_mp')
+    return hp, mp
+
+
 def read_percent_with_consistency(
     *,
     bar: Optional[PercentRead],

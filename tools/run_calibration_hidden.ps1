@@ -35,6 +35,38 @@ if (-not (Test-Path -LiteralPath $effectiveLogDir)) {
   New-Item -ItemType Directory -Path $effectiveLogDir | Out-Null
 }
 
+function Resolve-PythonExe([string]$Requested) {
+  $req = ($Requested | ForEach-Object { $_.ToString().Trim() })
+  if (-not $req) { $req = 'python' }
+
+  # If user provided an explicit path (or non-default command), prefer it.
+  if ($req -ne 'python') {
+    return $req
+  }
+
+  # Best-effort: detect Poetry virtualenv python.
+  $poetry = Get-Command poetry -ErrorAction SilentlyContinue
+  if ($null -ne $poetry) {
+    try {
+      $venv = (& poetry env info -p 2>$null | Out-String).Trim()
+      if ($venv) {
+        $pyWin = Join-Path $venv 'Scripts\python.exe'
+        if (Test-Path -LiteralPath $pyWin) {
+          return $pyWin
+        }
+        $pyPosix = Join-Path $venv 'bin\python'
+        if (Test-Path -LiteralPath $pyPosix) {
+          return $pyPosix
+        }
+      }
+    } catch {
+      # Ignore and fall back.
+    }
+  }
+
+  return 'python'
+}
+
 function New-LogPaths([string]$prefix) {
   $safePrefix = ($prefix -replace '[^a-zA-Z0-9._-]', '_')
   $out = Join-Path $effectiveLogDir ("{0}_{1}.stdout.log" -f $safePrefix, $ts)
@@ -59,6 +91,7 @@ if ($Mode -eq 'calibrate') {
 
   $logs = New-LogPaths "calibrate"
   Write-Host ("Starting hidden calibrator. Logs: {0} , {1}" -f $logs.out, $logs.err)
+  $PythonExe = Resolve-PythonExe $PythonExe
   $proc = Start-Process -FilePath $PythonExe -ArgumentList $argList -WindowStyle Hidden -PassThru -Wait -RedirectStandardOutput $logs.out -RedirectStandardError $logs.err
   $code = $proc.ExitCode
   if ($null -eq $code) { $code = 1 }

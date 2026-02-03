@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import os
-import time
 from typing import TypeAlias
 
 from adapters.capture.mock_world import MockWorldCapture
-from adapters.capture.cam_real import CamMinimapRealCapture
 from adapters.capture.meld_real import MeldBoundMinimapRealCapture
-from adapters.capture.meld_projector_real import MeldProjectorMinimapRealCapture
 from adapters.capture.mss_bound_window_real import MssBoundMinimapRealCapture
 from adapters.input.mock_world import MockWorldInput
 from adapters.input.win32_hwnd import Win32HwndKeyboard
@@ -20,78 +17,11 @@ from contracts.input import InputStatus
 from contracts.runtime import RuntimeContext, RuntimeState
 from runtime.config_loader import load_rois
 from runtime.minimap_semantics import detect_player_marker, marker_config_from_env
+from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_obs_projector_hwnd
+from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
+from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
 
-
-def _env_bool(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return bool(default)
-    return str(raw).strip().lower() not in {'', '0', 'false', 'no', 'off'}
-
-
-def _env_float(name: str, default: float) -> float:
-    raw = os.environ.get(name)
-    if raw is None:
-        return float(default)
-    try:
-        return float(str(raw).strip())
-    except Exception:
-        return float(default)
-
-
-def _maybe_focus_projector_window(*, hwnd: int, title_substring: str) -> None:
-    """Best-effort focus to satisfy Win32WindowBinding.verify() foreground requirement.
-
-    Strictness is preserved: verification still fails if foreground cannot be acquired.
-    """
-
-    if not _env_bool('FRBOT_PROJECTOR_FOCUS_ON_START', False):
-        return
-
-    try:
-        from adapters.windows import win32 as w32
-    except Exception:
-        return
-
-    timeout_s = max(0.0, min(10.0, _env_float('FRBOT_PROJECTOR_FOCUS_TIMEOUT_S', 2.0)))
-    deadline = time.monotonic() + float(timeout_s)
-
-    target_hwnd = int(hwnd)
-    if target_hwnd <= 0 and str(title_substring or '').strip():
-        try:
-            match = w32.find_window_by_title_substring(str(title_substring))
-            if match is not None:
-                target_hwnd = int(match.hwnd)
-        except Exception:
-            target_hwnd = 0
-
-    if target_hwnd <= 0:
-        return
-
-    while True:
-        remaining = float(deadline - time.monotonic())
-        # Let the win32 helper do a short internal retry loop too.
-        per_attempt_timeout = 0.0
-        if remaining > 0.0:
-            per_attempt_timeout = min(0.5, remaining)
-        try:
-            w32.try_focus_window(int(target_hwnd), timeout_s=per_attempt_timeout)
-        except Exception:
-            pass
-        try:
-            if int(w32.get_foreground_window()) == int(target_hwnd):
-                return
-        except Exception:
-            pass
-        if time.monotonic() >= deadline:
-            return
-        # CI guardrail: no time.sleep outside tick pacing. Best-effort focus may
-        # spin briefly until deadline; internal win32 focus helper may already
-        # perform bounded waiting.
-
-CaptureAdapter: TypeAlias = (
-    MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture | MeldProjectorMinimapRealCapture | CamMinimapRealCapture | MockWorldCapture
-)
+CaptureAdapter: TypeAlias = MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture | MockWorldCapture
 InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
 
@@ -106,36 +36,41 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
 
     mode = ctx.config.mode.strip().lower()
 
+    # PROD-EMERGENCY: require explicit HWND-bound foreground before doing anything else.
+    if mode == 'real':
+        enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=False)
+
     if mode == 'real':
         if os.name != 'nt':
             raise PreflightFailed('unsupported_platform')
         backend = (os.environ.get('FRBOT_CAPTURE_BACKEND', 'mss') or 'mss').strip().lower()
 
-        # Allow projector mode to bind against the OBS Projector window (not Tibia).
-        # This keeps the strict foreground invariant, but against the projector HWND/title.
-        binding_hwnd = int(ctx.config.window_hwnd)
-        binding_title = ctx.config.window_title_substring
-        if backend in {'projector', 'meld-projector', 'obs-projector'}:
-            raw_hwnd = (os.environ.get('FRBOT_PROJECTOR_WINDOW_HWND', '') or '').strip()
-            if raw_hwnd:
-                try:
-                    binding_hwnd = int(raw_hwnd, 0)
-                except Exception:
-                    # Keep config value; binding.verify() will surface a usable reason.
-                    pass
-            raw_title = (os.environ.get('FRBOT_PROJECTOR_WINDOW_TITLE', '') or '').strip()
-            if raw_title:
-                binding_title = raw_title
+        cap_source = capture_source()
 
-        # Strong binding is required BEFORE we attempt any capture/input.
-        if backend in {'projector', 'meld-projector', 'obs-projector'}:
-            _maybe_focus_projector_window(hwnd=int(binding_hwnd), title_substring=str(binding_title))
-        binding_real = Win32WindowBinding(
-            hwnd=int(binding_hwnd),
-            title_substring=binding_title,
-        )
+        # PROD-EMERGENCY: REAL capture is HWND-bound only (MSS/DXGI). No projector/cam.
+        profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+        if profile == 'prod_emergency' and backend not in {'mss', 'meld'}:
+            raise PreflightFailed('capture_invalid')
+
+        # Capture binding: either client HWND (default) or OBS Projector HWND.
+        if cap_source == 'obs':
+            obs_hwnd, _obs_title = resolve_obs_projector_hwnd()
+            binding_real = Win32WindowBinding(hwnd=int(obs_hwnd), title_substring=os.environ.get('FRBOT_OBS_PROJECTOR_TITLE', '') or '')
+        else:
+            binding_hwnd = int(ctx.config.window_hwnd)
+            binding_title = ctx.config.window_title_substring
+            binding_real = Win32WindowBinding(
+                hwnd=int(binding_hwnd),
+                title_substring=binding_title,
+            )
         bvr = binding_real.verify()
         if not bvr.ok:
+            raise PreflightFailed('window_binding_lost')
+
+        # Input always targets the game client HWND (PostMessage). In OBS capture mode,
+        # this is intentionally decoupled from the capture binding.
+        input_hwnd = resolve_input_hwnd(hwnd=int(ctx.config.window_hwnd), title_substring=ctx.config.window_title_substring)
+        if input_hwnd <= 0:
             raise PreflightFailed('window_binding_lost')
 
         snap = binding_real.snapshot()
@@ -146,21 +81,11 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
         if minimap_roi is None:
             raise PreflightFailed('minimap_not_detected')
 
-        capture_real: MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture | MeldProjectorMinimapRealCapture | CamMinimapRealCapture
+        capture_real: MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture
 
         if backend == 'meld':
             try:
                 capture_real = MeldBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=binding_real)
-            except ImportError as exc:
-                raise PreflightFailed('capture_black_or_unavailable') from exc
-        elif backend in {'obs-projector', 'projector', 'meld-projector'}:
-            try:
-                capture_real = MeldProjectorMinimapRealCapture(minimap_roi=minimap_roi, binding=binding_real)
-            except ImportError as exc:
-                raise PreflightFailed('capture_black_or_unavailable') from exc
-        elif backend in {'cam', 'obs', 'virtualcam'}:
-            try:
-                capture_real = CamMinimapRealCapture(minimap_roi=minimap_roi, binding=binding_real)
             except ImportError as exc:
                 raise PreflightFailed('capture_black_or_unavailable') from exc
         elif backend == 'mss':
@@ -172,7 +97,7 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
             raise PreflightFailed('capture_black_or_unavailable')
 
         try:
-            input_real = Win32HwndKeyboard(hwnd=int(snap.hwnd))
+            input_real = Win32HwndKeyboard(hwnd=int(input_hwnd))
         except Exception as exc:
             raise PreflightFailed(f'failed to initialize win32 input: {type(exc).__name__}: {exc}') from exc
 
@@ -183,6 +108,11 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
         ctx.input = InputStatus(backend=input_real.name, verified=inp_v.ok)
 
         if not cap_v.ok:
+            profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+            if profile == 'prod_emergency':
+                if cap_source == 'obs' and (cap_v.reason or '') in {'captured_frame_black', 'capture_black_or_unavailable', 'frame_empty'}:
+                    raise PreflightFailed('captured_frame_black_obs')
+                raise PreflightFailed('capture_invalid')
             if backend == 'meld':
                 raise PreflightFailed('capture_black_or_unavailable')
             raise PreflightFailed(cap_v.reason or 'capture not verified')
@@ -195,6 +125,10 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
         except Exception:
             raise PreflightFailed('window_binding_lost')
         before = capture_real.grab()
+
+        # PROD-EMERGENCY: strict ROI contract must be in-bounds against the real capture.
+        validate_prod_emergency_real_rois_in_bounds(rois=ctx.rois, frame=before)
+
         if not before.minimap_detected:
             raise PreflightFailed('minimap_not_detected')
         cfg = marker_config_from_env(

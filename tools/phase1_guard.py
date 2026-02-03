@@ -22,9 +22,7 @@ _REQUIRED_ROIS: tuple[str, ...] = (
     "minimap",
     "battle_list",
     "hp_mp",
-    "inventory",
-    "npc_dialog",
-    "trade",
+    "target_frame",
 )
 
 

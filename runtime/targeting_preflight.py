@@ -16,6 +16,9 @@ from contracts.input import InputStatus
 from contracts.runtime import RuntimeContext, RuntimeState
 from runtime.battle_list_semantics import detect_battle_list
 from runtime.config_loader import load_rois
+from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
+from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_obs_projector_hwnd
+from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
 
 
 CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MockWorldAnyCapture
@@ -60,6 +63,9 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
 
     mode = ctx.config.mode.strip().lower()
 
+    if mode == 'real':
+        enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=False)
+
     loaded = load_rois(ctx)
     ctx.rois = dict(loaded.rois)
 
@@ -69,8 +75,8 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
 
     if mode == 'real':
         binding_real = Win32WindowBinding(
-            hwnd=int(ctx.config.window_hwnd),
-            title_substring=ctx.config.window_title_substring,
+            hwnd=int(resolve_obs_projector_hwnd()[0]) if capture_source() == 'obs' else int(ctx.config.window_hwnd),
+            title_substring=(os.environ.get('FRBOT_OBS_PROJECTOR_TITLE', '') or '') if capture_source() == 'obs' else ctx.config.window_title_substring,
         )
         bvr = binding_real.verify()
         if not bvr.ok:
@@ -81,9 +87,11 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
         except ImportError as exc:
             raise PreflightFailed(str(exc)) from exc
 
-        snap = binding_real.snapshot()
         try:
-            input_real = Win32HwndKeyboard(hwnd=int(snap.hwnd))
+            input_hwnd = resolve_input_hwnd(hwnd=int(ctx.config.window_hwnd), title_substring=ctx.config.window_title_substring)
+            if input_hwnd <= 0:
+                raise PreflightFailed('targeting_window_binding_lost')
+            input_real = Win32HwndKeyboard(hwnd=int(input_hwnd))
         except Exception as exc:
             raise PreflightFailed(f'failed to initialize win32 input: {type(exc).__name__}: {exc}') from exc
 
@@ -94,6 +102,11 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
         ctx.input = InputStatus(backend=input_real.name, verified=inp_v.ok)
 
         if not cap_v.ok:
+            profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+            if profile == 'prod_emergency':
+                if capture_source() == 'obs' and (cap_v.reason or '') in {'captured_frame_black', 'capture_black_or_unavailable', 'frame_empty'}:
+                    raise PreflightFailed('captured_frame_black_obs')
+                raise PreflightFailed('capture_invalid')
             raise PreflightFailed(cap_v.reason or 'capture not verified')
         if not inp_v.ok:
             raise PreflightFailed(inp_v.reason or 'input not verified')
@@ -104,9 +117,7 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
             raise PreflightFailed('targeting_window_binding_lost')
 
         before = capture_real.grab()
-        # Battle List bbox must be within captured HWND region.
-        if (battle_roi.x + battle_roi.width) > before.width or (battle_roi.y + battle_roi.height) > before.height:
-            raise PreflightFailed('targeting_window_binding_lost')
+        validate_prod_emergency_real_rois_in_bounds(rois=ctx.rois, frame=before)
 
         obs = detect_battle_list(before, battle_roi)
         if obs is None:
@@ -155,6 +166,7 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
         raise PreflightFailed('input not verified')
 
     before = capture_mock.grab()
+    # Mock-only: keep legacy bounds check for the specific ROI we need.
     if (battle_roi.x + battle_roi.width) > before.width or (battle_roi.y + battle_roi.height) > before.height:
         raise PreflightFailed('targeting_window_binding_lost')
 
