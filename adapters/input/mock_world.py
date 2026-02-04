@@ -18,6 +18,9 @@ class MockWorldInput(InputAdapter):
 			return VerificationResult(ok=True)
 		return VerificationResult(ok=False, reason='mock input not verified')
 
+	def assert_bound(self, hwnd: int | None = None) -> None:
+		return
+
 	def press_noop(self) -> None:
 		self._world.on_noop()
 

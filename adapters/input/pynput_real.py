@@ -42,6 +42,9 @@ class PynputRealKeyboard(InputAdapter):
         except Exception as exc:
             return VerificationResult(ok=False, reason=f'input verify failed: {type(exc).__name__}: {exc}')
 
+    def assert_bound(self, hwnd: int | None = None) -> None:
+        return
+
     def press_noop(self) -> None:
         key = self._noop_key()
         self._controller.press(key)

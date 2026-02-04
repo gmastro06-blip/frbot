@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import dataclass
+import json
+import time
+from pathlib import Path
+from dataclasses import asdict, dataclass
 
 from adapters.windows import win32 as w32
 from contracts.errors import PreflightFailed
 from diagnostics.fatal import write_fatal
 from runtime.env import parse_window_hwnd_env
+
+
+_PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE: bool = False
+_PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +43,13 @@ def _mode() -> str:
 
 def _capture_source() -> str:
     v = (os.environ.get('FRBOT_CAPTURE_SOURCE', '') or '').strip().lower()
+    if v == 'obs_source':
+        return 'obs_source'
     return 'obs' if v == 'obs' else 'client'
+
+
+def _obs_source_name() -> str:
+    return str(os.environ.get('FRBOT_OBS_SOURCE_NAME') or '').strip()
 
 
 def _obs_projector_title() -> str:
@@ -54,6 +67,69 @@ def _found_titles() -> list[str]:
         if t:
             out.append(t)
     return out
+
+
+def _list_found_windows() -> list[dict[str, object]]:
+    try:
+        wins, _mons = w32.list_visible_windows_diagnostic()
+    except Exception:
+        return []
+    out: list[dict[str, object]] = []
+    for wi in wins[:80]:
+        try:
+            out.append(w32.window_diag_to_dict(wi))
+        except Exception:
+            continue
+    return out
+
+
+def _write_window_diagnostics_json(*, expected_title: str, resolved_hwnd: int, resolved_title: str, found_windows: list[dict[str, object]]) -> None:
+    try:
+        out = {
+            'ts': time.time(),
+            'expected_title': str(expected_title or ''),
+            'resolved_hwnd': hex(int(resolved_hwnd)) if int(resolved_hwnd) > 0 else None,
+            'resolved_title': str(resolved_title or ''),
+            'found_windows': list(found_windows),
+        }
+        p = Path('diagnostics') / 'window_diagnostics.json'
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
+    except Exception:
+        return
+
+
+def _ensure_trace_initialized() -> None:
+    # PROD-EMERGENCY REAL requires trace to exist even if we hard-stop in startup guards.
+    try:
+        if _profile() != 'prod_emergency' or _mode() != 'real':
+            return
+        frames_dir = Path('diagnostics') / 'frames_emergency'
+        frames_dir.mkdir(parents=True, exist_ok=True)
+        p = frames_dir / 'cavebot_trace.jsonl'
+        if not p.exists():
+            p.write_text('', encoding='utf-8')
+    except Exception:
+        return
+
+
+def _resolve_hwnd_by_title(title: str) -> tuple[int, str]:
+    t = str(title or '').strip()
+    if not t:
+        return 0, ''
+    try:
+        exact = w32.find_window_by_title_exact(t)
+        if exact is not None:
+            return int(exact.hwnd), str(exact.title)
+    except Exception:
+        pass
+    try:
+        sub = w32.find_window_by_title_substring(t)
+        if sub is not None:
+            return int(sub.hwnd), str(sub.title)
+    except Exception:
+        pass
+    return 0, ''
 
 
 def _collect_details(*, hwnd: int, title_substring: str) -> StartupGuardDetails:
@@ -104,7 +180,17 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
     - No focus stealing: we never attempt to activate/focus a window
     """
 
+    global _PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE
+    global _PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED
+
+    _ensure_trace_initialized()
+
     if _profile() != 'prod_emergency':
+        return
+
+    # Contract: foreground is verified at startup only (never during runtime).
+    # Multiple preflight entrypoints may call this; make it idempotent per-process.
+    if bool(_PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE):
         return
 
     if sys.platform != 'win32':
@@ -121,65 +207,7 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
             write_fatal('invalid_mode', exc, details=details)
         raise exc
 
-    # OBS capture mode: enforce OBS projector window instead of Tibia client.
-    if _capture_source() == 'obs':
-        expected_title = _obs_projector_title()
-        if not expected_title:
-            exc = PreflightFailed('obs_projector_not_found')
-            details = {'expected_title': '', 'found_titles': []}
-            setattr(exc, 'details', details)
-            if write_fatal_on_fail:
-                write_fatal('obs_projector_not_found', exc, details=details)
-            raise exc
-
-        try:
-            match = w32.find_window_by_title_substring(str(expected_title))
-        except Exception:
-            match = None
-        if match is None:
-            exc = PreflightFailed('obs_projector_not_found')
-            details = {'expected_title': str(expected_title), 'found_titles': _found_titles()}
-            setattr(exc, 'details', details)
-            if write_fatal_on_fail:
-                write_fatal('obs_projector_not_found', exc, details=details)
-            raise exc
-
-        hwnd = int(match.hwnd)
-        title_substring = str(expected_title)
-
-        info = _collect_details(hwnd=int(hwnd), title_substring=title_substring)
-        d = info.__dict__
-
-        if not w32.is_window(int(hwnd)):
-            pf = PreflightFailed('window_hwnd_invalid')
-            setattr(pf, 'details', d)
-            if write_fatal_on_fail:
-                write_fatal('window_hwnd_invalid', pf, details=d)
-            raise pf
-
-        if not info.visible:
-            pf = PreflightFailed('window_not_visible')
-            setattr(pf, 'details', d)
-            if write_fatal_on_fail:
-                write_fatal('window_not_visible', pf, details=d)
-            raise pf
-
-        if info.minimized:
-            pf = PreflightFailed('window_minimized')
-            setattr(pf, 'details', d)
-            if write_fatal_on_fail:
-                write_fatal('window_minimized', pf, details=d)
-            raise pf
-
-        if int(info.foreground_hwnd) != int(hwnd):
-            pf = PreflightFailed('obs_projector_foreground_mismatch')
-            setattr(pf, 'details', d)
-            if write_fatal_on_fail:
-                write_fatal('obs_projector_foreground_mismatch', pf, details=d)
-            raise pf
-
-        return
-
+    # InputAuthority: ALWAYS Tibia HWND/title (strict foreground).
     raw_hwnd = _env_str('FRBOT_WINDOW_HWND')
     title_substring = _env_str('FRBOT_WINDOW_TITLE')
     if not raw_hwnd and not title_substring:
@@ -191,46 +219,75 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         raise exc
 
     hwnd = 0
+    resolved_title = ''
+    hwnd_parse_error: str | None = None
+
     if raw_hwnd:
         try:
             hwnd = int(parse_window_hwnd_env('FRBOT_WINDOW_HWND'))
-        except PreflightFailed as err_exc:
-            d0 = {'hwnd': raw_hwnd}
-            setattr(err_exc, 'details', d0)
-            if write_fatal_on_fail:
-                write_fatal('window_hwnd_invalid', err_exc, details=d0)
-            raise
-    else:
-        # Resolve hwnd from title substring deterministically.
+        except PreflightFailed:
+            # Auto-resolve by title when HWND is invalid.
+            hwnd = 0
+            hwnd_parse_error = 'window_hwnd_invalid'
+
+    # If a parsed HWND is stale (no longer valid), treat as invalid and fall back to title.
+    if int(hwnd) > 0:
         try:
-            match = w32.find_window_by_title_substring(str(title_substring))
+            if (not w32.is_window(int(hwnd))) or (not w32.is_window_visible(int(hwnd))) or bool(w32.is_window_minimized(int(hwnd))):
+                hwnd = 0
+                if hwnd_parse_error is None:
+                    hwnd_parse_error = 'window_hwnd_invalid'
         except Exception:
-            match = None
-        if match is None:
-            pf = PreflightFailed('window_not_found')
-            d0 = {'title_substring': str(title_substring)}
-            setattr(pf, 'details', d0)
-            if write_fatal_on_fail:
-                write_fatal('window_not_found', pf, details=d0)
-            raise pf
-        hwnd = int(match.hwnd)
+            hwnd = 0
+            if hwnd_parse_error is None:
+                hwnd_parse_error = 'window_hwnd_invalid'
 
-    info = _collect_details(hwnd=int(hwnd), title_substring=title_substring)
-    d = info.__dict__
+    if hwnd <= 0 and title_substring:
+        hwnd, resolved_title = _resolve_hwnd_by_title(str(title_substring))
 
-    if not w32.is_window(int(hwnd)):
+    # One-time self-heal: if invalid, re-enumerate and retry resolve once.
+    if (hwnd <= 0) and title_substring and (not _PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED):
+        _PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED = True
+        hwnd2, resolved_title2 = _resolve_hwnd_by_title(str(title_substring))
+        if int(hwnd2) > 0:
+            hwnd = int(hwnd2)
+            resolved_title = str(resolved_title2 or resolved_title)
+
+    # If we resolved a HWND via title (or self-heal), persist it for downstream preflight.
+    if int(hwnd) > 0 and (not raw_hwnd or hwnd_parse_error is not None):
+        try:
+            os.environ['FRBOT_WINDOW_HWND'] = hex(int(hwnd))
+        except Exception:
+            pass
+
+    found_windows = _list_found_windows()
+    info = _collect_details(hwnd=int(hwnd), title_substring=str(title_substring))
+    d = asdict(info)
+    d.update(
+        {
+            'expected_title': str(title_substring or ''),
+            'resolved_hwnd': hex(int(hwnd)) if int(hwnd) > 0 else None,
+            'resolved_title': str(resolved_title or ''),
+            'hwnd_raw': str(raw_hwnd or ''),
+            'hwnd_parse_error': hwnd_parse_error,
+            'found_windows': list(found_windows),
+            'capture_source': _capture_source(),
+            'obs_source_name': _obs_source_name(),
+        }
+    )
+
+    _write_window_diagnostics_json(
+        expected_title=str(title_substring or ''),
+        resolved_hwnd=int(hwnd),
+        resolved_title=str(resolved_title or ''),
+        found_windows=list(found_windows),
+    )
+
+    if int(hwnd) <= 0 or not w32.is_window(int(hwnd)):
         pf = PreflightFailed('window_hwnd_invalid')
         setattr(pf, 'details', d)
         if write_fatal_on_fail:
             write_fatal('window_hwnd_invalid', pf, details=d)
-        raise pf
-
-    # Title check is additive (must still match when provided).
-    if title_substring.strip() and title_substring.strip().lower() not in (info.title_now or '').lower():
-        pf = PreflightFailed('window_title_mismatch')
-        setattr(pf, 'details', d)
-        if write_fatal_on_fail:
-            write_fatal('window_title_mismatch', pf, details=d)
         raise pf
 
     if not info.visible:
@@ -248,8 +305,59 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         raise pf
 
     if int(info.foreground_hwnd) != int(hwnd):
-        pf = PreflightFailed('window_not_foreground')
-        setattr(pf, 'details', d)
+        # Optional best-effort focus (kept opt-in to avoid side-effects in tests).
+        raw_try_focus = os.environ.get('FRBOT_STARTUP_TRY_FOCUS', '')
+        try_focus = raw_try_focus is not None and raw_try_focus.strip().lower() not in {'', '0', 'false', 'no', 'off'}
+        if try_focus:
+            try:
+                w32.try_focus_window(int(hwnd), timeout_s=0.8)
+            except Exception:
+                pass
+            info2 = _collect_details(hwnd=int(hwnd), title_substring=str(title_substring))
+            if int(getattr(info2, 'foreground_hwnd', 0)) == int(hwnd):
+                info = info2
+
+        if int(info.foreground_hwnd) != int(hwnd):
+            pf = PreflightFailed('window_not_foreground')
+            details_fg = {
+                'reason': 'window_not_foreground',
+                'expected_foreground': 'TIBIA',
+                'window_hwnd': hex(int(hwnd)),
+                'foreground_hwnd': hex(int(info.foreground_hwnd)),
+                'foreground_title': str(w32.get_window_text(int(info.foreground_hwnd)) or '') if int(info.foreground_hwnd) > 0 else '',
+                'hint': 'Focus Tibia window and rerun',
+                'try_focus': bool(try_focus),
+            }
+            setattr(pf, 'details', details_fg)
+            if write_fatal_on_fail:
+                write_fatal('window_not_foreground', pf, details=details_fg)
+            raise pf
+
+    # CaptureAuthority: OBS Source Identity (no HWND/foreground/monitor checks).
+    if _capture_source() == 'obs_source':
+        src = _obs_source_name()
+        if not src:
+            pf = PreflightFailed('obs_source_not_found')
+            details = {'reason': 'obs_source_not_found', 'obs_source_name': ''}
+            setattr(pf, 'details', details)
+            if write_fatal_on_fail:
+                write_fatal('obs_source_not_found', pf, details=details)
+            raise pf
+        _PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE = True
+        return
+
+    # PROD-EMERGENCY: legacy projector mode is disabled (capture must be OBS source identity).
+    if _capture_source() == 'obs':
+        pf = PreflightFailed('capture_source_invalid')
+        details = {
+            'reason': 'capture_source_invalid',
+            'capture_source': 'obs',
+            'required': 'obs_source',
+            'hint': 'Set FRBOT_CAPTURE_SOURCE=obs_source and provide FRBOT_OBS_SOURCE_NAME',
+        }
+        setattr(pf, 'details', details)
         if write_fatal_on_fail:
-            write_fatal('window_not_foreground', pf, details=d)
+            write_fatal('capture_source_invalid', pf, details=details)
         raise pf
+
+    return

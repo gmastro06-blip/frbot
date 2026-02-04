@@ -18,6 +18,12 @@ class InputAdapter(Protocol):
     def verify(self) -> VerificationResult:
         """Return ok=True only if input is verified safe to use."""
 
+    def assert_bound(self, hwnd: int | None = None) -> None:
+        """Hard-check that input is still bound to the expected window.
+
+        Implementations that do not target a specific HWND may treat this as a no-op.
+        """
+
     def press_noop(self) -> None:
         """Emit a configurable no-op key press used for verification."""
 

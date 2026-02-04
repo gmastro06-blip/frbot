@@ -141,6 +141,19 @@ class MonitorInfo:
     primary: bool
 
 
+@dataclass(frozen=True, slots=True)
+class WindowDiagnosticInfo:
+    hwnd: int
+    title: str
+    pid: int
+    visible: bool
+    minimized: bool
+    rect: WindowRect
+    monitor_device: str | None
+    monitor_primary: bool | None
+    z_order: int
+
+
 EnumWindowsProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
 if user32 is not None:
@@ -373,6 +386,63 @@ def find_window_by_title_substring(substr: str) -> Optional[HwndMatch]:
     return best
 
 
+def find_window_by_title_exact(title: str) -> Optional[HwndMatch]:
+    """Find a top-level window by exact title.
+
+    Deterministic:
+    - Returns the first match in EnumWindows (z-order) order.
+    - Tries case-sensitive exact match first; if none, falls back to case-insensitive exact.
+    """
+
+    u32 = _require_windows()
+    needle = (title or '').strip()
+    if not needle:
+        return None
+
+    best: Optional[HwndMatch] = None
+
+    def on_enum(hwnd: int) -> bool:
+        nonlocal best
+        t = get_window_text(hwnd)
+        if not t:
+            return True
+        if t == needle:
+            best = HwndMatch(hwnd=int(hwnd), title=t)
+            return False
+        return True
+
+    def _cb(hwnd: wintypes.HWND, lparam: wintypes.LPARAM) -> bool:
+        try:
+            return bool(on_enum(int(hwnd)))
+        except Exception:
+            return True
+
+    u32.EnumWindows(EnumWindowsProc(_cb), 0)
+    if best is not None:
+        return best
+
+    needle_cf = needle.casefold()
+
+    def on_enum_ci(hwnd: int) -> bool:
+        nonlocal best
+        t = get_window_text(hwnd)
+        if not t:
+            return True
+        if t.strip().casefold() == needle_cf:
+            best = HwndMatch(hwnd=int(hwnd), title=t)
+            return False
+        return True
+
+    def _cb_ci(hwnd: wintypes.HWND, lparam: wintypes.LPARAM) -> bool:
+        try:
+            return bool(on_enum_ci(int(hwnd)))
+        except Exception:
+            return True
+
+    u32.EnumWindows(EnumWindowsProc(_cb_ci), 0)
+    return best
+
+
 def list_monitors() -> list[MonitorInfo]:
     """Enumerate display monitors and their virtual-screen rectangles."""
 
@@ -473,3 +543,97 @@ def list_top_level_windows(*, title_substring: str = '', visible_only: bool = Tr
 
     u32.EnumWindows(EnumWindowsProc(_cb), 0)
     return out
+
+
+def list_visible_windows_diagnostic() -> tuple[list[WindowDiagnosticInfo], list[MonitorInfo]]:
+    """Enumerate visible top-level windows with monitor + z-order.
+
+    Captures:
+    - EnumWindows order as z-order (0 = topmost)
+    - GetWindowRect (screen coords)
+    - Visible/minimized flags
+    - Monitor device + primary (inferred by rect center)
+    """
+
+    u32 = _require_windows()
+    monitors = list_monitors()
+
+    out: list[WindowDiagnosticInfo] = []
+
+    z = 0
+
+    def on_enum(hwnd: int) -> bool:
+        nonlocal z
+
+        title = get_window_text(hwnd)
+        if not title:
+            return True
+
+        visible = is_window_visible(hwnd)
+        minimized = is_window_minimized(hwnd)
+        if not visible:
+            return True
+
+        try:
+            pid = get_window_process_id(hwnd)
+        except Exception:
+            pid = 0
+
+        try:
+            rect = get_window_rect_in_screen(hwnd)
+        except Exception:
+            rect = WindowRect(left=0, top=0, right=0, bottom=0)
+
+        cx = int(rect.left) + int(rect.width // 2)
+        cy = int(rect.top) + int(rect.height // 2)
+        mon = monitor_for_point(cx, cy, monitors)
+        mon_dev = str(mon.device) if mon is not None else None
+        mon_primary = bool(mon.primary) if mon is not None else None
+
+        out.append(
+            WindowDiagnosticInfo(
+                hwnd=int(hwnd),
+                title=str(title),
+                pid=int(pid),
+                visible=bool(visible),
+                minimized=bool(minimized),
+                rect=rect,
+                monitor_device=mon_dev,
+                monitor_primary=mon_primary,
+                z_order=int(z),
+            )
+        )
+        z += 1
+        return True
+
+    def _cb(hwnd: wintypes.HWND, lparam: wintypes.LPARAM) -> bool:
+        try:
+            return bool(on_enum(int(hwnd)))
+        except Exception:
+            return True
+
+    u32.EnumWindows(EnumWindowsProc(_cb), 0)
+    return out, monitors
+
+
+def monitor_info_to_dict(mi: MonitorInfo) -> dict[str, object]:
+    r = mi.rect
+    return {
+        'device': str(mi.device),
+        'primary': bool(mi.primary),
+        'rect': {'left': int(r.left), 'top': int(r.top), 'right': int(r.right), 'bottom': int(r.bottom)},
+    }
+
+
+def window_diag_to_dict(w: WindowDiagnosticInfo) -> dict[str, object]:
+    r = w.rect
+    return {
+        'hwnd': hex(int(w.hwnd)),
+        'title': str(w.title),
+        'pid': int(w.pid),
+        'is_visible': bool(w.visible),
+        'is_minimized': bool(w.minimized),
+        'rect': {'left': int(r.left), 'top': int(r.top), 'right': int(r.right), 'bottom': int(r.bottom)},
+        'monitor': {'device': w.monitor_device, 'primary': w.monitor_primary},
+        'z_order': int(w.z_order),
+    }
