@@ -263,6 +263,11 @@ def run() -> int:
                 locked=bool(ctx.targeting.target.locked),
                 target=str(ctx.targeting.target.target_name),
                 attempts=int(ctx.targeting.attempt_count),
+                capture_backend=str(getattr(capture, 'name', type(capture).__name__)),
+                capture_source=str(os.environ.get('FRBOT_CAPTURE_SOURCE', '') or 'client').strip().lower(),
+                obs_source_name=str(getattr(capture, 'obs_source_name', '') or ''),
+                frame_resolution=[int(getattr(capture, 'last_frame_resolution', (0, 0))[0]), int(getattr(capture, 'last_frame_resolution', (0, 0))[1])],
+                luma_std=float(getattr(capture, 'last_luma_std', 0.0) or 0.0),
             )
 
             ctx.telemetry.tick_count += 1

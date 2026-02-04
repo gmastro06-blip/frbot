@@ -1,8 +1,0 @@
-{
-  "schema": "frbot.obsdiag.v1",
-  "ts": "2026-02-03T13:15:39.988650+01:00",
-  "reason": "obs_projector_foreground_mismatch",
-  "hwnd": "0x31003a",
-  "title": "Proyector en ventana (Fuente) - Tibia_Fuente",
-  "method": "PrintWindow"
-}

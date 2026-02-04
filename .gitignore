@@ -37,9 +37,14 @@ venv
 htmlcov/
 
 # Runtime artifacts (must never be committed)
-diagnostics/*.log
-diagnostics/frames/
+# Keep the entire diagnostics tree out of git; it contains real-run evidence,
+# screenshots/PPMs, JSON reports, and transient logs.
+diagnostics/**
+*.ppm
+*_full.ppm
+*_minimap.ppm
 logs/
 
 # Local real-client evidence (never commit captured game frames)
 tests/real_frames/
+

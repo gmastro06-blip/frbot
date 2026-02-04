@@ -1,6 +1,0 @@
-{
-    "expected":  "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\rois_15y.json",
-    "missing":  "config_not_found",
-    "reason":  "missing_precondition",
-    "ts":  "2026-02-01T21:25:06.2809500+01:00"
-}

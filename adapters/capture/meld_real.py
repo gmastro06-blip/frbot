@@ -217,6 +217,29 @@ def _dxcam_output_map(dxcam_mod: Any, *, max_outputs: int = 8) -> dict[str, dict
     return out
 
 
+def _dxcam_available_output_indices(dxcam_mod: Any, *, max_outputs: int = 8) -> list[int]:
+    out: list[int] = []
+    for idx in range(int(max_outputs)):
+        try:
+            dxcam_mod.create(output_idx=int(idx))
+        except Exception:
+            continue
+        out.append(int(idx))
+    return out
+
+
+def _ordered_monitors(mons: list[Any]) -> list[Any]:
+    # Prefer primary first, then stable ordering by virtual origin.
+    def _key(m: Any) -> tuple[int, int, int]:
+        rect = getattr(m, 'rect', None)
+        left = int(getattr(rect, 'left', 0) or 0) if rect is not None else 0
+        top = int(getattr(rect, 'top', 0) or 0) if rect is not None else 0
+        primary = 0 if bool(getattr(m, 'primary', False)) else 1
+        return (primary, left, top)
+
+    return sorted(list(mons or []), key=_key)
+
+
 def _env_bool(name: str, default: bool = False) -> bool:
     raw = os.environ.get(name)
     if raw is None:
@@ -287,6 +310,9 @@ class MeldBoundWindowRealCapture(CaptureAdapter):
         self._monitor_rect: Any | None = None
         self._baseline_done: bool = False
 
+        # Some dxcam builds do not expose output names; in that case we may need to probe.
+        self._dxcam_outputs: list[int] | None = None
+
     def _resolve_output_for_hwnd(self, hwnd: int, rect_client: Any) -> dict[str, object]:
         mons = w32.list_monitors()
         cx = (int(getattr(rect_client, 'left', 0) or 0) + int(getattr(rect_client, 'right', 0) or 0)) // 2
@@ -295,6 +321,78 @@ class MeldBoundWindowRealCapture(CaptureAdapter):
         if mon is None:
             return {'device': '', 'rect': None, 'primary': True}
         return {'device': str(mon.device), 'rect': mon.rect, 'primary': bool(mon.primary)}
+
+    def _ensure_outputs(self) -> list[int]:
+        if self._dxcam_outputs is None:
+            self._dxcam_outputs = _dxcam_available_output_indices(self._dxcam)
+        return list(self._dxcam_outputs)
+
+    def _guess_output_idx_for_device(self, device: str) -> int:
+        mons = _ordered_monitors(w32.list_monitors())
+        dev = str(device or '')
+        for i, m in enumerate(mons):
+            if str(getattr(m, 'device', '') or '') == dev:
+                return int(i)
+        return 0
+
+    def _apply_output_and_monitor(self, *, output_idx: int, monitor: Any | None) -> Any:
+        if self._cam is None or self._output_idx != int(output_idx):
+            self._cam = self._dxcam.create(output_idx=int(output_idx))
+            self._output_idx = int(output_idx)
+            try:
+                o = getattr(self._cam, '_output', None)
+                self._output_name = str(getattr(o, 'name', '') or '')
+            except Exception:
+                self._output_name = ''
+
+        if monitor is not None:
+            self._monitor_device = str(getattr(monitor, 'device', '') or '')
+            self._monitor_rect = getattr(monitor, 'rect', None)
+        else:
+            self._monitor_device = ''
+            self._monitor_rect = None
+
+        if not self._baseline_done:
+            _grab_full_baseline(self._cam, out_path='diagnostics/capture_full.ppm')
+            self._baseline_done = True
+
+        return self._cam
+
+    def _probe_outputs_for_capture(self, *, hwnd: int, rect_client: Any, require_nonblack: bool = True) -> bool:
+        outputs = self._ensure_outputs()
+        mons = _ordered_monitors(w32.list_monitors())
+        if not outputs:
+            return False
+
+        for idx in outputs:
+            mon = mons[int(idx)] if int(idx) < len(mons) else (w32.primary_monitor(mons) if mons else None)
+            try:
+                cam = self._apply_output_and_monitor(output_idx=int(idx), monitor=mon)
+
+                fw = int(getattr(cam, 'width', 0) or 0)
+                fh = int(getattr(cam, 'height', 0) or 0)
+                if fw <= 0 or fh <= 0:
+                    fw, fh = _grab_full_baseline(cam, out_path='diagnostics/capture_full.ppm')
+                if fw <= 0 or fh <= 0:
+                    continue
+
+                region, _region_details = self._window_region_in_output(rect_client=rect_client, frame_w=fw, frame_h=fh)
+                frame = cam.grab(region=region)
+                rgb, w, h, _meta = _to_rgb_bytes(frame)
+                if not rgb or int(w) <= 0 or int(h) <= 0:
+                    continue
+                if require_nonblack:
+                    _mean, std, all_zero = _sample_luma_stats(rgb, width=int(w), height=int(h))
+                    if bool(all_zero) or float(std) <= 5.0:
+                        continue
+
+                return True
+            except PreflightFailed:
+                continue
+            except Exception:
+                continue
+
+        return False
 
     def _ensure(self, *, hwnd: int, rect_client: Any) -> Any:
         target = self._resolve_output_for_hwnd(hwnd, rect_client)
@@ -309,24 +407,26 @@ class MeldBoundWindowRealCapture(CaptureAdapter):
             desired_idx = int(forced_idx)
         elif device and device in output_map:
             desired_idx = _as_int(output_map[device].get('output_idx', 0), 0)
+        else:
+            # dxcam build does not provide output names; guess by monitor ordering.
+            desired_idx = self._guess_output_idx_for_device(device)
 
-        if self._cam is None or self._output_idx != int(desired_idx):
-            self._cam = self._dxcam.create(output_idx=int(desired_idx))
-            self._output_idx = int(desired_idx)
-            try:
-                o = getattr(self._cam, '_output', None)
-                self._output_name = str(getattr(o, 'name', '') or '')
-            except Exception:
-                self._output_name = ''
+        outputs = self._ensure_outputs()
+        if outputs and int(desired_idx) not in set(outputs):
+            desired_idx = int(outputs[0])
 
-        self._monitor_device = device
-        self._monitor_rect = mon_rect
+        # Monitor rect must match the chosen output idx assumption.
+        monitor = None
+        mons = _ordered_monitors(w32.list_monitors())
+        if int(desired_idx) < len(mons):
+            monitor = mons[int(desired_idx)]
+        else:
+            # Best effort: keep the hwnd-derived monitor.
+            monitor = w32.primary_monitor(mons) if mons else None
+            if monitor is None and mon_rect is not None:
+                monitor = type('M', (), {'device': device, 'rect': mon_rect, 'primary': bool(target.get('primary', True))})()
 
-        if not self._baseline_done:
-            _grab_full_baseline(self._cam, out_path='diagnostics/capture_full.ppm')
-            self._baseline_done = True
-
-        return self._cam
+        return self._apply_output_and_monitor(output_idx=int(desired_idx), monitor=monitor)
 
     def _window_region_in_output(self, *, rect_client: Any, frame_w: int, frame_h: int) -> tuple[tuple[int, int, int, int], dict[str, object]]:
         # Convert from virtual screen coords to output-local coords by subtracting monitor origin.
@@ -401,10 +501,15 @@ class MeldBoundWindowRealCapture(CaptureAdapter):
             frame = cam.grab(region=region)
             rgb, w, h, _meta = _to_rgb_bytes(frame)
             if not rgb or w <= 0 or h <= 0:
+                # On some dxcam builds, output selection is ambiguous; probe alternates.
+                if self._probe_outputs_for_capture(hwnd=hwnd, rect_client=rect_client, require_nonblack=False):
+                    return VerificationResult(ok=True)
                 return VerificationResult(ok=False, reason='frame_empty')
 
             _mean, std, all_zero = _sample_luma_stats(rgb, width=w, height=h)
             if all_zero or std <= 5.0:
+                if self._probe_outputs_for_capture(hwnd=hwnd, rect_client=rect_client, require_nonblack=True):
+                    return VerificationResult(ok=True)
                 return VerificationResult(ok=False, reason='capture_black_or_unavailable')
 
             return VerificationResult(ok=True)
@@ -430,6 +535,21 @@ class MeldBoundWindowRealCapture(CaptureAdapter):
         rgb, w, h, _meta = _to_rgb_bytes(frame)
         mean, std, all_zero = _sample_luma_stats(rgb, width=int(w), height=int(h))
         if (not rgb) or bool(all_zero) or float(std) <= 0.0001:
+            # Best-effort: probe alternate outputs once when dxcam output names are missing.
+            if not _dxcam_output_map(self._dxcam) and self._probe_outputs_for_capture(hwnd=hwnd, rect_client=rect_client, require_nonblack=True):
+                cam = self._cam
+                if cam is not None:
+                    fw2 = int(getattr(cam, 'width', 0) or 0)
+                    fh2 = int(getattr(cam, 'height', 0) or 0)
+                    if fw2 <= 0 or fh2 <= 0:
+                        fw2, fh2 = _grab_full_baseline(cam, out_path='diagnostics/capture_full.ppm')
+                    region, _region_details = self._window_region_in_output(rect_client=rect_client, frame_w=fw2, frame_h=fh2)
+                    frame = cam.grab(region=region)
+                    rgb, w, h, _meta = _to_rgb_bytes(frame)
+                    mean, std, all_zero = _sample_luma_stats(rgb, width=int(w), height=int(h))
+                    if rgb and (not bool(all_zero)) and float(std) > 0.0001:
+                        digest = hashlib.sha256(rgb).hexdigest() if rgb else ''
+                        return Frame(width=int(w), height=int(h), monotonic_ts_ns=int(ts_ns), digest_hex=str(digest), rgb=rgb)
             failing = Frame(width=int(w), height=int(h), monotonic_ts_ns=int(ts_ns), digest_hex='', rgb=rgb)
             if dump_enabled():
                 dump_pair(gate='capture', before=failing, after=None, reason='capture_invalid')
@@ -467,6 +587,79 @@ class MeldBoundMinimapRealCapture(CaptureAdapter):
         self._monitor_rect: Any | None = None
         self._baseline_done: bool = False
 
+        self._dxcam_outputs: list[int] | None = None
+
+    def _ensure_outputs(self) -> list[int]:
+        if self._dxcam_outputs is None:
+            self._dxcam_outputs = _dxcam_available_output_indices(self._dxcam)
+        return list(self._dxcam_outputs)
+
+    def _guess_output_idx_for_device(self, device: str) -> int:
+        mons = _ordered_monitors(w32.list_monitors())
+        dev = str(device or '')
+        for i, m in enumerate(mons):
+            if str(getattr(m, 'device', '') or '') == dev:
+                return int(i)
+        return 0
+
+    def _apply_output_and_monitor(self, *, output_idx: int, monitor: Any | None) -> Any:
+        if self._cam is None or self._output_idx != int(output_idx):
+            self._cam = self._dxcam.create(output_idx=int(output_idx))
+            self._output_idx = int(output_idx)
+            try:
+                o = getattr(self._cam, '_output', None)
+                self._output_name = str(getattr(o, 'name', '') or '')
+            except Exception:
+                self._output_name = ''
+
+        if monitor is not None:
+            self._monitor_device = str(getattr(monitor, 'device', '') or '')
+            self._monitor_rect = getattr(monitor, 'rect', None)
+        else:
+            self._monitor_device = ''
+            self._monitor_rect = None
+
+        if not self._baseline_done:
+            _grab_full_baseline(self._cam, out_path='diagnostics/capture_full.ppm')
+            self._baseline_done = True
+
+        return self._cam
+
+    def _probe_outputs_for_capture(self, *, hwnd: int, rect_client: Any, require_nonblack: bool = True) -> bool:
+        outputs = self._ensure_outputs()
+        mons = _ordered_monitors(w32.list_monitors())
+        if not outputs:
+            return False
+
+        for idx in outputs:
+            mon = mons[int(idx)] if int(idx) < len(mons) else (w32.primary_monitor(mons) if mons else None)
+            try:
+                cam = self._apply_output_and_monitor(output_idx=int(idx), monitor=mon)
+
+                fw = int(getattr(cam, 'width', 0) or 0)
+                fh = int(getattr(cam, 'height', 0) or 0)
+                if fw <= 0 or fh <= 0:
+                    fw, fh = _grab_full_baseline(cam, out_path='diagnostics/capture_full.ppm')
+                if fw <= 0 or fh <= 0:
+                    continue
+
+                region, _region_details = self._window_region_in_output(rect_client=rect_client, frame_w=fw, frame_h=fh)
+                frame = cam.grab(region=region)
+                rgb, w, h, _meta = _to_rgb_bytes(frame)
+                if not rgb or int(w) <= 0 or int(h) <= 0:
+                    continue
+                if require_nonblack:
+                    _mean, std, all_zero = _sample_luma_stats(rgb, width=int(w), height=int(h))
+                    if bool(all_zero) or float(std) <= 5.0:
+                        continue
+                return True
+            except PreflightFailed:
+                continue
+            except Exception:
+                continue
+
+        return False
+
     def _resolve_output_for_hwnd(self, hwnd: int, rect_client: Any) -> dict[str, object]:
         mons = w32.list_monitors()
         cx = (int(getattr(rect_client, 'left', 0) or 0) + int(getattr(rect_client, 'right', 0) or 0)) // 2
@@ -489,24 +682,23 @@ class MeldBoundMinimapRealCapture(CaptureAdapter):
             desired_idx = int(forced_idx)
         elif device and device in output_map:
             desired_idx = _as_int(output_map[device].get('output_idx', 0), 0)
+        else:
+            desired_idx = self._guess_output_idx_for_device(device)
 
-        if self._cam is None or self._output_idx != int(desired_idx):
-            self._cam = self._dxcam.create(output_idx=int(desired_idx))
-            self._output_idx = int(desired_idx)
-            try:
-                o = getattr(self._cam, '_output', None)
-                self._output_name = str(getattr(o, 'name', '') or '')
-            except Exception:
-                self._output_name = ''
+        outputs = self._ensure_outputs()
+        if outputs and int(desired_idx) not in set(outputs):
+            desired_idx = int(outputs[0])
 
-        self._monitor_device = device
-        self._monitor_rect = mon_rect
+        monitor = None
+        mons = _ordered_monitors(w32.list_monitors())
+        if int(desired_idx) < len(mons):
+            monitor = mons[int(desired_idx)]
+        else:
+            monitor = w32.primary_monitor(mons) if mons else None
+            if monitor is None and mon_rect is not None:
+                monitor = type('M', (), {'device': device, 'rect': mon_rect, 'primary': bool(target.get('primary', True))})()
 
-        if not self._baseline_done:
-            _grab_full_baseline(self._cam, out_path='diagnostics/capture_full.ppm')
-            self._baseline_done = True
-
-        return self._cam
+        return self._apply_output_and_monitor(output_idx=int(desired_idx), monitor=monitor)
 
     def _window_region_in_output(self, *, rect_client: Any, frame_w: int, frame_h: int) -> tuple[tuple[int, int, int, int], dict[str, object]]:
         mon_rect = self._monitor_rect
@@ -577,10 +769,14 @@ class MeldBoundMinimapRealCapture(CaptureAdapter):
             frame = cam.grab(region=region)
             rgb, w, h, _meta = _to_rgb_bytes(frame)
             if not rgb or w <= 0 or h <= 0:
+                if self._probe_outputs_for_capture(hwnd=hwnd, rect_client=rect_client, require_nonblack=False):
+                    return VerificationResult(ok=True)
                 return VerificationResult(ok=False, reason='frame_empty')
 
             mean, std, all_zero = _sample_luma_stats(rgb, width=w, height=h)
             if all_zero or std <= 5.0:
+                if self._probe_outputs_for_capture(hwnd=hwnd, rect_client=rect_client, require_nonblack=True):
+                    return VerificationResult(ok=True)
                 return VerificationResult(ok=False, reason='capture_black_or_unavailable')
 
             return VerificationResult(ok=True)
@@ -608,6 +804,34 @@ class MeldBoundMinimapRealCapture(CaptureAdapter):
         rgb, w, h, _meta = _to_rgb_bytes(frame)
         mean, std, all_zero = _sample_luma_stats(rgb, width=int(w), height=int(h))
         if (not rgb) or bool(all_zero) or float(std) <= 0.0001:
+            if not _dxcam_output_map(self._dxcam) and self._probe_outputs_for_capture(hwnd=hwnd, rect_client=rect_client, require_nonblack=True):
+                cam = self._cam
+                if cam is not None:
+                    fw2 = int(getattr(cam, 'width', 0) or 0)
+                    fh2 = int(getattr(cam, 'height', 0) or 0)
+                    if fw2 <= 0 or fh2 <= 0:
+                        fw2, fh2 = _grab_full_baseline(cam, out_path='diagnostics/capture_full.ppm')
+                    region, _region_details = self._window_region_in_output(rect_client=rect_client, frame_w=fw2, frame_h=fh2)
+                    frame = cam.grab(region=region)
+                    rgb, w, h, _meta = _to_rgb_bytes(frame)
+                    mean, std, all_zero = _sample_luma_stats(rgb, width=int(w), height=int(h))
+                    if rgb and (not bool(all_zero)) and float(std) > 0.0001:
+                        digest = hashlib.sha256(rgb).hexdigest() if rgb else ''
+                        minimap_rgb = _crop_rgb(rgb, w, h, self._minimap_roi) if rgb else b''
+                        minimap_detected = bool(minimap_rgb)
+                        minimap_digest = hashlib.sha256(minimap_rgb).hexdigest() if minimap_rgb else ''
+                        return Frame(
+                            width=int(w),
+                            height=int(h),
+                            monotonic_ts_ns=int(ts_ns),
+                            digest_hex=str(digest),
+                            rgb=rgb,
+                            minimap_detected=minimap_detected,
+                            minimap_rgb=minimap_rgb,
+                            minimap_width=int(self._minimap_roi.width),
+                            minimap_height=int(self._minimap_roi.height),
+                            minimap_digest_hex=str(minimap_digest),
+                        )
             failing = Frame(width=int(w), height=int(h), monotonic_ts_ns=int(ts_ns), digest_hex='', rgb=rgb)
             if dump_enabled():
                 dump_pair(gate='capture', before=failing, after=None, reason='capture_invalid')

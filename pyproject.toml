@@ -26,6 +26,9 @@ opencv-python = "^4.10.0.84"
 # Deterministic ROI calibration/overlay (PPM via Pillow)
 pillow = "^10.4.0"
 
+# OBS WebSocket v5 client (GetSourceScreenshot)
+websocket-client = "^1.7.0"
+
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.1.3"

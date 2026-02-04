@@ -1,4 +1,5 @@
 {
+  "frame": { "width": 1920, "height": 1080 },
   "rois": {
     "minimap": {
       "x": 1751,
@@ -13,10 +14,10 @@
       "height": 210
     },
     "target_frame": {
-      "x": 780,
-      "y": 55,
-      "width": 700,
-      "height": 70
+      "x": 836,
+      "y": 40,
+      "width": 220,
+      "height": 50
     },
     "hp_mp": {
       "x": 790,

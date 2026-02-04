@@ -5,6 +5,7 @@ from typing import TypeAlias
 
 from adapters.capture.mock_world_any import MockWorldAnyCapture
 from adapters.capture.mss_bound_window_real import MssBoundWindowRealCapture
+from adapters.capture.meld_real import MeldBoundWindowRealCapture
 from adapters.input.mock_world import MockWorldInput
 from adapters.input.win32_hwnd import Win32HwndKeyboard
 from adapters.mock_world import MockWorld
@@ -28,7 +29,7 @@ from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_o
 from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
 
 
-CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MockWorldAnyCapture
+CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MeldBoundWindowRealCapture | MockWorldAnyCapture
 InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
 
@@ -80,6 +81,10 @@ def healing_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
             raise PreflightFailed('heal_cooldown_unknown')
 
     if mode == 'real':
+        backend = (os.environ.get('FRBOT_CAPTURE_BACKEND', 'mss') or 'mss').strip().lower()
+        if profile == 'prod_emergency' and backend not in {'mss', 'meld'}:
+            raise PreflightFailed('capture_invalid')
+
         binding_real = Win32WindowBinding(
             hwnd=int(resolve_obs_projector_hwnd()[0]) if capture_source() == 'obs' else int(ctx.config.window_hwnd),
             title_substring=(os.environ.get('FRBOT_OBS_PROJECTOR_TITLE', '') or '') if capture_source() == 'obs' else ctx.config.window_title_substring,
@@ -88,10 +93,17 @@ def healing_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
         if not bvr.ok:
             raise PreflightFailed('healing_window_binding_lost')
 
-        try:
-            capture_real = MssBoundWindowRealCapture(binding=binding_real)
-        except ImportError as exc:
-            raise PreflightFailed(str(exc)) from exc
+        capture_real: MssBoundWindowRealCapture | MeldBoundWindowRealCapture
+        if backend == 'meld':
+            try:
+                capture_real = MeldBoundWindowRealCapture(binding=binding_real)
+            except ImportError as exc:
+                raise PreflightFailed('capture_black_or_unavailable') from exc
+        else:
+            try:
+                capture_real = MssBoundWindowRealCapture(binding=binding_real)
+            except ImportError as exc:
+                raise PreflightFailed(str(exc)) from exc
 
         try:
             input_hwnd = resolve_input_hwnd(hwnd=int(ctx.config.window_hwnd), title_substring=ctx.config.window_title_substring)

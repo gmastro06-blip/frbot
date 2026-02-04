@@ -48,7 +48,13 @@ def _env_str(name: str, default: str = '') -> str:
 
 def _capture_source() -> str:
     v = (_env_str('FRBOT_CAPTURE_SOURCE', 'client') or 'client').strip().lower()
+    if v == 'obs_source':
+        return 'obs_source'
     return 'obs' if v == 'obs' else 'client'
+
+
+def _obs_source_name() -> str:
+    return _env_str('FRBOT_OBS_SOURCE_NAME', '')
 
 
 def _obs_projector_title() -> str:
@@ -82,6 +88,37 @@ def _check_obs_manifest(frames_dir: Path) -> tuple[bool, str, list[str]]:
     man_title = str(data.get('obs_projector_title', '') or '')
     if expected_title and man_title and expected_title != man_title:
         return False, 'obs_evidence_source_mismatch', ['Manifest obs_projector_title mismatch']
+
+    return True, '', []
+
+
+def _check_obs_source_manifest(frames_dir: Path) -> tuple[bool, str, list[str]]:
+    """Return (ok, canonical_reason, reasons)."""
+
+    reasons: list[str] = []
+    expected = _obs_source_name()
+    if not expected:
+        return False, 'obs_source_not_found', ['FRBOT_OBS_SOURCE_NAME missing']
+
+    mp = frames_dir / 'evidence_manifest.json'
+    if not mp.exists():
+        return False, 'obs_evidence_manifest_missing', [f'Missing manifest: {mp}']
+
+    try:
+        data = json.loads(mp.read_text(encoding='utf-8'))
+    except Exception as exc:
+        return False, 'obs_evidence_manifest_missing', [f'Manifest unreadable: {type(exc).__name__}: {exc}']
+
+    if not isinstance(data, dict):
+        return False, 'obs_evidence_manifest_missing', ['Manifest invalid shape (expected object)']
+
+    src = str(data.get('capture_source', '') or '').strip().lower()
+    if src != 'obs_source':
+        return False, 'obs_evidence_source_mismatch', [f"Manifest capture_source mismatch (expected obs_source, got {src!r})"]
+
+    man_name = str(data.get('obs_source_name', '') or '')
+    if expected and man_name and expected != man_name:
+        return False, 'obs_evidence_source_mismatch', ['Manifest obs_source_name mismatch']
 
     return True, '', []
 
@@ -219,9 +256,13 @@ def main() -> int:
     required_gates, enabled_features, disabled_features = _gates_for_profile()
     _print_header(mode=pre.mode, frames_dir=pre.frames_dir, config_path=pre.config_path)
 
-    # OBS capture source enforcement: evidence must declare OBS projector origin.
-    if pre.mode == 'real' and _capture_source() == 'obs':
-        ok_obs, canon, obs_reasons = _check_obs_manifest(pre.frames_dir)
+    # OBS capture source enforcement: evidence must declare OBS origin.
+    if pre.mode == 'real' and _capture_source() in {'obs', 'obs_source'}:
+        if _capture_source() == 'obs':
+            ok_obs, canon, obs_reasons = _check_obs_manifest(pre.frames_dir)
+        else:
+            ok_obs, canon, obs_reasons = _check_obs_source_manifest(pre.frames_dir)
+
         if not ok_obs:
             print('')
             print('Blocking reasons:')
@@ -234,6 +275,7 @@ def main() -> int:
                     details={
                         'FRBOT_CAPTURE_SOURCE': _env_str('FRBOT_CAPTURE_SOURCE', ''),
                         'FRBOT_OBS_PROJECTOR_TITLE': _obs_projector_title(),
+                        'FRBOT_OBS_SOURCE_NAME': _obs_source_name(),
                         'frames_dir': str(pre.frames_dir),
                         'reasons': list(obs_reasons),
                     },

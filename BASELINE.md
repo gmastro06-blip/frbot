@@ -1,5 +1,25 @@
 # BASELINE (STABLE)
 
+## PROD_EMERGENCY FROZEN (REAL)
+
+This repository is **frozen** for Windows REAL operation under the `prod_emergency` profile.
+
+Policy (non-negotiable):
+
+- **Supported REAL gates:** `targeting`, `healing`, `cavebot`.
+- **Hard-disabled modes:** `combat`, `looting`, `deposit`, `trade` (must abort with `feature_disabled`).
+- **Input authority:** ALWAYS HWND-bound to the Tibia window (via `FRBOT_WINDOW_HWND` or `FRBOT_WINDOW_TITLE`).
+- **Capture authority:** MUST be `obs_source` (OBS WebSocket v5 GetSourceScreenshot) to avoid foreground/HWND capture flakiness.
+- **Artifacts:** anything under `diagnostics/` and any `*.ppm` are generated evidence/logs and MUST NOT be committed.
+
+Operational environment (summary):
+
+- `main.py` pins `FRBOT_PROFILE=prod_emergency` (external overrides ignored).
+- For REAL evidence/certification runs:
+  - `FRBOT_CAPTURE_SOURCE=obs_source`
+  - `FRBOT_OBS_SOURCE_NAME=<OBS source name>`
+- For deterministic audit (no REAL IO): run `tools/audit_all.py` with `FRBOT_MODE=mock`.
+
 **Internal tag (documentation only):**
 
 BASELINE_STABLE = True

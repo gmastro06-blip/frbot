@@ -15,6 +15,13 @@ if str(ROOT) not in sys.path:
 def _test_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     # Keep tests deterministic and isolated from developer machine env.
     monkeypatch.delenv('FRBOT_PROFILE', raising=False)
+    monkeypatch.delenv('FRBOT_MAX_TICKS', raising=False)
+    monkeypatch.delenv('FRBOT_CAPTURE_SOURCE', raising=False)
+    monkeypatch.delenv('FRBOT_OBS_SOURCE_NAME', raising=False)
+    monkeypatch.delenv('FRBOT_OBS_PROJECTOR_TITLE', raising=False)
+    monkeypatch.delenv('FRBOT_REAL_FRAMES_DIR', raising=False)
+    monkeypatch.delenv('FRBOT_PLAYER_MARKER_RGB_EFFECTIVE', raising=False)
+    monkeypatch.delenv('FRBOT_PLAYER_MARKER_MIN_PIXELS_EFFECTIVE', raising=False)
     monkeypatch.setenv('FRBOT_MINIMAP_ROI', 'minimap')
     monkeypatch.setenv('FRBOT_ENABLE_CAVEBOT', '1')
     monkeypatch.setenv('FRBOT_PLAYER_MARKER_RGB', '255,0,255')

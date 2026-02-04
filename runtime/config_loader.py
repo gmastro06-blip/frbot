@@ -14,6 +14,8 @@ from contracts.runtime import RuntimeContext
 @dataclass(frozen=True, slots=True)
 class LoadedConfig:
 	rois: Dict[str, Roi]
+	frame_width: int | None = None
+	frame_height: int | None = None
 
 
 _REQUIRED_REAL_ROIS: tuple[str, ...] = (
@@ -48,11 +50,30 @@ def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 
 		# Canonical schema (single allowed):
 		# {"rois": {"name": {"x": int, "y": int, "width": int, "height": int}, ...}}
+		# Optional (OBS-source capture resolution contract):
+		# {"frame": {"width": int, "height": int}, "rois": {...}}
 		if not isinstance(data, dict):
 			raise PreflightFailed('config_invalid_schema')
 
-		# Eliminate ambiguous configs: only 'rois' is allowed at top-level.
-		if set(data.keys()) != {'rois'}:
+		frame_w: int | None = None
+		frame_h: int | None = None
+
+		keys = set(data.keys())
+		if keys == {'rois'}:
+			pass
+		elif keys == {'rois', 'frame'}:
+			frame = data.get('frame')
+			if not isinstance(frame, dict):
+				raise PreflightFailed('config_invalid_schema')
+			try:
+				frame_w = int(frame['width'])
+				frame_h = int(frame['height'])
+			except Exception as exc:
+				raise PreflightFailed('config_invalid_schema') from exc
+			if frame_w <= 0 or frame_h <= 0:
+				raise PreflightFailed('config_invalid_schema')
+		else:
+			# Eliminate ambiguous configs.
 			raise PreflightFailed('config_invalid_schema')
 
 		rois_node = data.get('rois')
@@ -84,7 +105,7 @@ def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 				if set(rois.keys()) != set(_REQUIRED_REAL_ROIS):
 					raise PreflightFailed('config_invalid_schema')
 
-		return LoadedConfig(rois=rois)
+		return LoadedConfig(rois=rois, frame_width=frame_w, frame_height=frame_h)
 
 	# No config file: allow default ROIs in mock mode only.
 	if mode == 'mock':

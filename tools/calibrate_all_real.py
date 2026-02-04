@@ -179,7 +179,13 @@ def _capture_backend() -> str:
 
 def _capture_source() -> str:
     v = (_env_str('FRBOT_CAPTURE_SOURCE', 'client') or 'client').strip().lower()
+    if v == 'obs_source':
+        return 'obs_source'
     return 'obs' if v == 'obs' else 'client'
+
+
+def _obs_source_name() -> str:
+    return _env_str('FRBOT_OBS_SOURCE_NAME', '')
 
 
 def _obs_projector_title() -> str:
@@ -246,7 +252,7 @@ def _resolve_tibia_hwnd() -> tuple[int, str]:
 
 
 def _resolve_obs_projector_hwnd() -> tuple[int, str]:
-    """Resolve OBS projector HWND deterministically by title substring."""
+    """Resolve OBS projector HWND deterministically by exact title."""
 
     from adapters.windows.win32 import (
         find_window_by_title_substring,
@@ -259,25 +265,25 @@ def _resolve_obs_projector_hwnd() -> tuple[int, str]:
     if not expected:
         raise _hard_stop('obs_projector_not_found', expected_title='', found_titles=[])
 
+    expected_norm = str(expected).strip()
+    hwnd = 0
+    title = ''
+    found: list[str] = []
     try:
-        match = find_window_by_title_substring(str(expected))
+        wins = list_top_level_windows(title_substring='', visible_only=False)
+        for wi in wins:
+            t = str(getattr(wi, 'title', '') or '').strip()
+            if t:
+                found.append(t)
+            if t == expected_norm:
+                hwnd = int(getattr(wi, 'hwnd', 0) or 0)
+                title = t
+                break
     except Exception:
-        match = None
+        wins = []
 
-    if match is None:
-        found: list[str] = []
-        try:
-            wins = list_top_level_windows(title_substring='', visible_only=True)
-            for wi in wins:
-                t = str(getattr(wi, 'title', '') or '').strip()
-                if t:
-                    found.append(t)
-        except Exception:
-            found = []
-        raise _hard_stop('obs_projector_not_found', expected_title=str(expected), found_titles=found)
-
-    hwnd = int(match.hwnd)
-    title = str(match.title or '')
+    if int(hwnd) <= 0:
+        raise _hard_stop('obs_projector_not_found', expected_title=str(expected_norm), found_titles=found)
 
     if not is_window_visible(hwnd):
         raise _hard_stop('window_not_visible', expected_hwnd=hex(int(hwnd)), expected_title=title)
@@ -309,10 +315,11 @@ def _require_tibia_foreground() -> int:
         if fg != int(capture_hwnd):
             raise _hard_stop(
                 'obs_projector_foreground_mismatch',
-                expected_hwnd=hex(int(capture_hwnd)),
-                expected_title=str(capture_title),
+                expected_foreground='OBS_PROJECTOR',
+                projector_hwnd=hex(int(capture_hwnd)),
                 foreground_hwnd=hex(int(fg)),
                 foreground_title=str(fg_title),
+                hint='Click OBS projector window and rerun',
             )
         return int(capture_hwnd)
 
@@ -700,6 +707,7 @@ def _aggregate_frames_flat(*, repo_root: Path, frames_gates_root: Path, version_
         'capture_source': _capture_source(),
         'capture_backend': _capture_backend(),
         'obs_projector_title': _env_str('FRBOT_OBS_PROJECTOR_TITLE', ''),
+        'obs_source_name': _obs_source_name(),
     }
     if _capture_source() == 'obs':
         try:

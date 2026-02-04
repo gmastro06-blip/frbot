@@ -1,7 +1,0 @@
-python.exe : Traceback (most recent call last):
-En C:\Users\gmast\Documents\GitHub\frbot\tools\bootstrap_real_evidence.ps1: 32 Car cter: 13
-+     return (& $PythonExe $tmp 2>&1)
-+             ~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 

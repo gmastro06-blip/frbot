@@ -4,6 +4,7 @@ import os
 from typing import TypeAlias
 
 from adapters.capture.mock_world import MockWorldCapture
+from adapters.capture.obs_source_real import ObsSourceRealCapture
 from adapters.capture.meld_real import MeldBoundMinimapRealCapture
 from adapters.capture.mss_bound_window_real import MssBoundMinimapRealCapture
 from adapters.input.mock_world import MockWorldInput
@@ -11,6 +12,7 @@ from adapters.input.win32_hwnd import Win32HwndKeyboard
 from adapters.mock_world import MockWorld
 from adapters.window.mock import MockWindowBinding
 from adapters.window.win32 import Win32WindowBinding
+from contracts.capture import Frame
 from contracts.capture import CaptureStatus
 from contracts.errors import PreflightFailed
 from contracts.input import InputStatus
@@ -21,7 +23,28 @@ from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_o
 from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
 from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
 
-CaptureAdapter: TypeAlias = MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture | MockWorldCapture
+
+def _frames_dir_for_preflight() -> str:
+    raw = (os.environ.get('FRBOT_REAL_FRAMES_DIR', '') or '').strip()
+    if raw:
+        return raw
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        return str(os.path.join('diagnostics', 'frames_emergency'))
+    return str(os.path.join('diagnostics', 'frames'))
+
+
+def _dump_preflight_failure_frames(*, reason: str, before: Frame) -> None:
+    try:
+        from diagnostics.frame_dump import dump_enabled, dump_pair
+
+        if not dump_enabled():
+            return
+        dump_pair(gate='preflight', before=before, after=None, reason=str(reason), out_dir=_frames_dir_for_preflight())
+    except Exception:
+        return
+
+CaptureAdapter: TypeAlias = MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture | ObsSourceRealCapture | MockWorldCapture
 InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
 
@@ -52,17 +75,10 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
         if profile == 'prod_emergency' and backend not in {'mss', 'meld'}:
             raise PreflightFailed('capture_invalid')
 
-        # Capture binding: either client HWND (default) or OBS Projector HWND.
-        if cap_source == 'obs':
-            obs_hwnd, _obs_title = resolve_obs_projector_hwnd()
-            binding_real = Win32WindowBinding(hwnd=int(obs_hwnd), title_substring=os.environ.get('FRBOT_OBS_PROJECTOR_TITLE', '') or '')
-        else:
-            binding_hwnd = int(ctx.config.window_hwnd)
-            binding_title = ctx.config.window_title_substring
-            binding_real = Win32WindowBinding(
-                hwnd=int(binding_hwnd),
-                title_substring=binding_title,
-            )
+        # InputAuthority (strict): always bind to Tibia HWND/title; capture is separate.
+        binding_hwnd = int(ctx.config.window_hwnd)
+        binding_title = ctx.config.window_title_substring
+        binding_real = Win32WindowBinding(hwnd=int(binding_hwnd), title_substring=binding_title)
         bvr = binding_real.verify()
         if not bvr.ok:
             raise PreflightFailed('window_binding_lost')
@@ -73,28 +89,47 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
         if input_hwnd <= 0:
             raise PreflightFailed('window_binding_lost')
 
-        snap = binding_real.snapshot()
-
         loaded = load_rois(ctx)
         ctx.rois = dict(loaded.rois)
         minimap_roi = ctx.rois.get(ctx.config.minimap_roi)
         if minimap_roi is None:
             raise PreflightFailed('minimap_not_detected')
 
-        capture_real: MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture
+        capture_real: MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture | ObsSourceRealCapture
 
-        if backend == 'meld':
-            try:
-                capture_real = MeldBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=binding_real)
-            except ImportError as exc:
-                raise PreflightFailed('capture_black_or_unavailable') from exc
-        elif backend == 'mss':
-            try:
-                capture_real = MssBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=binding_real)
-            except ImportError as exc:
-                raise PreflightFailed(str(exc)) from exc
+        if cap_source == 'obs_source':
+            src = (os.environ.get('FRBOT_OBS_SOURCE_NAME', '') or '').strip()
+            if not src:
+                raise PreflightFailed('obs_source_not_found')
+            if loaded.frame_width is None or loaded.frame_height is None:
+                raise PreflightFailed('config_invalid_schema')
+
+            capture_real = ObsSourceRealCapture(
+                obs_source_name=str(src),
+                expected_width=int(loaded.frame_width),
+                expected_height=int(loaded.frame_height),
+                rois=ctx.rois,
+                minimap_roi_name=str(ctx.config.minimap_roi),
+            )
         else:
-            raise PreflightFailed('capture_black_or_unavailable')
+            # Capture binding: either client HWND (default) or OBS Projector HWND.
+            cap_binding = binding_real
+            if cap_source == 'obs':
+                obs_hwnd, _obs_title = resolve_obs_projector_hwnd()
+                cap_binding = Win32WindowBinding(hwnd=int(obs_hwnd), title_substring=os.environ.get('FRBOT_OBS_PROJECTOR_TITLE', '') or '')
+
+            if backend == 'meld':
+                try:
+                    capture_real = MeldBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=cap_binding)
+                except ImportError as exc:
+                    raise PreflightFailed('capture_black_or_unavailable') from exc
+            elif backend == 'mss':
+                try:
+                    capture_real = MssBoundMinimapRealCapture(minimap_roi=minimap_roi, binding=cap_binding)
+                except ImportError as exc:
+                    raise PreflightFailed(str(exc)) from exc
+            else:
+                raise PreflightFailed('capture_black_or_unavailable')
 
         try:
             input_real = Win32HwndKeyboard(hwnd=int(input_hwnd))
@@ -112,6 +147,8 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
             if profile == 'prod_emergency':
                 if cap_source == 'obs' and (cap_v.reason or '') in {'captured_frame_black', 'capture_black_or_unavailable', 'frame_empty'}:
                     raise PreflightFailed('captured_frame_black_obs')
+                if cap_source == 'obs_source' and (cap_v.reason or ''):
+                    raise PreflightFailed(str(cap_v.reason))
                 raise PreflightFailed('capture_invalid')
             if backend == 'meld':
                 raise PreflightFailed('capture_black_or_unavailable')
@@ -130,6 +167,7 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
         validate_prod_emergency_real_rois_in_bounds(rois=ctx.rois, frame=before)
 
         if not before.minimap_detected:
+            _dump_preflight_failure_frames(reason='minimap_not_detected', before=before)
             raise PreflightFailed('minimap_not_detected')
         cfg = marker_config_from_env(
             ctx.config.player_marker_rgb,
@@ -139,8 +177,51 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
             str(ctx.config.player_marker_min_fill_ratio),
             str(ctx.config.player_marker_max_aspect_ratio),
         )
-        if detect_player_marker(before, cfg) is None:
-            raise PreflightFailed('minimap_player_not_found')
+        det = detect_player_marker(before, cfg)
+        if det is None:
+            # Fallback for REAL runs: marker colors differ by client/theme.
+            # Keep deterministic: only try a small, ordered set.
+            candidates: list[str] = []
+            for rgb in [ctx.config.player_marker_rgb, '255,255,0', '255,0,255', '255,255,255']:
+                s = str(rgb or '').strip()
+                if s and s not in candidates:
+                    candidates.append(s)
+
+            chosen: str | None = None
+            chosen_min_pixels: int | None = None
+            best_score: float = -1.0
+            base_min_pixels = int(ctx.config.player_marker_min_pixels)
+            # Deterministic, conservative relaxation: allow as low as 3 pixels.
+            min_pixel_options = [base_min_pixels]
+            if base_min_pixels > 3:
+                min_pixel_options.append(3)
+
+            for rgb in candidates:
+                for min_pix in min_pixel_options:
+                    cfg2 = marker_config_from_env(
+                        rgb,
+                        str(ctx.config.player_marker_tol),
+                        str(min_pix),
+                        str(ctx.config.player_marker_max_pixels),
+                        str(ctx.config.player_marker_min_fill_ratio),
+                        str(ctx.config.player_marker_max_aspect_ratio),
+                    )
+                    det2 = detect_player_marker(before, cfg2)
+                    if det2 is None:
+                        continue
+                    # Prefer larger, denser, more compact detections.
+                    score = float(det2.pixel_count) * float(det2.fill_ratio) / max(1.0, float(det2.aspect_ratio))
+                    if score > best_score:
+                        best_score = score
+                        chosen = rgb
+                        chosen_min_pixels = int(min_pix)
+
+            if chosen is None:
+                _dump_preflight_failure_frames(reason='minimap_player_not_found', before=before)
+                raise PreflightFailed('minimap_player_not_found')
+            os.environ['FRBOT_PLAYER_MARKER_RGB_EFFECTIVE'] = str(chosen)
+            if chosen_min_pixels is not None:
+                os.environ['FRBOT_PLAYER_MARKER_MIN_PIXELS_EFFECTIVE'] = str(int(chosen_min_pixels))
 
         ctx.status.state = RuntimeState.READY
         return capture_real, input_real, binding_real
@@ -164,6 +245,12 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
         'down': 'move_down',
         'left': 'move_left',
         'right': 'move_right',
+
+        # WASD movement keys (dual support).
+        'w': 'move_up',
+        's': 'move_down',
+        'a': 'move_left',
+        'd': 'move_right',
     }
     if os.environ.get('FRBOT_MOCK_STUCK', '0') == '1':
         key_kinds = {'up': 'noop', 'down': 'noop', 'left': 'noop', 'right': 'noop'}

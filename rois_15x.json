@@ -1,4 +1,5 @@
 {
+  "frame": { "width": 1920, "height": 1080 },
   "rois": {
     "minimap": { "x": 20, "y": 20, "width": 160, "height": 160 },
     "battle_list": { "x": 1400, "y": 200, "width": 350, "height": 600 },

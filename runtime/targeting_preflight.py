@@ -5,6 +5,8 @@ from typing import TypeAlias
 
 from adapters.capture.mock_world_any import MockWorldAnyCapture
 from adapters.capture.mss_bound_window_real import MssBoundWindowRealCapture
+from adapters.capture.meld_real import MeldBoundWindowRealCapture
+from adapters.capture.obs_source_real import ObsSourceRealCapture
 from adapters.input.mock_world import MockWorldInput
 from adapters.input.win32_hwnd import Win32HwndKeyboard
 from adapters.mock_world import MockBattleListRow, MockWorld
@@ -21,7 +23,7 @@ from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_o
 from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
 
 
-CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MockWorldAnyCapture
+CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MeldBoundWindowRealCapture | ObsSourceRealCapture | MockWorldAnyCapture
 InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
 
@@ -74,18 +76,54 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
         raise PreflightFailed('battle_list_not_detected')
 
     if mode == 'real':
+        backend = (os.environ.get('FRBOT_CAPTURE_BACKEND', 'mss') or 'mss').strip().lower()
+        profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+        if profile == 'prod_emergency' and backend not in {'mss', 'meld'}:
+            raise PreflightFailed('capture_invalid')
+
+        cap_source = capture_source()
+
+        # InputAuthority (strict): always bind to Tibia HWND/title; capture is separate.
         binding_real = Win32WindowBinding(
-            hwnd=int(resolve_obs_projector_hwnd()[0]) if capture_source() == 'obs' else int(ctx.config.window_hwnd),
-            title_substring=(os.environ.get('FRBOT_OBS_PROJECTOR_TITLE', '') or '') if capture_source() == 'obs' else ctx.config.window_title_substring,
+            hwnd=int(ctx.config.window_hwnd),
+            title_substring=ctx.config.window_title_substring,
         )
         bvr = binding_real.verify()
         if not bvr.ok:
             raise PreflightFailed('targeting_window_binding_lost')
 
-        try:
-            capture_real = MssBoundWindowRealCapture(binding=binding_real)
-        except ImportError as exc:
-            raise PreflightFailed(str(exc)) from exc
+        capture_real: MssBoundWindowRealCapture | MeldBoundWindowRealCapture | ObsSourceRealCapture
+
+        if cap_source == 'obs_source':
+            src = (os.environ.get('FRBOT_OBS_SOURCE_NAME', '') or '').strip()
+            if not src:
+                raise PreflightFailed('obs_source_not_found')
+            if loaded.frame_width is None or loaded.frame_height is None:
+                raise PreflightFailed('config_invalid_schema')
+
+            capture_real = ObsSourceRealCapture(
+                obs_source_name=str(src),
+                expected_width=int(loaded.frame_width),
+                expected_height=int(loaded.frame_height),
+                rois=ctx.rois,
+                minimap_roi_name=str(ctx.config.minimap_roi),
+            )
+        else:
+            cap_binding = binding_real
+            if cap_source == 'obs':
+                obs_hwnd, _obs_title = resolve_obs_projector_hwnd()
+                cap_binding = Win32WindowBinding(hwnd=int(obs_hwnd), title_substring=(os.environ.get('FRBOT_OBS_PROJECTOR_TITLE', '') or ''))
+
+            if backend == 'meld':
+                try:
+                    capture_real = MeldBoundWindowRealCapture(binding=cap_binding)
+                except ImportError as exc:
+                    raise PreflightFailed('capture_black_or_unavailable') from exc
+            else:
+                try:
+                    capture_real = MssBoundWindowRealCapture(binding=cap_binding)
+                except ImportError as exc:
+                    raise PreflightFailed(str(exc)) from exc
 
         try:
             input_hwnd = resolve_input_hwnd(hwnd=int(ctx.config.window_hwnd), title_substring=ctx.config.window_title_substring)
@@ -104,8 +142,10 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
         if not cap_v.ok:
             profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
             if profile == 'prod_emergency':
-                if capture_source() == 'obs' and (cap_v.reason or '') in {'captured_frame_black', 'capture_black_or_unavailable', 'frame_empty'}:
+                if cap_source == 'obs' and (cap_v.reason or '') in {'captured_frame_black', 'capture_black_or_unavailable', 'frame_empty'}:
                     raise PreflightFailed('captured_frame_black_obs')
+                if cap_source == 'obs_source' and (cap_v.reason or ''):
+                    raise PreflightFailed(str(cap_v.reason))
                 raise PreflightFailed('capture_invalid')
             raise PreflightFailed(cap_v.reason or 'capture not verified')
         if not inp_v.ok:

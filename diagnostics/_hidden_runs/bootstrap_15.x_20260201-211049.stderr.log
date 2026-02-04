@@ -1,7 +1,0 @@
-python.exe : missing_gate_pairs:targeting,healing,combat,cavebot,looting,deposit,trade
-En C:\Users\gmast\Documents\GitHub\frbot\tools\bootstrap_real_evidence.ps1: 32 Car cter: 13
-+     return (& $PythonExe $tmp 2>&1)
-+             ~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (missing_gate_pa...g,deposit,trade:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
