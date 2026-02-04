@@ -12,7 +12,8 @@ from contracts.runtime import RuntimeContext, Waypoint
 from contracts.window import WindowBindingAdapter
 from diagnostics.last_frames import record_after, record_before
 from diagnostics.frame_dump import dump_enabled, dump_pair
-from runtime.cavebot_semantics import ProgressResult, compute_progress, detect_player_marker, is_progress_valid
+from runtime.cavebot_semantics import ProgressResult, compute_progress, detect_player_marker, is_progress_valid, select_player_marker
+from runtime.profile import is_prod_emergency
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,9 +55,8 @@ def _select_key_toward_waypoint(marker_before: object, waypoint: Waypoint) -> st
 
 
 def _append_trace(*, gate: str, payload: dict) -> None:
-    if not dump_enabled():
-        return
     try:
+        # Required audit trace (generated artifact; must not be committed).
         out_dir = Path('diagnostics') / 'frames'
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / f'{str(gate).strip().lower()}_trace.jsonl'
@@ -66,24 +66,41 @@ def _append_trace(*, gate: str, payload: dict) -> None:
         return
 
 
+def _dump_marker_abort_pair(*, before: Frame | None, after: Frame | None, reason: str) -> None:
+    # PROD_EMERGENCY REAL contract: marker aborts must dump BEFORE/AFTER.
+    try:
+        dump_pair(gate='cavebot', before=before, after=after, reason=str(reason))
+    except Exception:
+        return
+
+
 def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, waypoint: Waypoint) -> tuple[Optional[ProgressResult], str]:
-    marker_before = detect_player_marker(
+    cfg_rgb = _parse_rgb(ctx.config.player_marker_rgb)
+    sel_b = select_player_marker(
         before_f,
-        marker_rgb=_parse_rgb(ctx.config.player_marker_rgb),
+        marker_rgb=cfg_rgb,
         tol=int(ctx.config.player_marker_tol),
         min_pixels=int(ctx.config.player_marker_min_pixels),
         max_pixels=int(ctx.config.player_marker_max_pixels),
+        prev_marker=getattr(ctx.cavebot_gate.telemetry, 'marker_after', None),
     )
+    if sel_b.abort_reason is not None:
+        return None, str(sel_b.abort_reason)
+    marker_before = sel_b.marker
     if marker_before is None:
         return None, 'cavebot_marker_not_found'
 
-    marker_after = detect_player_marker(
+    sel_a = select_player_marker(
         after_f,
-        marker_rgb=_parse_rgb(ctx.config.player_marker_rgb),
+        marker_rgb=cfg_rgb,
         tol=int(ctx.config.player_marker_tol),
         min_pixels=int(ctx.config.player_marker_min_pixels),
         max_pixels=int(ctx.config.player_marker_max_pixels),
+        prev_marker=marker_before,
     )
+    if sel_a.abort_reason is not None:
+        return None, str(sel_a.abort_reason)
+    marker_after = sel_a.marker
     if marker_after is None:
         return None, 'cavebot_marker_not_found'
 
@@ -131,26 +148,80 @@ def execute_cavebot_tick(
     before = capture.grab()
     record_before('cavebot', before)
 
-    marker_before = detect_player_marker(
+    cfg_rgb = _parse_rgb(ctx.config.player_marker_rgb)
+    prev_marker = getattr(ctx.cavebot_gate.telemetry, 'marker_after', None)
+    sel_before = select_player_marker(
         before,
-        marker_rgb=_parse_rgb(ctx.config.player_marker_rgb),
+        marker_rgb=cfg_rgb,
         tol=int(ctx.config.player_marker_tol),
         min_pixels=int(ctx.config.player_marker_min_pixels),
         max_pixels=int(ctx.config.player_marker_max_pixels),
+        prev_marker=prev_marker,
     )
+
+    marker_before = sel_before.marker
+
+    # Marker aborts: must be explicit with evidence.
+    if sel_before.abort_reason in {'cavebot_marker_ambiguous', 'cavebot_marker_roi_black'}:
+        after = capture.grab()
+        record_after('cavebot', after)
+
+        ev = CavebotTickEvidence(
+            marker_before=None,
+            marker_after=None,
+            progress=None,
+            status=str(sel_before.abort_reason),
+        )
+        out = CavebotTickOutcome(reached_waypoint=False, evidence=ev, abort_reason=str(sel_before.abort_reason))
+        if is_prod_emergency() and str(ctx.config.mode).strip().lower() == 'real':
+            _dump_marker_abort_pair(before=before, after=after, reason=str(out.abort_reason))
+        elif dump_enabled():
+            dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
+
+        _append_trace(
+            gate='cavebot',
+            payload={
+                'event': 'abort',
+                'tick_index': int(tick_index),
+                'abort_reason': str(out.abort_reason),
+                'candidates_count': int(len(sel_before.candidates)),
+                'selected_marker_confidence': float(sel_before.confidence),
+                'selected_marker_id': sel_before.selected_candidate_id,
+                'marker_candidates': sel_before.details.get('marker_candidates', []),
+                'waypoint': {
+                    'waypoint_id': str(waypoint.waypoint_id),
+                    'x': int(waypoint.x),
+                    'y': int(waypoint.y),
+                    'z': int(waypoint.z),
+                    'radius_px': int(waypoint.radius_px),
+                    'max_ticks': int(waypoint.max_ticks),
+                },
+            },
+        )
+        # Attach structured details for fatal.log.
+        abort_exc = PreflightFailed(str(out.abort_reason))
+        setattr(
+            abort_exc,
+            'details',
+            {
+                'reason': str(out.abort_reason),
+                'marker_candidates': sel_before.details.get('marker_candidates', []),
+                'selected_marker': None,
+                'selected_marker_id': sel_before.selected_candidate_id,
+                'selected_marker_confidence': float(sel_before.confidence),
+                'luma': {k: sel_before.details.get(k) for k in ['full_std_luma', 'roi_std_luma'] if k in sel_before.details},
+            },
+        )
+        raise abort_exc
+
     if marker_before is None:
         after = capture.grab()
         record_after('cavebot', after)
-        marker_after = detect_player_marker(
-            after,
-            marker_rgb=_parse_rgb(ctx.config.player_marker_rgb),
-            tol=int(ctx.config.player_marker_tol),
-            min_pixels=int(ctx.config.player_marker_min_pixels),
-            max_pixels=int(ctx.config.player_marker_max_pixels),
-        )
-        ev = CavebotTickEvidence(marker_before=None, marker_after=marker_after, progress=None, status='cavebot_marker_not_found')
+        ev = CavebotTickEvidence(marker_before=None, marker_after=None, progress=None, status='cavebot_marker_not_found')
         out = CavebotTickOutcome(reached_waypoint=False, evidence=ev, abort_reason='cavebot_marker_not_found')
-        if dump_enabled():
+        if is_prod_emergency() and str(ctx.config.mode).strip().lower() == 'real':
+            _dump_marker_abort_pair(before=before, after=after, reason=str(out.abort_reason))
+        elif dump_enabled():
             dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
         _append_trace(
             gate='cavebot',
@@ -158,6 +229,10 @@ def execute_cavebot_tick(
                 'event': 'abort',
                 'tick_index': int(tick_index),
                 'abort_reason': str(out.abort_reason),
+                'candidates_count': int(len(sel_before.candidates)),
+                'selected_marker_confidence': float(sel_before.confidence),
+                'selected_marker_id': sel_before.selected_candidate_id,
+                'marker_candidates': sel_before.details.get('marker_candidates', []),
                 'waypoint': {
                     'waypoint_id': str(waypoint.waypoint_id),
                     'x': int(waypoint.x),
@@ -169,6 +244,9 @@ def execute_cavebot_tick(
             },
         )
         return out
+
+    # Persist marker telemetry for next tick stabilization.
+    ctx.cavebot_gate.telemetry.marker_before = marker_before
 
     # Waypoint timeout is deterministic (no further input).
     if int(ctx.cavebot.gate_ticks_in_waypoint) >= int(waypoint.max_ticks):
@@ -262,13 +340,15 @@ def execute_cavebot_tick(
 
     progress, status = _progress_from_frames(ctx, before, after, waypoint)
 
-    marker_after = detect_player_marker(
+    sel_after = select_player_marker(
         after,
-        marker_rgb=_parse_rgb(ctx.config.player_marker_rgb),
+        marker_rgb=cfg_rgb,
         tol=int(ctx.config.player_marker_tol),
         min_pixels=int(ctx.config.player_marker_min_pixels),
         max_pixels=int(ctx.config.player_marker_max_pixels),
+        prev_marker=marker_before,
     )
+    marker_after = sel_after.marker
 
     evidence = CavebotTickEvidence(
         marker_before=marker_before,
@@ -276,6 +356,9 @@ def execute_cavebot_tick(
         progress=progress,
         status=str(status),
     )
+
+    # Persist marker telemetry for next tick stabilization.
+    ctx.cavebot_gate.telemetry.marker_after = marker_after
 
     # Update telemetry distances (post-input).
     dist_b = float(progress.distance_before_px) if progress is not None else 1e9
@@ -297,6 +380,9 @@ def execute_cavebot_tick(
             'tick_index': int(tick_index),
             'input_sent': True,
             'key': str(key),
+            'candidates_count': int(len(sel_before.candidates)),
+            'selected_marker_confidence': float(sel_before.confidence),
+            'selected_marker_id': sel_before.selected_candidate_id,
             'reach_streak': int(ctx.cavebot.gate_reach_streak),
             'distance_before_px': float(dist_b),
             'distance_after_px': float(dist_a),
@@ -315,7 +401,9 @@ def execute_cavebot_tick(
 
     if status == 'cavebot_marker_not_found':
         out = CavebotTickOutcome(reached_waypoint=False, evidence=evidence, abort_reason='cavebot_marker_not_found')
-        if dump_enabled():
+        if is_prod_emergency() and str(ctx.config.mode).strip().lower() == 'real':
+            _dump_marker_abort_pair(before=before, after=after, reason=str(out.abort_reason))
+        elif dump_enabled():
             dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
         _append_trace(
             gate='cavebot',
@@ -323,6 +411,38 @@ def execute_cavebot_tick(
                 'event': 'abort',
                 'tick_index': int(tick_index),
                 'abort_reason': str(out.abort_reason),
+                'candidates_count': int(len(sel_after.candidates)),
+                'selected_marker_confidence': float(sel_after.confidence),
+                'selected_marker_id': sel_after.selected_candidate_id,
+                'marker_candidates': sel_after.details.get('marker_candidates', []),
+                'waypoint': {
+                    'waypoint_id': str(waypoint.waypoint_id),
+                    'x': int(waypoint.x),
+                    'y': int(waypoint.y),
+                    'z': int(waypoint.z),
+                    'radius_px': int(waypoint.radius_px),
+                    'max_ticks': int(waypoint.max_ticks),
+                },
+            },
+        )
+        return out
+
+    if status in {'cavebot_marker_ambiguous', 'cavebot_marker_roi_black'}:
+        out = CavebotTickOutcome(reached_waypoint=False, evidence=evidence, abort_reason=str(status))
+        if is_prod_emergency() and str(ctx.config.mode).strip().lower() == 'real':
+            _dump_marker_abort_pair(before=before, after=after, reason=str(out.abort_reason))
+        elif dump_enabled():
+            dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
+        _append_trace(
+            gate='cavebot',
+            payload={
+                'event': 'abort',
+                'tick_index': int(tick_index),
+                'abort_reason': str(out.abort_reason),
+                'candidates_count': int(len(sel_after.candidates)),
+                'selected_marker_confidence': float(sel_after.confidence),
+                'selected_marker_id': sel_after.selected_candidate_id,
+                'marker_candidates': sel_after.details.get('marker_candidates', []),
                 'waypoint': {
                     'waypoint_id': str(waypoint.waypoint_id),
                     'x': int(waypoint.x),

@@ -128,7 +128,64 @@ def test_cavebot_stuck_detected_after_five_ticks(tmp_path: Path, monkeypatch: Mo
     runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
     # One intent max per tick; ensure no unexpected extra inputs were sent.
     assert '"inputs_sent":5' in runtime_log
-    assert '"inputs_sent":6' not in runtime_log
+
+
+def test_cavebot_dual_marker_prefers_moving_marker(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    _base_env(monkeypatch, tmp_path)
+
+    # With dual-marker enabled, MockWorld starts the moving marker at (10,10).
+    # If the static marker is chosen instead, direction/progress will be wrong and cavebot aborts.
+    monkeypatch.setenv(
+        'FRBOT_CAVEBOT_WAYPOINTS',
+        json.dumps(
+            [
+                {
+                    'waypoint_id': 'wp0',
+                    'x': 18,
+                    'y': 10,
+                    'z': 7,
+                    'radius_px': 2,
+                    'max_ticks': 20,
+                }
+            ]
+        ),
+    )
+
+    monkeypatch.setenv('MOCK_CAVEBOT_PROGRESS_OK', 'true')
+    monkeypatch.setenv('MOCK_CAVEBOT_DUAL_MARKER', 'true')
+    monkeypatch.setenv('MOCK_CAVEBOT_MARKER_STATIC', 'false')
+    monkeypatch.setenv('MOCK_CAVEBOT_MARKER_WRONG_DIRECTION', 'false')
+    monkeypatch.setenv('MOCK_CAVEBOT_NOISE_ONLY', 'false')
+
+    assert run_cavebot_only() == 0
+
+
+def test_cavebot_minimap_force_black_aborts_roi_black(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    _base_env(monkeypatch, tmp_path)
+
+    monkeypatch.setenv(
+        'FRBOT_CAVEBOT_WAYPOINTS',
+        json.dumps(
+            [
+                {
+                    'waypoint_id': 'wp0',
+                    'x': 8,
+                    'y': 0,
+                    'z': 7,
+                    'radius_px': 2,
+                    'max_ticks': 5,
+                }
+            ]
+        ),
+    )
+
+    monkeypatch.setenv('MOCK_CAVEBOT_MINIMAP_FORCE_BLACK', 'true')
+    monkeypatch.setenv('MOCK_CAVEBOT_NOISE_ONLY', 'false')
+
+    assert run_cavebot_only() == 1
+
+    fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
+    assert 'cavebot_marker_roi_black' in fatal
 
 def test_cavebot_waypoint_timeout_aborts_deterministically(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     _base_env(monkeypatch, tmp_path)

@@ -272,6 +272,10 @@ def main() -> int:
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
+    # Required audit trailer for PROD_EMERGENCY REAL certification.
+    if str(mode).lower() == 'real':
+        print('FINAL DECISION: OPERATIONAL_REAL' if res.ok else 'FINAL DECISION: NOT_OPERATIONAL_REAL')
+
     if res.ok:
         return 0
     return 2

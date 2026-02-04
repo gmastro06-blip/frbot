@@ -87,6 +87,10 @@ class MockWorld:
 	mock_cavebot_marker_wrong_direction: bool = False
 	mock_cavebot_noise_only: bool = False
 	mock_cavebot_progress_ok: bool = False
+	# - dual_marker: renders an additional static marker blob to validate stabilization
+	# - minimap_force_black: minimap ROI stays uniform/black while full frame changes
+	mock_cavebot_dual_marker: bool = False
+	mock_cavebot_minimap_force_black: bool = False
 
 	# Looting mock state.
 	inventory_gold_count: int = 0
@@ -170,6 +174,8 @@ class MockWorld:
 		mock_cavebot_marker_wrong_direction: bool = False,
 		mock_cavebot_noise_only: bool = False,
 		mock_cavebot_progress_ok: bool = False,
+		mock_cavebot_dual_marker: bool = False,
+		mock_cavebot_minimap_force_black: bool = False,
 		inventory_gold_count: int = 0,
 		inventory_capacity_used: int = 0,
 		depot_item_count: int = 0,
@@ -235,6 +241,8 @@ class MockWorld:
 			mock_cavebot_marker_wrong_direction=bool(mock_cavebot_marker_wrong_direction),
 			mock_cavebot_noise_only=bool(mock_cavebot_noise_only),
 			mock_cavebot_progress_ok=bool(mock_cavebot_progress_ok),
+			mock_cavebot_dual_marker=bool(mock_cavebot_dual_marker),
+			mock_cavebot_minimap_force_black=bool(mock_cavebot_minimap_force_black),
 			inventory_gold_count=int(inventory_gold_count),
 			inventory_capacity_used=int(inventory_capacity_used),
 			depot_item_count=int(depot_item_count),
@@ -260,6 +268,13 @@ class MockWorld:
 			mock_trade_gold_only=bool(mock_trade_gold_only),
 			mock_trade_item_only=bool(mock_trade_item_only),
 		)
+
+		# Dual-marker cavebot tests require a stable marker area across moves.
+		# Keep the moving marker away from minimap edges to avoid clipping.
+		if bool(world.mock_cavebot_dual_marker):
+			world.pos_x = 10
+			world.pos_y = 10
+			world._encode_position()
 
 		# If a battle list row is pre-selected, expose a consistent locked target frame.
 		if battle_list_selected_row is not None:
@@ -663,6 +678,19 @@ class MockWorld:
 		# Clear minimap region.
 		self.fill_roi('minimap', 0, 0, 0)
 
+		# Force-black minimap ROI while keeping full-frame variance (anti-noise guard test).
+		if bool(self.mock_cavebot_minimap_force_black):
+			self._noise_bit ^= 1
+			# Toggle a full row outside minimap for full-frame luma variance.
+			row_stride = self.width * 3
+			val = 255 if self._noise_bit else 0
+			end = min(len(self.rgb), row_stride)
+			for i in range(0, end, 3):
+				self.rgb[i] = val
+				self.rgb[i + 1] = val
+				self.rgb[i + 2] = val
+			return
+
 		# Optional visual noise (must NOT count as progress).
 		if self.minimap_noise:
 			self._noise_bit ^= 1
@@ -692,6 +720,22 @@ class MockWorld:
 					self.rgb[idx0] = 255
 					self.rgb[idx0 + 1] = 0
 					self.rgb[idx0 + 2] = 255
+
+		# Optional second static marker blob (same color) for stabilization tests.
+		if bool(self.mock_cavebot_dual_marker):
+			sx = max(0, min(mw - 1, mw - 8))
+			sy = max(0, min(mh - 1, mh - 8))
+			for dy in (-2, -1, 0, 1, 2):
+				for dx in (-2, -1, 0, 1, 2):
+					x = sx + dx
+					y = sy + dy
+					if x < 0 or y < 0 or x >= mw or y >= mh:
+						continue
+					idx0 = ((minimap.y + y) * row_stride) + ((minimap.x + x) * 3)
+					if 0 <= idx0 + 2 < len(self.rgb):
+						self.rgb[idx0] = 255
+						self.rgb[idx0 + 1] = 0
+						self.rgb[idx0 + 2] = 255
 
 	def frame(self) -> Frame:
 		# Targeting UI overlays.

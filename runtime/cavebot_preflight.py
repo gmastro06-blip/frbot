@@ -18,7 +18,7 @@ from contracts.input import InputStatus
 from typing import Literal
 
 from contracts.runtime import RuntimeContext, RuntimeState, Waypoint
-from runtime.cavebot_semantics import detect_player_marker
+from runtime.cavebot_semantics import detect_player_marker, select_player_marker
 from runtime.config_loader import load_rois
 from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
 from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
@@ -251,6 +251,8 @@ def cavebot_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
     wrong_dir = _env_bool('MOCK_CAVEBOT_MARKER_WRONG_DIRECTION', False)
     noise_only = _env_bool('MOCK_CAVEBOT_NOISE_ONLY', False)
     progress_ok = _env_bool('MOCK_CAVEBOT_PROGRESS_OK', False)
+    dual_marker = _env_bool('MOCK_CAVEBOT_DUAL_MARKER', False)
+    minimap_force_black = _env_bool('MOCK_CAVEBOT_MINIMAP_FORCE_BLACK', False)
 
     world = MockWorld.create(
         rois=ctx.rois,
@@ -264,6 +266,8 @@ def cavebot_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
         mock_cavebot_marker_wrong_direction=bool(wrong_dir),
         mock_cavebot_noise_only=bool(noise_only),
         mock_cavebot_progress_ok=bool(progress_ok),
+        mock_cavebot_dual_marker=bool(dual_marker),
+        mock_cavebot_minimap_force_black=bool(minimap_force_black),
     )
     world.on_noop()
 
@@ -282,14 +286,19 @@ def cavebot_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
         raise PreflightFailed('input not verified')
 
     f = capture_mock.grab()
-    marker = detect_player_marker(
+    sel = select_player_marker(
         f,
         marker_rgb=_parse_rgb(ctx.config.player_marker_rgb),
         tol=int(ctx.config.player_marker_tol),
         min_pixels=int(ctx.config.player_marker_min_pixels),
         max_pixels=int(ctx.config.player_marker_max_pixels),
+        prev_marker=None,
     )
-    if marker is None:
+    if sel.abort_reason is not None:
+        pf = PreflightFailed(str(sel.abort_reason))
+        setattr(pf, 'details', sel.details)
+        raise pf
+    if sel.marker is None:
         raise PreflightFailed('cavebot_marker_not_found')
 
     ctx.status.state = RuntimeState.READY
