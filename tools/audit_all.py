@@ -8,7 +8,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-_ALL_GATES: tuple[str, ...] = ('targeting', 'healing', 'combat', 'cavebot', 'looting', 'deposit', 'trade')
+_ALL_GATES: tuple[str, ...] = (
+    'targeting',
+    'healing',
+    'combat_basic',
+    'cavebot',
+    'looting_basic',
+    'combat',
+    'looting',
+    'deposit',
+    'trade',
+)
 
 
 def _profile() -> str:
@@ -19,10 +29,10 @@ def _gates_for_profile() -> tuple[tuple[str, ...], list[str], list[str]]:
     """Return (required_gates, enabled_features, disabled_features)."""
 
     if _profile() == 'prod_emergency':
-        enabled = ['capture_real', 'targeting_basic', 'cavebot_basic', 'healing_basic']
+        enabled = ['capture_real', 'targeting_basic', 'cavebot_basic', 'healing_basic', 'combat_basic', 'looting_basic']
         disabled = ['combat', 'looting', 'deposit', 'trade']
         # Only require evidence for the allowed gates.
-        return ('targeting', 'cavebot', 'healing'), enabled, disabled
+        return ('targeting', 'cavebot', 'healing', 'combat_basic', 'looting_basic'), enabled, disabled
 
     return _ALL_GATES, [], []
 

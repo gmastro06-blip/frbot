@@ -13,6 +13,17 @@ if str(REPO_ROOT) not in sys.path:
 from adapters.windows import win32 as w32
 
 
+def _safe_print(line: str) -> None:
+    # Avoid Windows console encoding failures (e.g. cp1252) on odd window titles.
+    try:
+        sys.stdout.buffer.write((str(line) + '\n').encode('utf-8', errors='backslashreplace'))
+    except Exception:
+        try:
+            print(str(line).encode('utf-8', errors='backslashreplace').decode('utf-8'))
+        except Exception:
+            print(str(line))
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description='List top-level visible windows (Win32).')
     ap.add_argument('--filter', default='', help='Case-insensitive substring filter for window titles')
@@ -42,13 +53,14 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if args.json:
-        print(json.dumps({'foreground_hwnd_hex': hex(int(fg)), 'windows': rows}, ensure_ascii=False))
+        # JSON may still contain unicode; write as UTF-8 safely.
+        _safe_print(json.dumps({'foreground_hwnd_hex': hex(int(fg)), 'windows': rows}, ensure_ascii=False))
         return 0
 
-    print(f'Foreground HWND: {hex(int(fg))}')
+    _safe_print(f'Foreground HWND: {hex(int(fg))}')
     for r in rows:
         mark = '*' if r['foreground'] else ' '
-        print(f"{mark} {r['hwnd_hex']}  pid={r['pid']}  minimized={r['minimized']}  title={r['title']}")
+        _safe_print(f"{mark} {r['hwnd_hex']}  pid={r['pid']}  minimized={r['minimized']}  title={r['title']}")
     return 0
 
 

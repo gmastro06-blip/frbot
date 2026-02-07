@@ -14,10 +14,12 @@ def capture_source() -> str:
     - 'obs': capture exclusively from OBS Projector window
     - 'obs_source': capture directly from OBS source identity (no HWND/foreground)
 
-    Default: 'client'
+    Default: 'obs_source' (REAL-safe by default; decouples capture from HWND focus)
     """
 
     v = (os.environ.get('FRBOT_CAPTURE_SOURCE', '') or '').strip().lower()
+    if not v:
+        return 'obs_source'
     if v == 'obs_source':
         return 'obs_source'
     return 'obs' if v == 'obs' else 'client'
@@ -243,14 +245,16 @@ def resolve_input_hwnd(*, hwnd: int, title_substring: str) -> int:
     if h > 0:
         try:
             if not w32.is_window(h):
-                return 0
+                raise RuntimeError('hwnd_invalid')
             if not w32.is_window_visible(h):
-                return 0
+                raise RuntimeError('hwnd_invalid')
             if w32.is_window_minimized(h):
-                return 0
+                raise RuntimeError('hwnd_invalid')
         except Exception:
-            return 0
-        return h
+            # Provided HWND can go stale; fall back to title-based resolve below.
+            h = 0
+        else:
+            return h
 
     needle = (title_substring or '').strip()
     if not needle:

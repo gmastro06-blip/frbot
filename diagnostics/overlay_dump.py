@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 
@@ -9,6 +10,13 @@ from contracts.evidence import Roi
 
 def _ppm_p6_header(width: int, height: int) -> bytes:
     return f"P6\n{int(width)} {int(height)}\n255\n".encode("ascii")
+
+
+def _safe_reason(reason: str) -> str:
+    s = (reason or 'unknown').strip().lower()
+    s = re.sub(r'[^a-z0-9._-]+', '_', s)
+    s = re.sub(r'_+', '_', s).strip('_')
+    return s[:80] if s else 'unknown'
 
 
 def _draw_cross(rgb: bytearray, *, width: int, height: int, x: int, y: int, size: int = 4) -> None:
@@ -68,7 +76,30 @@ def dump_marker_centroid_overlay(
     _draw_cross(rgb, width=int(frame.width), height=int(frame.height), x=int(abs_x), y=int(abs_y), size=5)
 
     ts = time.strftime("%Y%m%d-%H%M%S")
-    name = f"marker_overlay_{ts}_{str(reason).strip() or 'marker'}.ppm"
+    name = f"marker_overlay_{ts}_{_safe_reason(str(reason))}.ppm"
+    try:
+        p = frames_dir / name
+        p.write_bytes(_ppm_p6_header(int(frame.width), int(frame.height)) + bytes(rgb))
+    except Exception:
+        return
+
+
+def dump_click_point_overlay(*, frames_dir: Path, frame: Frame, x: int, y: int, reason: str) -> None:
+    """Dump a full-frame PPM with a cross at the attempted click point (frame coords)."""
+
+    if not frame.rgb or int(frame.width) <= 0 or int(frame.height) <= 0:
+        return
+
+    try:
+        frames_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        return
+
+    rgb = bytearray(frame.rgb)
+    _draw_cross(rgb, width=int(frame.width), height=int(frame.height), x=int(x), y=int(y), size=6)
+
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    name = f"click_overlay_{ts}_{_safe_reason(str(reason))}.ppm"
     try:
         p = frames_dir / name
         p.write_bytes(_ppm_p6_header(int(frame.width), int(frame.height)) + bytes(rgb))

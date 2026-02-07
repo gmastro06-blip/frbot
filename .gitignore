@@ -28,6 +28,7 @@ var/
 .vscode/
 venv
 .venv/
+.ci_venv/
 
 # Test / tooling caches
 .pytest_cache/

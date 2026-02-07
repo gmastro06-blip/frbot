@@ -10,7 +10,7 @@ from contracts.input import InputAdapter
 from contracts.runtime import InventorySnapshot, RuntimeContext
 from contracts.window import WindowBindingAdapter
 from diagnostics.last_frames import record_after, record_before
-from runtime.inventory_semantics import InventoryDelta, diff_inventory, is_loot_success, read_inventory
+from runtime.inventory_semantics import InventoryDelta, diff_inventory, is_loot_success, read_inventory_pair
 from runtime.looting_engine import LootingTickInput, select_looting_intent
 
 
@@ -98,13 +98,15 @@ def execute_looting_tick(
             abort_reason='looting_ambiguous_result',
         )
 
-    inv_before = read_inventory(before, inv_roi)
-    if inv_before is None:
+    inv_pair_before = read_inventory_pair(before, before, inv_roi)
+    if inv_pair_before is None:
         return LootingTickOutcome(
             looted=False,
             evidence=LootingTickEvidence(None, None, None, None, None, 'looting_inventory_unreadable'),
             abort_reason='looting_inventory_unreadable',
         )
+
+    inv_before, _ = inv_pair_before
 
     ctx.looting.last_inventory = inv_before
 
@@ -186,13 +188,15 @@ def execute_looting_tick(
     after = capture.grab()
     record_after('looting', after)
 
-    inv_after = read_inventory(after, inv_roi)
-    if inv_after is None:
+    inv_pair = read_inventory_pair(before, after, inv_roi)
+    if inv_pair is None:
         return LootingTickOutcome(
             looted=False,
             evidence=LootingTickEvidence(inv_before, None, None, container_open_before, None, 'looting_inventory_unreadable'),
             abort_reason='looting_inventory_unreadable',
         )
+
+    _inv_before2, inv_after = inv_pair
 
     ctx.looting.last_inventory = inv_after
 

@@ -17,7 +17,21 @@ def _mode() -> str:
     return (os.environ.get('FRBOT_MODE', 'real') or 'real').strip().lower()
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() not in {'', '0', 'false', 'no', 'off'}
+
+
 def main() -> int:
+    mode = _mode()
+
+    # CI and unit tests run in mock mode across platforms.
+    # PROD-EMERGENCY constraints apply only to REAL execution.
+    if mode == 'mock':
+        return int(run())
+
     # Windows-only (PROD-EMERGENCY): abort immediately with fatal.log.
     if sys.platform != 'win32':
         write_fatal('unsupported_platform', details={'platform': str(sys.platform)})
@@ -47,26 +61,66 @@ def main() -> int:
         return 1
 
     # Hard-disabled feature modes (no routes, no execution).
-    if _mode() in {'combat', 'looting', 'deposit', 'trade'}:
-        write_fatal('feature_disabled', details={'feature': _mode()})
+    if mode in {'combat', 'looting', 'deposit', 'trade'}:
+        write_fatal('feature_disabled', details={'feature': mode})
         print('REAL_CAVEBOT_FAILED:feature_disabled')
         return 1
 
-    if _mode() == 'targeting':
+    if mode == 'combat_basic':
+        from combat_basic_entrypoint import run_combat_basic_only
+
+        code = int(run_combat_basic_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:combat_basic_failed')
+        return code
+
+    if mode == 'looting_basic':
+        from looting_basic_entrypoint import run_looting_basic_only
+
+        code = int(run_looting_basic_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:looting_basic_failed')
+        return code
+
+    if mode == 'looting_full':
+        from looting_full_entrypoint import run_looting_full_only
+
+        code = int(run_looting_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:looting_full_failed')
+        return code
+
+    if mode == 'deposit_basic':
+        from deposit_basic_entrypoint import run_deposit_basic_only
+
+        code = int(run_deposit_basic_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:deposit_basic_failed')
+        return code
+
+    if mode == 'trade_basic':
+        from trade_basic_entrypoint import run_trade_basic_only
+
+        code = int(run_trade_basic_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:trade_basic_failed')
+        return code
+
+    if mode == 'targeting':
         from targeting_entrypoint import run_targeting_only
 
         code = int(run_targeting_only())
         if code != 0:
             print('REAL_CAVEBOT_FAILED:targeting_failed')
         return code
-    if _mode() == 'cavebot':
+    if mode == 'cavebot':
         from cavebot_entrypoint import run_cavebot_only
 
         code = int(run_cavebot_only())
         if code != 0:
             print('REAL_CAVEBOT_FAILED:cavebot_failed')
         return code
-    if _mode() == 'healing':
+    if mode == 'healing':
         from healing_entrypoint import run_healing_only
 
         code = int(run_healing_only())

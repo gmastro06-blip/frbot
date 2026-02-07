@@ -140,10 +140,19 @@ def _write_rois_config(config_path: Path, *, name: str, roi: dict[str, int]) -> 
     if err is not None:
         return False, err
 
-    if not isinstance(data, dict) or set(data.keys()) != {"rois"}:
-        return False, "invalid_config_schema:top_level_must_be_only_rois"
+    if not isinstance(data, dict):
+        return False, "invalid_config_schema:top_level_must_be_object"
 
-    rois_node = data.get("rois")
+    keys = set(data.keys())
+    if keys == {"rois"}:
+        out: dict[str, Any] = {"rois": data.get("rois")}
+    elif keys == {"rois", "frame"}:
+        # Preserve optional frame resolution metadata used by OBS-source capture.
+        out = {"frame": data.get("frame"), "rois": data.get("rois")}
+    else:
+        return False, "invalid_config_schema:top_level_must_be_only_rois_or_frame_plus_rois"
+
+    rois_node = out.get("rois")
     if not isinstance(rois_node, dict):
         return False, "invalid_config_schema:rois_must_be_object"
 
@@ -154,7 +163,7 @@ def _write_rois_config(config_path: Path, *, name: str, roi: dict[str, int]) -> 
         "height": int(roi["height"]),
     }
 
-    config_path.write_text(json.dumps({"rois": rois_node}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    config_path.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return True, None
 
 

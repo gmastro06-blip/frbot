@@ -69,6 +69,8 @@ def _write_report(*, gates: dict[str, str], final_decision: str) -> None:
             "capture": str(gates.get("capture", "FAIL")),
             "targeting": str(gates.get("targeting", "FAIL")),
             "healing": str(gates.get("healing", "FAIL")),
+            "combat_basic": str(gates.get("combat_basic", "SKIP")),
+            "looting_basic": str(gates.get("looting_basic", "FAIL")),
             "cavebot": str(gates.get("cavebot", "FAIL")),
         },
         "final_decision": str(final_decision),
@@ -332,6 +334,110 @@ def _run_cavebot_gate(*, gates: dict[str, str], out_dir: Path) -> None:
         raise HardStop("cavebot_trace_missing_waypoint_reached", {"event": str(out.event), "abort_reason": str(out.abort_reason or "")})
 
 
+def _run_combat_basic_gate(*, gates: dict[str, str], out_dir: Path) -> None:
+    from contracts.errors import PreflightFailed
+    from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
+    from diagnostics.last_frames import snapshot, clear
+    from runtime.combat_basic_preflight import run as combat_basic_preflight
+    from runtime.combat_basic_runner import execute_combat_basic_once
+    from runtime.env import parse_window_hwnd_env
+
+    clear('combat_basic')
+
+    try:
+        cfg = RuntimeConfig(
+            mode='real',
+            tick_hz=float(_env_str('FRBOT_TICK_HZ', '20.0') or '20.0'),
+            config_path=str(_env_str('FRBOT_CONFIG_PATH', '') or ''),
+            enable_cavebot=False,
+            enable_targeting=False,
+            enable_healing=False,
+            enable_combat=True,
+            minimap_roi=_env_str('FRBOT_MINIMAP_ROI', 'minimap') or 'minimap',
+            window_hwnd=parse_window_hwnd_env('FRBOT_WINDOW_HWND'),
+            window_title_substring=_env_str('FRBOT_WINDOW_TITLE', ''),
+            target_frame_roi=_env_str('FRBOT_TARGET_FRAME_ROI', 'target_frame') or 'target_frame',
+            target_hp_bar_roi=_env_str('FRBOT_TARGET_HP_BAR_ROI', 'target_hp_bar') or 'target_hp_bar',
+            combat_cooldown_roi=_env_str('FRBOT_COMBAT_COOLDOWN_ROI', 'combat_cooldown') or 'combat_cooldown',
+            combat_feedback_roi=_env_str('FRBOT_COMBAT_FEEDBACK_ROI', 'combat_feedback') or 'combat_feedback',
+            attack_key=_env_str('FRBOT_ATTACK_KEY', 'SPACE') or 'SPACE',
+            combat_target_hp_decrease_min=float(_env_str('FRBOT_COMBAT_BASIC_TARGET_HP_DECREASE_MIN', '0.02') or '0.02'),
+            player_marker_rgb=_env_str('FRBOT_PLAYER_MARKER_RGB', '255,255,0'),
+            player_marker_tol=_env_int('FRBOT_PLAYER_MARKER_TOL', 10),
+            player_marker_min_pixels=_env_int('FRBOT_PLAYER_MARKER_MIN_PIXELS', 3),
+        )
+        ctx = RuntimeContext(config=cfg, status=RuntimeStatus(state=RuntimeState.INIT), telemetry=RuntimeTelemetry())
+
+        cap, inp, binding = combat_basic_preflight(ctx)
+        out = execute_combat_basic_once(ctx, capture=cap, input_=inp, binding=binding)
+
+        before, after = snapshot('combat_basic')
+        dump_pair(gate='combat_basic', before=before, after=after, reason=str(out.evidence.evidence_kind), out_dir=out_dir)
+
+        if int(ctx.combat.inputs_sent) != 1:
+            raise HardStop('combat_basic_input_contract_violation', {'inputs_sent': int(ctx.combat.inputs_sent)})
+
+        if not bool(out.ok):
+            raise HardStop('combat_unverified_action', {'ok': False})
+
+    except PreflightFailed as exc:
+        before, after = snapshot('combat_basic')
+        if before is not None or after is not None:
+            dump_pair(gate='combat_basic', before=before, after=after, reason=str(exc), out_dir=out_dir)
+        else:
+            _run_capture_gate_obs_source(out_dir=out_dir, gate='combat_basic', reason=str(exc))
+        raise HardStop('combat_basic_failed', {'reason': str(exc), 'details': getattr(exc, 'details', None)})
+
+
+def _run_looting_basic_gate(*, gates: dict[str, str], out_dir: Path) -> None:
+    from contracts.errors import PreflightFailed
+    from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
+    from diagnostics.last_frames import snapshot, clear
+    from runtime.env import parse_window_hwnd_env
+    from runtime.looting_basic_preflight import run as looting_basic_preflight
+    from runtime.looting_basic_runner import execute_looting_basic_once
+
+    clear('looting_basic')
+
+    try:
+        cfg = RuntimeConfig(
+            mode='real',
+            tick_hz=float(_env_str('FRBOT_TICK_HZ', '20.0') or '20.0'),
+            config_path=str(_env_str('FRBOT_CONFIG_PATH', '') or ''),
+            enable_cavebot=False,
+            enable_targeting=False,
+            enable_healing=False,
+            enable_combat=False,
+            minimap_roi=_env_str('FRBOT_MINIMAP_ROI', 'minimap') or 'minimap',
+            window_hwnd=parse_window_hwnd_env('FRBOT_WINDOW_HWND'),
+            window_title_substring=_env_str('FRBOT_WINDOW_TITLE', ''),
+            inventory_text_roi=_env_str('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text') or 'inventory_text',
+            quick_loot_key=_env_str('FRBOT_QUICK_LOOT_KEY', 'R') or 'R',
+        )
+        ctx = RuntimeContext(config=cfg, status=RuntimeStatus(state=RuntimeState.INIT), telemetry=RuntimeTelemetry())
+
+        cap, inp, binding = looting_basic_preflight(ctx)
+        out = execute_looting_basic_once(ctx, capture=cap, input_=inp, binding=binding)
+
+        before, after = snapshot('looting_basic')
+        dump_pair(gate='looting_basic', before=before, after=after, reason=str(out.evidence_kind), out_dir=out_dir)
+
+        if int(getattr(ctx.looting, 'attempts_used', 0)) != 1:
+            raise HardStop('looting_basic_input_contract_violation', {'attempts_used': int(getattr(ctx.looting, 'attempts_used', 0))})
+
+        if not bool(out.ok):
+            raise HardStop('looting_no_inventory_delta', {'ok': False})
+
+    except PreflightFailed as exc:
+        before, after = snapshot('looting_basic')
+        if before is not None or after is not None:
+            dump_pair(gate='looting_basic', before=before, after=after, reason=str(exc), out_dir=out_dir)
+        else:
+            _run_capture_gate_obs_source(out_dir=out_dir, gate='looting_basic', reason=str(exc))
+        raise HardStop('looting_basic_failed', {'reason': str(exc), 'details': getattr(exc, 'details', None)})
+
+
+
 def _run_audit(*, repo_root: Path, out_dir: Path) -> None:
     audit_py = repo_root / "tools" / "audit_all.py"
     out_log = Path("diagnostics") / "audit_all_real_obs.stdout.log"
@@ -362,8 +468,6 @@ def _run_input_contract_gate(*, gate: str, out_dir: Path) -> None:
     from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
     from runtime.targeting_runner import _load_config_from_env
 
-    from runtime.pacing import wait_until_ns
-
     # Enforce the startup-only guard once per process.
     try:
         enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=False)
@@ -378,58 +482,31 @@ def _run_input_contract_gate(*, gate: str, out_dir: Path) -> None:
 
     binding = Win32WindowBinding(hwnd=int(input_hwnd), title_substring=str(cfg.window_title_substring))
 
-    # InputAuthority can be temporarily lost if the user alt-tabs while this tool is running.
-    # For evidence generation, tolerate short binding loss by waiting (and optionally trying focus)
-    # before hard-stopping with detailed diagnostics.
-    max_block_ms = int(_env_int('FRBOT_BINDING_BLOCK_MAX_MS', 8000))
-    try_focus = bool(_env_bool('FRBOT_BINDING_TRY_FOCUS_ON_BLOCK', False) or _env_bool('FRBOT_STARTUP_TRY_FOCUS', False))
-    start_ns = int(time.monotonic_ns())
-    deadline_ns = int(start_ns + (max(0, max_block_ms) * 1_000_000))
-    tries = 0
-    last_reason = 'window_binding_lost'
-
-    while True:
-        tries += 1
-        bvr = binding.verify()
-        if bvr.ok:
-            break
-        last_reason = str(bvr.reason or 'window_binding_lost')
-
-        if try_focus:
-            try:
-                w32.try_focus_window(int(input_hwnd), timeout_s=0.2)
-            except Exception:
-                pass
-
-        now_ns = int(time.monotonic_ns())
-        if now_ns >= deadline_ns:
+    # No retries / no focus stealing: verify once and abort-fast.
+    bvr = binding.verify()
+    if not bvr.ok:
+        fg_hwnd = 0
+        fg_title = ''
+        try:
+            fg_hwnd = int(w32.get_foreground_window() or 0)
+        except Exception:
             fg_hwnd = 0
+        try:
+            fg_title = str(w32.get_window_text(int(fg_hwnd)) or '') if int(fg_hwnd) > 0 else ''
+        except Exception:
             fg_title = ''
-            try:
-                fg_hwnd = int(w32.get_foreground_window() or 0)
-            except Exception:
-                fg_hwnd = 0
-            try:
-                fg_title = str(w32.get_window_text(int(fg_hwnd)) or '') if int(fg_hwnd) > 0 else ''
-            except Exception:
-                fg_title = ''
-            raise HardStop(
-                'window_binding_lost',
-                {
-                    'reason': str(last_reason or 'window_binding_lost'),
-                    'input_hwnd': hex(int(input_hwnd)),
-                    'title_substring': str(cfg.window_title_substring or ''),
-                    'blocked_ms': int((now_ns - start_ns) // 1_000_000),
-                    'tries': int(tries),
-                    'try_focus': bool(try_focus),
-                    'foreground_hwnd': hex(int(fg_hwnd)) if int(fg_hwnd) > 0 else '0x0',
-                    'foreground_title': str(fg_title),
-                    'hint': 'Focus Tibia window and rerun (or set FRBOT_BINDING_TRY_FOCUS_ON_BLOCK=1)',
-                },
-            )
-
-        # Wait ~50ms without time.sleep to reduce scheduling jitter.
-        wait_until_ns(int(now_ns + 50_000_000))
+        raise HardStop(
+            'window_binding_lost',
+            {
+                'reason': str(bvr.reason or 'window_binding_lost'),
+                'input_hwnd': hex(int(input_hwnd)),
+                'title_substring': str(cfg.window_title_substring or ''),
+                'try_focus': False,
+                'foreground_hwnd': hex(int(fg_hwnd)) if int(fg_hwnd) > 0 else '0x0',
+                'foreground_title': str(fg_title),
+                'hint': 'Focus Tibia window and rerun',
+            },
+        )
 
     try:
         binding.assert_bound()
@@ -449,7 +526,7 @@ def _run_input_contract_gate(*, gate: str, out_dir: Path) -> None:
 
 
 def main() -> int:
-    gates: dict[str, str] = {"capture": "FAIL", "targeting": "FAIL", "healing": "FAIL", "cavebot": "FAIL"}
+    gates: dict[str, str] = {"capture": "FAIL", "targeting": "FAIL", "healing": "FAIL", "combat_basic": "SKIP", "looting_basic": "FAIL", "cavebot": "FAIL"}
 
     _rotate_fatal_log()
 
@@ -520,6 +597,14 @@ def main() -> int:
         _run_healing_gate(gates=gates, out_dir=frames_dir)
         gates["healing"] = "PASS"
         log_json(logger, event="success", gate="healing")
+
+        _run_looting_basic_gate(gates=gates, out_dir=frames_dir)
+        gates["looting_basic"] = "PASS"
+        log_json(logger, event="success", gate="looting_basic")
+
+        _run_combat_basic_gate(gates=gates, out_dir=frames_dir)
+        gates['combat_basic'] = 'PASS'
+        log_json(logger, event='success', gate='combat_basic')
 
         _run_cavebot_gate(gates=gates, out_dir=frames_dir)
         gates["cavebot"] = "PASS"

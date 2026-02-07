@@ -101,17 +101,6 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return str(raw).strip().lower() not in {'', '0', 'false', 'no', 'off'}
 
 
-def _binding_ok_or_none(binding: object) -> bool:
-    try:
-        fn = getattr(binding, 'assert_bound', None)
-        if fn is None:
-            return True
-        fn()
-        return True
-    except Exception:
-        return False
-
-
 def _trace_required() -> bool:
     # PROD-EMERGENCY REAL requires trace artifacts even on failures.
     profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
@@ -526,53 +515,7 @@ def run() -> int:
 
         next_tick_ns = start_ns
         while True:
-            # PROD-EMERGENCY REAL: tolerate temporary foreground loss.
-            # Block inputs while unbound; hard-stop only if binding doesn't recover.
-            binding_block_timeout_ms = _env_ms('FRBOT_BINDING_BLOCK_MAX_MS', 8000)
-            binding_try_focus = _env_bool('FRBOT_BINDING_TRY_FOCUS_ON_BLOCK', False)
-
-            if 'binding_blocked_since_ns' not in locals():
-                binding_blocked_since_ns: int | None = None
-                binding_blocked_tries: int = 0
-
             now_ns = time.monotonic_ns()
-            bound_now = _binding_ok_or_none(binding)
-            if (not bound_now) and binding_try_focus:
-                try:
-                    from adapters.windows import win32 as w32
-
-                    snap = binding.snapshot()
-                    w32.try_focus_window(int(getattr(snap, 'hwnd', 0) or 0), timeout_s=0.25)
-                except Exception:
-                    pass
-                bound_now = _binding_ok_or_none(binding)
-
-            if not bound_now:
-                if binding_blocked_since_ns is None:
-                    binding_blocked_since_ns = int(now_ns)
-                    binding_blocked_tries = 0
-                binding_blocked_tries += 1
-                blocked_ms = int((now_ns - int(binding_blocked_since_ns)) // 1_000_000)
-                if blocked_ms >= int(max(0, int(binding_block_timeout_ms))):
-                    exc = PreflightFailed('window_binding_lost')
-                    try:
-                        setattr(
-                            exc,
-                            'details',
-                            {
-                                'reason': 'window_binding_lost',
-                                'blocked_ms': int(blocked_ms),
-                                'tries': int(binding_blocked_tries),
-                                'try_focus': bool(binding_try_focus),
-                            },
-                        )
-                    except Exception:
-                        pass
-                    raise exc
-            else:
-                binding_blocked_since_ns = None
-                binding_blocked_tries = 0
-
             frame = capture.grab()  # verified by preflight
             record_before('runtime', frame)
             if not frame.minimap_detected:
@@ -705,22 +648,14 @@ def run() -> int:
                     raise PreflightFailed(f'unknown intent type: {type(intent).__name__}')
                 ctx.telemetry.last_intent = type(intent).__name__
 
-                # Block inputs while binding is invalid; allow resume when valid.
-                if not bound_now:
-                    # Skip input emission this tick; continue to capture/track.
-                    next_tick_ns += int(tick_period_ns)
-                    wait_until_ns(int(next_tick_ns))
-                    continue
-
-                # Enforce: inputs must be bound to the Tibia HWND (not OBS).
+                # Window binding is checked ONLY immediately before emitting input.
+                # Losing foreground/focus must not abort a capture-only tick.
                 try:
+                    binding.assert_bound()
                     snap = binding.snapshot()
                     input_.assert_bound(int(getattr(snap, 'hwnd', 0)))
-                except Exception:
-                    # Treat as binding lost; skip input and let the top-of-loop timeout handle hard-stop.
-                    next_tick_ns += int(tick_period_ns)
-                    wait_until_ns(int(next_tick_ns))
-                    continue
+                except Exception as exc:
+                    raise PreflightFailed('window_binding_lost') from exc
 
                 before_tile = ctx.position.tile()
                 waypoint = ctx.cavebot.current_waypoint()

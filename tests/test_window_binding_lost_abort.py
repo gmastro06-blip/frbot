@@ -16,8 +16,8 @@ def test_window_binding_lost_abort(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setenv('FRBOT_MOCK_CAPTURE_OK', '1')
     monkeypatch.setenv('FRBOT_MOCK_INPUT_OK', '1')
 
-    # Simulate losing foreground/binding.
-    monkeypatch.setenv('FRBOT_MOCK_WINDOW_FOREGROUND', '0')
+    # Simulate losing binding.
+    monkeypatch.setenv('FRBOT_MOCK_WINDOW_OK', '0')
 
     code = run()
     assert code == 1

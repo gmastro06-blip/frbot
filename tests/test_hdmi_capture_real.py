@@ -1,7 +1,18 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
+
+
+# This file is a manual, REAL-hardware smoke script, not a unit test.
+# Pytest will still import it during collection due to the filename.
+# Skip it during pytest runs to avoid importing heavy/optional deps (e.g. OpenCV)
+# and to avoid attempting REAL capture in CI.
+if 'pytest' in sys.modules or os.environ.get('PYTEST_CURRENT_TEST'):
+    import pytest
+
+    pytest.skip('manual REAL HDMI capture script (not a unit test)', allow_module_level=True)
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:

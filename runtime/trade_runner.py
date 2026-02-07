@@ -36,6 +36,7 @@ def execute_trade_tick(
     input_: InputAdapter,
     binding: WindowBindingAdapter,
     tick_index: int,
+    gate: str = 'trade',
 ) -> TradeTickOutcome:
     """Execute exactly one Trade tick.
 
@@ -65,8 +66,10 @@ def execute_trade_tick(
             abort_reason='trade_unverified_action',
         )
 
+    gate_name = (str(gate or 'trade') or 'trade').strip().lower()
+
     before = capture.grab()
-    record_before('trade', before)
+    record_before(gate_name, before)
 
     npc = detect_npc_window(before, npc_roi)
     if npc is None:
@@ -114,7 +117,7 @@ def execute_trade_tick(
     ctx.trade.inputs_sent += 1
 
     after = capture.grab()
-    record_after('trade', after)
+    record_after(gate_name, after)
 
     inv_after = read_trade_inventory(after, inv_roi)
     if inv_after is None:

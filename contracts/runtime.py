@@ -412,6 +412,11 @@ class RuntimeContext:
     # Loaded ROI map (must include minimap in operational modes).
     rois: dict[str, Roi] = field(default_factory=dict)
 
+    # Optional: configured capture frame dimensions (used to map ROI/frame coordinates
+    # to window client coordinates for input when capture is OBS source identity).
+    frame_width: Optional[int] = None
+    frame_height: Optional[int] = None
+
 
 @dataclass(slots=True)
 class HealState:
@@ -435,6 +440,9 @@ class CombatState:
     intents_emitted: int = 0
     inputs_sent: int = 0
     last_target_hp: Optional[float] = None
+    last_click_xy: Optional[tuple[int, int]] = None
+    last_action_type: str = ''
+    last_action_value: str = ''
 
 
 @dataclass(frozen=True, slots=True)

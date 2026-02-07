@@ -26,6 +26,33 @@ _REQUIRED_REAL_ROIS: tuple[str, ...] = (
 )
 
 
+_ALLOWED_PROD_EMERGENCY_EXTRA_ROIS: set[str] = {
+	# combat_basic: additional ROIs allowed for semantic combat evidence.
+	'target_hp_bar',
+	'combat_cooldown',
+	'combat_feedback',
+	# looting_basic: semantic inventory snapshot.
+	'inventory_text',
+	# looting_basic: secondary semantic loot evidence (pixel-hash), no OCR.
+	'chat_loot_area',
+	# looting_basic: deterministic click target for the loot gesture.
+	'loot_corpse',
+	# deposit_basic: depot container semantic evidence.
+	'depot_container',
+	# trade_basic: strong NPC identity + trade delta evidence.
+	'trade_inventory',
+	'trade_npc',
+	'trade_action',
+}
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+	raw = os.environ.get(name)
+	if raw is None:
+		return bool(default)
+	return str(raw).strip().lower() not in {'', '0', 'false', 'no', 'off'}
+
+
 def _default_mock_rois() -> Dict[str, Roi]:
 	# Fits within a 16x16 mock frame.
 	return {
@@ -97,13 +124,18 @@ def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 
 		# REAL-mode certification requires a minimal, fixed ROI inventory.
 		if mode == 'real':
-			for req in _REQUIRED_REAL_ROIS:
-				if req not in rois:
+			for required_roi in _REQUIRED_REAL_ROIS:
+				if required_roi not in rois:
 					raise PreflightFailed('config_invalid_schema')
-			# PROD-EMERGENCY: config must contain *exactly* the required ROI keys.
+			# PROD-EMERGENCY: default is *exactly* the required ROI keys.
+			# Exception: allow a small, explicit allowlisted superset (audited).
 			if profile == 'prod_emergency':
-				if set(rois.keys()) != set(_REQUIRED_REAL_ROIS):
-					raise PreflightFailed('config_invalid_schema')
+				keys = set(rois.keys())
+				required_keys = set(_REQUIRED_REAL_ROIS)
+				if keys != required_keys:
+					extra = keys - required_keys
+					if not extra.issubset(set(_ALLOWED_PROD_EMERGENCY_EXTRA_ROIS)):
+						raise PreflightFailed('config_invalid_schema')
 
 		return LoadedConfig(rois=rois, frame_width=frame_w, frame_height=frame_h)
 

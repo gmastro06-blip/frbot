@@ -33,6 +33,16 @@ def _env_str(name: str) -> str:
     return str(os.environ.get(name) or '').strip()
 
 
+def _env_int_opt(name: str) -> int | None:
+    raw = os.environ.get(name)
+    if raw is None:
+        return None
+    try:
+        return int(str(raw).strip())
+    except Exception:
+        return None
+
+
 def _profile() -> str:
     return (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
 
@@ -43,6 +53,8 @@ def _mode() -> str:
 
 def _capture_source() -> str:
     v = (os.environ.get('FRBOT_CAPTURE_SOURCE', '') or '').strip().lower()
+    if not v:
+        return 'obs_source'
     if v == 'obs_source':
         return 'obs_source'
     return 'obs' if v == 'obs' else 'client'
@@ -172,7 +184,7 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
     Requirements:
     - Windows-only
     - FRBOT_PROFILE=prod_emergency (enforced by caller)
-    - FRBOT_MODE must be 'real'
+    - FRBOT_MODE must be 'real' or 'combat_basic' (real-mode gates)
         - Capture source selector:
             - FRBOT_CAPTURE_SOURCE=client (default): must provide FRBOT_WINDOW_HWND or FRBOT_WINDOW_TITLE
             - FRBOT_CAPTURE_SOURCE=obs: must provide FRBOT_OBS_PROJECTOR_TITLE
@@ -199,9 +211,13 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
             write_fatal('unsupported_platform', exc, details={'platform': str(sys.platform)})
         raise exc
 
-    if _mode() != 'real':
+    # Allow running independent gates via main.py routing.
+    if _mode() not in {'real', 'combat_basic', 'looting_basic', 'looting_full', 'deposit_basic', 'trade_basic', 'targeting', 'healing', 'cavebot'}:
         exc = PreflightFailed('invalid_mode')
-        details: dict[str, object] = {'mode': _mode(), 'required': 'real'}
+        details: dict[str, object] = {
+            'mode': _mode(),
+            'required': ['real', 'combat_basic', 'looting_basic', 'looting_full', 'deposit_basic', 'trade_basic', 'targeting', 'healing', 'cavebot'],
+        }
         setattr(exc, 'details', details)
         if write_fatal_on_fail:
             write_fatal('invalid_mode', exc, details=details)
@@ -305,17 +321,34 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         raise pf
 
     if int(info.foreground_hwnd) != int(hwnd):
-        # Optional best-effort focus (kept opt-in to avoid side-effects in tests).
-        raw_try_focus = os.environ.get('FRBOT_STARTUP_TRY_FOCUS', '')
-        try_focus = raw_try_focus is not None and raw_try_focus.strip().lower() not in {'', '0', 'false', 'no', 'off'}
-        if try_focus:
+        # Optional operator-wait for foreground (still no focus stealing).
+        retries_opt = _env_int_opt('FRBOT_FOREGROUND_RETRIES')
+        retries = int(retries_opt) if retries_opt is not None else 0
+        delay_ms = int(
+            _env_int_opt('FRBOT_FOREGROUND_DELAY_MS')
+            or _env_int_opt('FRBOT_FOREGROUND_RETRY_DELAY_MS')
+            or 150
+        )
+
+        last_fg = int(info.foreground_hwnd)
+        last_title = str(w32.get_window_text(int(last_fg)) or '') if int(last_fg) > 0 else ''
+
+        # Import locally to keep startup dependencies minimal.
+        from runtime.pacing import sleep_ms
+
+        for attempt in range(max(0, int(retries)) + 1):
             try:
-                w32.try_focus_window(int(hwnd), timeout_s=0.8)
+                fg_now = int(w32.get_foreground_window())
             except Exception:
-                pass
-            info2 = _collect_details(hwnd=int(hwnd), title_substring=str(title_substring))
-            if int(getattr(info2, 'foreground_hwnd', 0)) == int(hwnd):
-                info = info2
+                fg_now = 0
+            last_fg = int(fg_now)
+            last_title = str(w32.get_window_text(int(last_fg)) or '') if int(last_fg) > 0 else ''
+            if int(fg_now) == int(hwnd):
+                # Refresh info for downstream consumers.
+                info = _collect_details(hwnd=int(hwnd), title_substring=str(title_substring))
+                break
+            if attempt < int(retries):
+                sleep_ms(max(0.0, float(delay_ms)))
 
         if int(info.foreground_hwnd) != int(hwnd):
             pf = PreflightFailed('window_not_foreground')
@@ -323,10 +356,12 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
                 'reason': 'window_not_foreground',
                 'expected_foreground': 'TIBIA',
                 'window_hwnd': hex(int(hwnd)),
-                'foreground_hwnd': hex(int(info.foreground_hwnd)),
-                'foreground_title': str(w32.get_window_text(int(info.foreground_hwnd)) or '') if int(info.foreground_hwnd) > 0 else '',
+                'foreground_hwnd': hex(int(last_fg)),
+                'foreground_title': str(last_title),
                 'hint': 'Focus Tibia window and rerun',
-                'try_focus': bool(try_focus),
+                'try_focus': False,
+                'retries': int(retries),
+                'delay_ms': int(delay_ms),
             }
             setattr(pf, 'details', details_fg)
             if write_fatal_on_fail:

@@ -39,6 +39,7 @@ def execute_deposit_tick(
     input_: InputAdapter,
     binding: WindowBindingAdapter,
     tick_index: int,
+    gate: str = 'deposit',
 ) -> DepositTickOutcome:
     """Execute exactly one deposit tick.
 
@@ -66,8 +67,10 @@ def execute_deposit_tick(
             abort_reason='deposit_unreadable_state',
         )
 
+    gate_name = (str(gate or 'deposit') or 'deposit').strip().lower()
+
     before = capture.grab()
-    record_before('deposit', before)
+    record_before(gate_name, before)
 
     inv_before = read_inventory(before, inv_roi)
     if inv_before is None:
@@ -130,7 +133,7 @@ def execute_deposit_tick(
     ctx.deposit.attempts_used += 1
 
     after = capture.grab()
-    record_after('deposit', after)
+    record_after(gate_name, after)
 
     inv_after = read_inventory(after, inv_roi)
     if inv_after is None:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Tuple
 
 import pytest
 
@@ -16,12 +18,18 @@ class _DummyDet:
     pos: tuple[int, int]
 
 
-def _mk_ctx(tmp_path) -> RuntimeContext:
+@dataclass(frozen=True)
+class _VerifyResult:
+    ok: bool
+    reason: str = ''
+
+
+def _mk_ctx(tmp_path: Path) -> RuntimeContext:
     cfg = RuntimeConfig(
         mode='real',
         tick_hz=20.0,
-        config_path='',
-        bot_config_path='',
+        config_path=str(tmp_path / 'runtime_config.json'),
+        bot_config_path=str(tmp_path / 'bot_config.json'),
         enable_cavebot=False,
         minimap_roi='minimap',
         window_hwnd=0x222,
@@ -43,7 +51,7 @@ def _mk_ctx(tmp_path) -> RuntimeContext:
     )
 
 
-def test_obs_source_preflight_does_not_touch_projector(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_obs_source_preflight_does_not_touch_projector(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from runtime import preflight as preflight_mod
 
     monkeypatch.chdir(tmp_path)
@@ -67,8 +75,8 @@ def test_obs_source_preflight_does_not_touch_projector(monkeypatch: pytest.Monke
             self.hwnd = hwnd
             self.title_substring = title_substring
 
-        def verify(self):
-            return type('VR', (), {'ok': True, 'reason': ''})()
+        def verify(self) -> _VerifyResult:
+            return _VerifyResult(ok=True, reason='')
 
         def assert_bound(self) -> None:
             return None
@@ -82,8 +90,8 @@ def test_obs_source_preflight_does_not_touch_projector(monkeypatch: pytest.Monke
         def __init__(self, *, hwnd: int) -> None:
             self.hwnd = hwnd
 
-        def verify(self):
-            return type('VR', (), {'ok': True, 'reason': ''})()
+        def verify(self) -> _VerifyResult:
+            return _VerifyResult(ok=True, reason='')
 
     monkeypatch.setattr(preflight_mod, 'Win32HwndKeyboard', FakeInput, raising=True)
 
@@ -101,7 +109,7 @@ def test_obs_source_preflight_does_not_touch_projector(monkeypatch: pytest.Monke
     monkeypatch.setattr(preflight_mod, 'detect_player_marker', lambda *_a, **_k: _DummyDet(pos=(0, 0)), raising=True)
 
     # Force obs_source provider to be deterministic without OBS/WebSocket dependency.
-    def provider(_name: str, _w: int, _h: int):
+    def provider(_name: str, _w: int, _h: int) -> Tuple[bytes, int, int]:
         w, h = 4, 4
         rgb = bytearray(w * h * 3)
         for i in range(0, len(rgb), 3):
@@ -119,7 +127,7 @@ def test_obs_source_preflight_does_not_touch_projector(monkeypatch: pytest.Monke
     assert binding.verify().ok is True
 
 
-def test_obs_source_preflight_requires_frame_dimensions(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_obs_source_preflight_requires_frame_dimensions(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from runtime import preflight as preflight_mod
 
     monkeypatch.chdir(tmp_path)
@@ -136,8 +144,8 @@ def test_obs_source_preflight_requires_frame_dimensions(monkeypatch: pytest.Monk
             self.hwnd = hwnd
             self.title_substring = title_substring
 
-        def verify(self):
-            return type('VR', (), {'ok': True, 'reason': ''})()
+        def verify(self) -> _VerifyResult:
+            return _VerifyResult(ok=True, reason='')
 
         def assert_bound(self) -> None:
             return None
@@ -151,8 +159,8 @@ def test_obs_source_preflight_requires_frame_dimensions(monkeypatch: pytest.Monk
         def __init__(self, *, hwnd: int) -> None:
             self.hwnd = hwnd
 
-        def verify(self):
-            return type('VR', (), {'ok': True, 'reason': ''})()
+        def verify(self) -> _VerifyResult:
+            return _VerifyResult(ok=True, reason='')
 
     monkeypatch.setattr(preflight_mod, 'Win32HwndKeyboard', FakeInput, raising=True)
 
