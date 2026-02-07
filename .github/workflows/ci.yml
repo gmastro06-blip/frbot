@@ -63,8 +63,28 @@ jobs:
       - name: Pytest
         env:
           FRBOT_MODE: mock
+        shell: bash
         run: |
-          python -m pytest -q
+          set -euo pipefail
+          python -m pytest -q 2>&1 | tee pytest.log
+
+      - name: Pytest failure (annotate)
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f pytest.log ]; then
+            tail -n 200 pytest.log | python - <<'PY'
+import sys
+
+text = sys.stdin.read()
+text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+
+# GitHub annotations are single-line; embed newlines with %0A.
+print(f"::error::pytest failed (tail -n 200).%0A{text}")
+PY
+          else
+            echo "::error::pytest failed and pytest.log was missing"
+          fi
 
   audit-mock:
     runs-on: ubuntu-latest
