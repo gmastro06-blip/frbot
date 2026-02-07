@@ -91,11 +91,13 @@ def run_targeting_only() -> int:
     max_total_ticks = cap_ticks(_env_int('FRBOT_TARGETING_MAX_TICKS', 30))
 
     try:
-        if sys.platform != 'win32':
+        cfg = _load_targeting_config_from_env()
+
+        # Mock backend is used in CI on Linux; only REAL runs are Windows-only.
+        if cfg.mode.strip().lower() == 'real' and sys.platform != 'win32':
             write_fatal('unsupported_platform', details={'platform': str(sys.platform)})
             return 1
 
-        cfg = _load_targeting_config_from_env()
         ctx = RuntimeContext(
             config=cfg,
             status=RuntimeStatus(state=RuntimeState.INIT),

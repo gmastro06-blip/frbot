@@ -91,11 +91,13 @@ def run_combat_basic_only() -> int:
     """
 
     try:
-        if sys.platform != 'win32':
+        cfg = _load_config_from_env()
+
+        # Mock backend is used in CI on Linux; only REAL runs are Windows-only.
+        if cfg.mode.strip().lower() == 'real' and sys.platform != 'win32':
             write_fatal('unsupported_platform', details={'platform': str(sys.platform)})
             return 1
 
-        cfg = _load_config_from_env()
         ctx = RuntimeContext(config=cfg, status=RuntimeStatus(state=RuntimeState.INIT), telemetry=RuntimeTelemetry())
 
         # Gate preflight must run before runtime.log.
