@@ -526,7 +526,14 @@ def _run_input_contract_gate(*, gate: str, out_dir: Path) -> None:
 
 
 def main() -> int:
-    gates: dict[str, str] = {"capture": "FAIL", "targeting": "FAIL", "healing": "FAIL", "combat_basic": "SKIP", "looting_basic": "FAIL", "cavebot": "FAIL"}
+    gates: dict[str, str] = {
+        "capture": "FAIL",
+        "targeting": "FAIL",
+        "healing": "FAIL",
+        "combat_basic": "FAIL",
+        "looting_basic": "FAIL",
+        "cavebot": "FAIL",
+    }
 
     _rotate_fatal_log()
 

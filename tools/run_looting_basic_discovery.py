@@ -315,14 +315,18 @@ def main() -> int:
     # Ensure evidence dumps are enabled.
     os.environ.setdefault("FRBOT_DUMP_FRAMES", "1")
 
-    # Mandatory REAL/prod_emergency constraints.
-    os.environ.setdefault("FRBOT_PROFILE", "prod_emergency")
+    # Discovery is intended to find a working clickpoint for click-based gestures
+    # (e.g. Shift+RMB). In prod_emergency, looting_basic forces Alt+Q and ignores
+    # ClickXY, which makes clickpoint discovery meaningless. So:
+    # - Discovery defaults to a non-prod profile.
+    # - If --certify is requested, the final certified run switches to prod_emergency.
+    os.environ.setdefault("FRBOT_PROFILE", "dev")
     os.environ.setdefault("FRBOT_MODE", "real")
     os.environ.setdefault("FRBOT_CAPTURE_SOURCE", "obs_source")
     if args.obs_source:
         os.environ["FRBOT_OBS_SOURCE_NAME"] = str(args.obs_source)
 
-    # Certified gesture contract required by preflight in prod_emergency.
+    # Discovery gesture (click-based).
     os.environ.setdefault("FRBOT_TIBIA_LOOT_GESTURE", "shift_rmb")
 
     # IMPORTANT: discovery points are typically expressed in capture-frame space.
@@ -481,6 +485,9 @@ def main() -> int:
         return 0
 
     # Certified run: exactly one input, in its own evidence dir.
+    os.environ["FRBOT_PROFILE"] = "prod_emergency"
+    # For clarity: prod_emergency forces Alt+Q anyway.
+    os.environ["FRBOT_TIBIA_LOOT_GESTURE"] = "alt_q"
     certified_dir = root / f"certified_{int(winner[0])}_{int(winner[1])}"
     cert = _run_once(ctx=ctx, cap=cap, inp=inp, binding=binding, x=int(winner[0]), y=int(winner[1]), frames_dir=certified_dir)
     (root / "certified_result.json").write_text(json.dumps(cert, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

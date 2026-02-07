@@ -32,9 +32,11 @@ Enabled (only if REAL evidence passes):
 Hard-disabled in `FRBOT_PROFILE=prod_emergency`:
 
 - Combat loop automatic
-- Looting
+- Looting loop automatic
 - Deposit
 - Trade
+
+Note: the isolated single-intent gates `combat_basic` and `looting_basic` are allowed in PROD-EMERGENCY (evidence-or-abort), even though the full-loop modes above are hard-disabled.
 
 Additionally, these feature modes are not runnable in PROD-EMERGENCY (hard abort with `feature_disabled`):
 
@@ -61,7 +63,8 @@ Emergency guardrails applied:
 
 - `minimap`
 - `battle_list`
-- `hp_text`
+- `target_frame`
+- `hp_mp`
 
 If your capture resolution/layout differs, recalibrate and regenerate a matching runtime ROI config.
 
