@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import json
 import sys
 import time
@@ -26,7 +27,6 @@ def _try_import_win32() -> tuple[Any, Any]:
     if sys.platform != 'win32':
         return None, None
     try:
-        import ctypes
         import ctypes.wintypes as wintypes
         return ctypes, wintypes
     except Exception:
@@ -98,7 +98,7 @@ def _get_cursor_pos() -> Point | None:
 
     user32 = ctypes_module.windll.user32
 
-    class _POINT(ctypes_module.Structure):  # type: ignore[misc]
+    class _POINT(ctypes.Structure):
         _fields_ = [("x", wintypes_module.LONG), ("y", wintypes_module.LONG)]
 
     pt = _POINT()
@@ -115,7 +115,7 @@ def _screen_to_client(hwnd: int, pt: Point) -> Point | None:
 
     user32 = ctypes_module.windll.user32
 
-    class _POINT(ctypes_module.Structure):  # type: ignore[misc]
+    class _POINT(ctypes.Structure):
         _fields_ = [("x", wintypes_module.LONG), ("y", wintypes_module.LONG)]
 
     cpt = _POINT(int(pt.x), int(pt.y))
@@ -132,7 +132,7 @@ def _get_client_size(hwnd: int) -> tuple[int, int] | None:
 
     user32 = ctypes_module.windll.user32
 
-    class _RECT(ctypes_module.Structure):  # type: ignore[misc]
+    class _RECT(ctypes.Structure):
         _fields_ = [("left", wintypes_module.LONG), ("top", wintypes_module.LONG), ("right", wintypes_module.LONG), ("bottom", wintypes_module.LONG)]
 
     r = _RECT()

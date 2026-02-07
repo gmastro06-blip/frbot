@@ -4,7 +4,7 @@ import ctypes
 import os
 import time
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from contracts.window import WindowRect
 
@@ -158,13 +158,17 @@ class WindowDiagnosticInfo:
     z_order: int
 
 
-EnumWindowsProc = None
+# Keep EnumWindowsProc callable for typing even on non-Windows.
+# On Windows it's a ctypes callback factory; elsewhere it's a no-op wrapper.
+EnumWindowsProc: Any
 if _IS_WINDOWS and user32 is not None and wintypes is not None and hasattr(ctypes, 'WINFUNCTYPE'):
     EnumWindowsProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
     # Ensure EnumWindows signature is known to ctypes.
     user32.EnumWindows.argtypes = [EnumWindowsProc, wintypes.LPARAM]
     user32.EnumWindows.restype = wintypes.BOOL
+else:  # pragma: no cover
+    EnumWindowsProc = lambda cb: cb
 
 
 def _require_windows() -> ctypes.WinDLL:

@@ -52,11 +52,13 @@ else:  # pragma: no cover
 # Keep it import-safe cross-platform by never loading Win32 DLLs at import time
 # unless running on Windows.
 try:
-    user32 = ctypes.WinDLL('user32', use_last_error=True) if _IS_WINDOWS else None
-    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True) if _IS_WINDOWS else None
+    # NOTE: `Any` is intentional: on non-Windows we keep these as None, but mypy
+    # should not treat every call site as Optional.
+    user32 = cast(Any, ctypes.WinDLL('user32', use_last_error=True) if _IS_WINDOWS else None)
+    kernel32 = cast(Any, ctypes.WinDLL('kernel32', use_last_error=True) if _IS_WINDOWS else None)
 except Exception:
-    user32 = None
-    kernel32 = None
+    user32 = cast(Any, None)
+    kernel32 = cast(Any, None)
 
 # Ensure the process is DPI-aware as early as possible.
 # Without this, Win32 APIs like ClientToScreen may return scaled (virtual)
