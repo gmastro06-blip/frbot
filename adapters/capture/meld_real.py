@@ -518,6 +518,8 @@ class MeldBoundWindowRealCapture(CaptureAdapter):
         except PreflightFailed:
             raise
         except Exception as exc:
+            if isinstance(exc, RuntimeError) and 'win32_unavailable' in str(exc):
+                return VerificationResult(ok=False, reason='capture_black_or_unavailable')
             return VerificationResult(ok=False, reason=f'capture verify failed: {type(exc).__name__}: {exc}')
 
     def grab(self) -> Frame:
