@@ -73,15 +73,7 @@ jobs:
         shell: bash
         run: |
           if [ -f pytest.log ]; then
-            tail -n 200 pytest.log | python - <<'PY'
-import sys
-
-text = sys.stdin.read()
-text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-
-# GitHub annotations are single-line; embed newlines with %0A.
-print(f"::error::pytest failed (tail -n 200).%0A{text}")
-PY
+            tail -n 200 pytest.log | python -c 'import sys; text=sys.stdin.read(); text=text.replace("%","%25").replace("\r","%0D").replace("\n","%0A"); print(f"::error::pytest failed (tail -n 200).%0A{text}")'
           else
             echo "::error::pytest failed and pytest.log was missing"
           fi
