@@ -56,6 +56,9 @@ def test_obs_source_preflight_does_not_touch_projector(monkeypatch: pytest.Monke
 
     monkeypatch.chdir(tmp_path)
 
+    # Keep this unit test deterministic across CI platforms.
+    monkeypatch.setattr(preflight_mod.os, 'name', 'nt', raising=False)
+
     monkeypatch.setenv('FRBOT_PROFILE', 'prod_emergency')
     monkeypatch.setenv('FRBOT_MODE', 'real')
     monkeypatch.setenv('FRBOT_CAPTURE_SOURCE', 'obs_source')
@@ -131,6 +134,9 @@ def test_obs_source_preflight_requires_frame_dimensions(monkeypatch: pytest.Monk
     from runtime import preflight as preflight_mod
 
     monkeypatch.chdir(tmp_path)
+
+    # Keep this unit test deterministic across CI platforms.
+    monkeypatch.setattr(preflight_mod.os, 'name', 'nt', raising=False)
 
     monkeypatch.setenv('FRBOT_PROFILE', 'prod_emergency')
     monkeypatch.setenv('FRBOT_MODE', 'real')
