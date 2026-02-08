@@ -75,6 +75,39 @@ def _write_obs_source_manifest(frames_dir: Path, *, obs_source_name: str) -> Non
 	(frames_dir / "evidence_manifest.json").write_text(json.dumps(data), encoding="utf-8")
 
 
+def _write_client_manifest(frames_dir: Path) -> None:
+	(frames_dir / "evidence_manifest.json").write_text(json.dumps({"capture_source": "client"}), encoding="utf-8")
+
+
+def _write_runtime_log_locked_after(tmp_path: Path) -> None:
+	# evidence_inventory looks for runtime.log next to frames/.
+	(tmp_path / "runtime.log").write_text(
+		json.dumps({"event": "tick", "gate": "combat_basic", "abort_reason": "none", "locked_after": True}) + "\n",
+		encoding="utf-8",
+	)
+
+
+def _write_last_result_ok(
+	frames_dir: Path,
+	*,
+	gate: str,
+	before_ppm: str,
+	after_ppm: str,
+	extra: dict | None = None,
+) -> None:
+	payload: dict = {
+		"gate": str(gate),
+		"ok": True,
+		"outcome_kind": "ok",
+		"inputs_sent": 1,
+		"before_ppm": str(before_ppm),
+		"after_ppm": str(after_ppm),
+	}
+	if extra:
+		payload.update(dict(extra))
+	(frames_dir / f"{gate}_last_result.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
 def test_prod_full_real_mode_partial_gate_evidence_stops_unverified(tmp_path: Path) -> None:
 	repo_root = Path(__file__).resolve().parents[1]
 	frames_dir = tmp_path / "frames"
@@ -84,6 +117,15 @@ def test_prod_full_real_mode_partial_gate_evidence_stops_unverified(tmp_path: Pa
 	stamp = "20260201-000000"
 	_write_ppm_checker(frames_dir / f"combat_basic_{stamp}_idle_before.ppm")
 	_write_ppm_checker(frames_dir / f"combat_basic_{stamp}_idle_after.ppm")
+	_write_client_manifest(frames_dir)
+	_write_runtime_log_locked_after(tmp_path)
+
+	_write_last_result_ok(
+		frames_dir,
+		gate="combat_basic",
+		before_ppm=f"combat_basic_{stamp}_idle_before.ppm",
+		after_ppm=f"combat_basic_{stamp}_idle_after.ppm",
+	)
 
 	proc = _run_audit(repo_root, frames_dir=frames_dir, config_path=config_path)
 	assert proc.returncode != 0
@@ -105,18 +147,46 @@ def test_prod_full_real_mode_operational_real_with_minimal_evidence(tmp_path: Pa
 	# Idle pair also counts as combat_basic evidence.
 	_write_ppm_checker(frames_dir / f"combat_basic_{stamp0}_idle_before.ppm")
 	_write_ppm_checker(frames_dir / f"combat_basic_{stamp0}_idle_after.ppm")
+	_write_client_manifest(frames_dir)
+	_write_runtime_log_locked_after(tmp_path)
+	_write_last_result_ok(
+		frames_dir,
+		gate="combat_basic",
+		before_ppm=f"combat_basic_{stamp0}_idle_before.ppm",
+		after_ppm=f"combat_basic_{stamp0}_idle_after.ppm",
+	)
 
 	stamp1 = "20260201-000100"
 	_write_ppm_checker(frames_dir / f"looting_full_{stamp1}_tick_before.ppm")
 	_write_ppm_checker(frames_dir / f"looting_full_{stamp1}_tick_after.ppm")
+	_write_last_result_ok(
+		frames_dir,
+		gate="looting_full",
+		before_ppm=f"looting_full_{stamp1}_tick_before.ppm",
+		after_ppm=f"looting_full_{stamp1}_tick_after.ppm",
+		extra={"actions_sent": 1, "successes": 1, "evidence_reason": "inventory_delta"},
+	)
 
 	stamp2 = "20260201-000200"
 	_write_ppm_checker(frames_dir / f"deposit_full_{stamp2}_tick_before.ppm")
 	_write_ppm_checker(frames_dir / f"deposit_full_{stamp2}_tick_after.ppm")
+	_write_last_result_ok(
+		frames_dir,
+		gate="deposit_full",
+		before_ppm=f"deposit_full_{stamp2}_tick_before.ppm",
+		after_ppm=f"deposit_full_{stamp2}_tick_after.ppm",
+	)
 
 	stamp3 = "20260201-000300"
 	_write_ppm_checker(frames_dir / f"trade_full_{stamp3}_tick_before.ppm")
 	_write_ppm_checker(frames_dir / f"trade_full_{stamp3}_tick_after.ppm")
+	_write_last_result_ok(
+		frames_dir,
+		gate="trade_full",
+		before_ppm=f"trade_full_{stamp3}_tick_before.ppm",
+		after_ppm=f"trade_full_{stamp3}_tick_after.ppm",
+		extra={"intent_type": "buy"},
+	)
 
 	proc = _run_audit(repo_root, frames_dir=frames_dir, config_path=config_path)
 	combined = (proc.stdout or "") + (proc.stderr or "")
@@ -133,6 +203,13 @@ def test_prod_full_real_mode_blocks_without_obs_source_manifest_when_required(tm
 	stamp0 = "20260201-000000"
 	_write_ppm_checker(frames_dir / f"combat_basic_{stamp0}_idle_before.ppm")
 	_write_ppm_checker(frames_dir / f"combat_basic_{stamp0}_idle_after.ppm")
+	_write_runtime_log_locked_after(tmp_path)
+	_write_last_result_ok(
+		frames_dir,
+		gate="combat_basic",
+		before_ppm=f"combat_basic_{stamp0}_idle_before.ppm",
+		after_ppm=f"combat_basic_{stamp0}_idle_after.ppm",
+	)
 
 	# Require OBS source identity without providing manifest.
 	monkeypatch.setenv("FRBOT_CAPTURE_SOURCE", "obs_source")
@@ -166,18 +243,45 @@ def test_prod_full_real_mode_operational_real_with_obs_source_manifest(tmp_path:
 	stamp0 = "20260201-000000"
 	_write_ppm_checker(frames_dir / f"combat_basic_{stamp0}_idle_before.ppm")
 	_write_ppm_checker(frames_dir / f"combat_basic_{stamp0}_idle_after.ppm")
+	_write_runtime_log_locked_after(tmp_path)
+	_write_last_result_ok(
+		frames_dir,
+		gate="combat_basic",
+		before_ppm=f"combat_basic_{stamp0}_idle_before.ppm",
+		after_ppm=f"combat_basic_{stamp0}_idle_after.ppm",
+	)
 
 	stamp1 = "20260201-000100"
 	_write_ppm_checker(frames_dir / f"looting_full_{stamp1}_tick_before.ppm")
 	_write_ppm_checker(frames_dir / f"looting_full_{stamp1}_tick_after.ppm")
+	_write_last_result_ok(
+		frames_dir,
+		gate="looting_full",
+		before_ppm=f"looting_full_{stamp1}_tick_before.ppm",
+		after_ppm=f"looting_full_{stamp1}_tick_after.ppm",
+		extra={"actions_sent": 1, "successes": 1, "evidence_reason": "inventory_delta"},
+	)
 
 	stamp2 = "20260201-000200"
 	_write_ppm_checker(frames_dir / f"deposit_full_{stamp2}_tick_before.ppm")
 	_write_ppm_checker(frames_dir / f"deposit_full_{stamp2}_tick_after.ppm")
+	_write_last_result_ok(
+		frames_dir,
+		gate="deposit_full",
+		before_ppm=f"deposit_full_{stamp2}_tick_before.ppm",
+		after_ppm=f"deposit_full_{stamp2}_tick_after.ppm",
+	)
 
 	stamp3 = "20260201-000300"
 	_write_ppm_checker(frames_dir / f"trade_full_{stamp3}_tick_before.ppm")
 	_write_ppm_checker(frames_dir / f"trade_full_{stamp3}_tick_after.ppm")
+	_write_last_result_ok(
+		frames_dir,
+		gate="trade_full",
+		before_ppm=f"trade_full_{stamp3}_tick_before.ppm",
+		after_ppm=f"trade_full_{stamp3}_tick_after.ppm",
+		extra={"intent_type": "buy"},
+	)
 
 	_write_obs_source_manifest(frames_dir, obs_source_name="Tibia_Fuente")
 

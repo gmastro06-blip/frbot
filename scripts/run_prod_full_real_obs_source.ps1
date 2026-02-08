@@ -155,6 +155,11 @@ try {
     if (-not $env:FRBOT_DUMP_FRAMES) { $env:FRBOT_DUMP_FRAMES = "1" }
   }
 
+  # Operational robustness: give operator a short window to focus Tibia
+  # after starting the script (no focus stealing; guards just wait).
+  if (-not $env:FRBOT_FOREGROUND_RETRIES) { $env:FRBOT_FOREGROUND_RETRIES = "40" }
+  if (-not $env:FRBOT_FOREGROUND_DELAY_MS) { $env:FRBOT_FOREGROUND_DELAY_MS = "150" }
+
   # ----------------
   # 1) Precheck (no gate execution)
   # ----------------
@@ -166,6 +171,9 @@ try {
     "-c",
     @'
 import os
+import json
+import time
+from pathlib import Path
 from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
 from runtime.config_loader import load_rois
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
@@ -177,6 +185,20 @@ enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=True)
 cfg = RuntimeConfig(mode="real", config_path=os.environ.get("FRBOT_CONFIG_PATH",""))
 ctx = RuntimeContext(config=cfg, status=RuntimeStatus(state=RuntimeState.INIT), telemetry=RuntimeTelemetry())
 load_rois(ctx)
+
+# Always record capture identity into the evidence directory.
+frames_dir = Path(os.environ.get("FRBOT_REAL_FRAMES_DIR", "") or ".")
+try:
+  frames_dir.mkdir(parents=True, exist_ok=True)
+  payload = {
+    "capture_source": ("obs_source" if (os.environ.get("FRBOT_CAPTURE_SOURCE", "") or "").strip().lower() == "obs_source" else "client"),
+    "obs_source_name": str((os.environ.get("FRBOT_OBS_SOURCE_NAME", "") or "").strip()),
+    "obs_projector_title": str((os.environ.get("FRBOT_OBS_PROJECTOR_TITLE", "") or "").strip()),
+    "ts": int(time.time()),
+  }
+  (frames_dir / "evidence_manifest.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+except Exception:
+  pass
 print("PRECHECK_OK")
 '@
   ) -OutPath $preOut

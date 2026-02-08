@@ -72,7 +72,7 @@ def _write_evidence_manifest(*, evidence_dir: Path, capture: object) -> None:
         src = (_env_str('FRBOT_CAPTURE_SOURCE', 'client') or 'client').strip().lower()
         payload = {
             'capture_source': ('obs_source' if src == 'obs_source' else ('obs' if src == 'obs' else 'client')),
-            'obs_source_name': str(getattr(capture, 'obs_source_name', '') or ''),
+            'obs_source_name': str(getattr(capture, 'obs_source_name', '') or _env_str('FRBOT_OBS_SOURCE_NAME', '') or ''),
             'obs_projector_title': str(_env_str('FRBOT_OBS_PROJECTOR_TITLE', '') or ''),
             'ts': int(time.time()),
         }

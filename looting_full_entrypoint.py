@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from contracts.errors import ContractViolation, PreflightFailed
@@ -64,6 +65,24 @@ def _append_trace(*, gate: str, payload: dict) -> None:
         path = out_dir / f'{str(gate).strip().lower()}_trace.jsonl'
         with path.open('a', encoding='utf-8') as f:
             f.write(json.dumps(payload, sort_keys=True) + '\n')
+    except Exception:
+        return
+
+
+def _write_evidence_manifest(*, evidence_dir: Path, capture: object) -> None:
+    try:
+        src = (_env_str('FRBOT_CAPTURE_SOURCE', 'client') or 'client').strip().lower()
+        payload = {
+            'capture_source': ('obs_source' if src == 'obs_source' else ('obs' if src == 'obs' else 'client')),
+            'obs_source_name': str(getattr(capture, 'obs_source_name', '') or _env_str('FRBOT_OBS_SOURCE_NAME', '') or ''),
+            'obs_projector_title': str(_env_str('FRBOT_OBS_PROJECTOR_TITLE', '') or ''),
+            'ts': int(time.time()),
+        }
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        (evidence_dir / 'evidence_manifest.json').write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding='utf-8',
+        )
     except Exception:
         return
 
@@ -170,6 +189,9 @@ def run_looting_full_only() -> int:
 
         capture, input_, binding = looting_full_preflight_run(ctx)
 
+        evidence_dir = _frames_dir()
+        _write_evidence_manifest(evidence_dir=evidence_dir, capture=capture)
+
         logger = configure_logger()
         ctx.status.state = RuntimeState.RUNNING
 
@@ -189,7 +211,6 @@ def run_looting_full_only() -> int:
         for att in outcome.attempts:
             _append_trace(gate='looting_full', payload={'event': 'attempt', 'gate': 'looting_full', **dict(att)})
 
-        evidence_dir = _frames_dir()
         before_ppm, after_ppm, evidence_reason = _latest_success_pair(evidence_dir)
 
         profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()

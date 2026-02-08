@@ -459,12 +459,67 @@ def collect_evidence_inventory(frames_dir: Path, config_path: Path | None) -> Ev
 
     # PROD-EMERGENCY special rule: combat_basic must be proven via runtime.log locked_after=true.
     profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
-    if profile == 'prod_emergency':
+    if profile in {'prod_emergency', 'prod_full'}:
         st = per_gate_status.get('combat_basic')
         if st == 'PASS':
             if not _combat_basic_locked_after_ok(frames_dir=frames_dir):
                 per_gate_status['combat_basic'] = 'UNVERIFIED'
                 missing.append('combat_basic_locked_after_missing')
+
+    def _require_last_result_ok(*, gate: str) -> None:
+        st = per_gate_status.get(gate)
+        if st not in {'PASS'}:
+            return
+        lp = frames_dir / f'{gate}_last_result.json'
+        if not lp.exists():
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_last_result_missing')
+            return
+        try:
+            data = json.loads(lp.read_text(encoding='utf-8', errors='replace'))
+        except Exception as exc:
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_last_result_unreadable:{type(exc).__name__}')
+            return
+        if not isinstance(data, dict):
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_last_result_invalid_shape')
+            return
+        if bool(data.get('ok', False)) is not True:
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_semantic_fail')
+            return
+
+        # Ensure the meta points to concrete evidence artifacts.
+        bp = str(data.get('before_ppm', '') or '').strip()
+        ap = str(data.get('after_ppm', '') or '').strip()
+        if not bp or not ap:
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_last_result_missing_ppm_ptrs')
+            return
+        if not (frames_dir / bp).exists() or not (frames_dir / ap).exists():
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_last_result_ppm_ptrs_missing')
+            return
+
+        # Gate-specific semantic expectations.
+        if gate == 'looting_full':
+            try:
+                successes = int(data.get('successes', 0) or 0)
+            except Exception:
+                successes = 0
+            if successes <= 0:
+                per_gate_status[gate] = 'UNVERIFIED'
+                missing.append('looting_full_no_semantic_success')
+
+    if profile == 'prod_full':
+        # In prod_full REAL, operational evidence requires a manifest and per-gate meta.
+        mp = frames_dir / 'evidence_manifest.json'
+        if not mp.exists():
+            missing.append('evidence_manifest_missing')
+
+        for g in ('combat_basic', 'looting_full', 'deposit_full', 'trade_full'):
+            _require_last_result_ok(gate=str(g))
 
     # Cavebot certification: require semantic trace (series + reached event).
     cavebot_status = per_gate_status.get('cavebot')
@@ -479,6 +534,7 @@ def collect_evidence_inventory(frames_dir: Path, config_path: Path | None) -> Ev
         'config_path': (str(config_path) if config_path is not None else ''),
         'unparsed_ppm': int(unparsed),
         'missing_rois': missing_rois,
+        'missing_preconditions': list(missing),
         'per_gate': {
             g: {
                 'before_full': int(details[g].before_full),
