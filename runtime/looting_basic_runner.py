@@ -41,6 +41,8 @@ def _frames_dir_for_looting_evidence() -> str:
     profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
     if profile == 'prod_emergency':
         return str(Path('diagnostics') / 'frames_emergency')
+    if profile == 'prod_full':
+        return str(Path('diagnostics') / 'frames_full')
     return str(Path('diagnostics') / 'frames')
 
 
@@ -55,7 +57,7 @@ def _try_dump_looting_pair(
         from diagnostics.frame_dump import dump_enabled, dump_pair
 
         profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
-        if profile != 'prod_emergency' and not dump_enabled():
+        if profile not in {'prod_emergency', 'prod_full'} and not dump_enabled():
             return (None, None)
 
         g = (gate or 'looting_basic').strip().lower() or 'looting_basic'

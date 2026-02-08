@@ -130,10 +130,13 @@ _GATES = (
     'combat_basic',
     'cavebot',
     'looting_basic',
+    'looting_full',
     'combat',
     'looting',
     'deposit',
     'trade',
+    'deposit_full',
+    'trade_full',
 )
 
 
@@ -181,7 +184,7 @@ def _env_str(name: str, default: str) -> str:
 def _roi_names_for_gate(gate: str) -> tuple[str, ...]:
     # ROI-name requirements per gate, aligned to runtime env defaults.
     profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
-    if profile == 'prod_emergency':
+    if profile in {'prod_emergency', 'prod_full'}:
         if gate == 'targeting':
             # Targeting evidence requires both battle list and target frame.
             return (
@@ -199,6 +202,19 @@ def _roi_names_for_gate(gate: str) -> tuple[str, ...]:
             return (_env_str('FRBOT_TARGET_FRAME_ROI', 'target_frame'),)
         if gate == 'looting_basic':
             return (_env_str('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text'),)
+        if gate == 'looting_full':
+            return (_env_str('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text'),)
+        if gate == 'deposit_full':
+            return (
+                _env_str('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text'),
+                _env_str('FRBOT_DEPOT_CONTAINER_ROI', 'depot_container'),
+            )
+        if gate == 'trade_full':
+            return (
+                _env_str('FRBOT_TRADE_INVENTORY_ROI', 'trade_inventory'),
+                _env_str('FRBOT_TRADE_NPC_ROI', 'trade_npc'),
+                _env_str('FRBOT_TRADE_ACTION_ROI', 'trade_action'),
+            )
 
     if gate == 'targeting':
         return (

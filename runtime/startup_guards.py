@@ -13,8 +13,8 @@ from diagnostics.fatal import write_fatal
 from runtime.env import parse_window_hwnd_env
 
 
-_PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE: bool = False
-_PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED: bool = False
+_PROD_PROFILE_REAL_GUARDS_PASSED_ONCE: bool = False
+_PROD_PROFILE_REAL_HWND_SELF_HEAL_USED: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,11 +112,11 @@ def _write_window_diagnostics_json(*, expected_title: str, resolved_hwnd: int, r
 
 
 def _ensure_trace_initialized() -> None:
-    # PROD-EMERGENCY REAL requires trace to exist even if we hard-stop in startup guards.
+    # PROD profiles REAL requires trace to exist even if we hard-stop in startup guards.
     try:
-        if _profile() != 'prod_emergency' or _mode() != 'real':
+        if _profile() not in {'prod_emergency', 'prod_full'} or _mode() != 'real':
             return
-        frames_dir = Path('diagnostics') / 'frames_emergency'
+        frames_dir = Path('diagnostics') / ('frames_emergency' if _profile() == 'prod_emergency' else 'frames_full')
         frames_dir.mkdir(parents=True, exist_ok=True)
         p = frames_dir / 'cavebot_trace.jsonl'
         if not p.exists():
@@ -179,7 +179,7 @@ def _collect_details(*, hwnd: int, title_substring: str) -> StartupGuardDetails:
 
 
 def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> None:
-    """Enforce non-negotiable startup guards for PROD-EMERGENCY REAL.
+    """Enforce non-negotiable startup guards for PROD profiles REAL.
 
     Requirements:
     - Windows-only
@@ -192,17 +192,17 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
     - No focus stealing: we never attempt to activate/focus a window
     """
 
-    global _PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE
-    global _PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED
+    global _PROD_PROFILE_REAL_GUARDS_PASSED_ONCE
+    global _PROD_PROFILE_REAL_HWND_SELF_HEAL_USED
 
     _ensure_trace_initialized()
 
-    if _profile() != 'prod_emergency':
+    if _profile() not in {'prod_emergency', 'prod_full'}:
         return
 
     # Contract: foreground is verified at startup only (never during runtime).
     # Multiple preflight entrypoints may call this; make it idempotent per-process.
-    if bool(_PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE):
+    if bool(_PROD_PROFILE_REAL_GUARDS_PASSED_ONCE):
         return
 
     if sys.platform != 'win32':
@@ -212,11 +212,11 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         raise exc
 
     # Allow running independent gates via main.py routing.
-    if _mode() not in {'real', 'combat_basic', 'looting_basic', 'looting_full', 'deposit_basic', 'trade_basic', 'targeting', 'healing', 'cavebot'}:
+    if _mode() not in {'real', 'prod_full', 'combat_basic', 'looting_basic', 'looting_full', 'deposit_basic', 'trade_basic', 'deposit_full', 'trade_full', 'targeting', 'healing', 'cavebot'}:
         exc = PreflightFailed('invalid_mode')
         details: dict[str, object] = {
             'mode': _mode(),
-            'required': ['real', 'combat_basic', 'looting_basic', 'looting_full', 'deposit_basic', 'trade_basic', 'targeting', 'healing', 'cavebot'],
+            'required': ['real', 'prod_full', 'combat_basic', 'looting_basic', 'looting_full', 'deposit_basic', 'trade_basic', 'deposit_full', 'trade_full', 'targeting', 'healing', 'cavebot'],
         }
         setattr(exc, 'details', details)
         if write_fatal_on_fail:
@@ -262,8 +262,8 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         hwnd, resolved_title = _resolve_hwnd_by_title(str(title_substring))
 
     # One-time self-heal: if invalid, re-enumerate and retry resolve once.
-    if (hwnd <= 0) and title_substring and (not _PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED):
-        _PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED = True
+    if (hwnd <= 0) and title_substring and (not _PROD_PROFILE_REAL_HWND_SELF_HEAL_USED):
+        _PROD_PROFILE_REAL_HWND_SELF_HEAL_USED = True
         hwnd2, resolved_title2 = _resolve_hwnd_by_title(str(title_substring))
         if int(hwnd2) > 0:
             hwnd = int(hwnd2)
@@ -378,10 +378,10 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
             if write_fatal_on_fail:
                 write_fatal('obs_source_not_found', pf, details=details)
             raise pf
-        _PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE = True
+        _PROD_PROFILE_REAL_GUARDS_PASSED_ONCE = True
         return
 
-    # PROD-EMERGENCY: legacy projector mode is disabled (capture must be OBS source identity).
+    # PROD profiles: legacy projector mode is disabled (capture must be OBS source identity).
     if _capture_source() == 'obs':
         pf = PreflightFailed('capture_source_invalid')
         details = {

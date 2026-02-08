@@ -34,15 +34,32 @@ def _allowed_prod_emergency_extra_rois() -> set[str]:
     }
 
 
-def validate_prod_emergency_real_rois_in_bounds(*, rois: dict[str, Roi], frame: Frame) -> None:
-    """Validate the strict prod_emergency REAL ROI contract.
+def _allowed_prod_full_extra_rois() -> set[str]:
+    # Keep this set explicit and auditable.
+    return {
+        'target_hp_bar',
+        'combat_cooldown',
+        'combat_feedback',
+        'chat_loot_area',
+        'inventory_text',
+        'loot_corpse',
+        'depot_container',
+        'trade_inventory',
+        'trade_npc',
+        'trade_action',
+    }
 
-    - Requires exactly the fixed ROI names (already enforced by config_loader, but rechecked here)
-    - Requires each ROI to be within the captured frame bounds
+
+def validate_prod_emergency_real_rois_in_bounds(*, rois: dict[str, Roi], frame: Frame) -> None:
+    """Validate the strict PROD profile REAL ROI contract.
+
+    Applies to:
+    - prod_emergency
+    - prod_full
     """
 
     profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
-    if profile != 'prod_emergency':
+    if profile not in {'prod_emergency', 'prod_full'}:
         return
 
     expected = set(_PROD_EMERGENCY_REQUIRED_ROIS)
@@ -51,7 +68,8 @@ def validate_prod_emergency_real_rois_in_bounds(*, rois: dict[str, Roi], frame: 
     if not expected.issubset(keys):
         raise PreflightFailed('config_invalid_schema')
 
-    allowed = set(expected) | _allowed_prod_emergency_extra_rois()
+    allowed_extra = _allowed_prod_emergency_extra_rois() if profile == 'prod_emergency' else _allowed_prod_full_extra_rois()
+    allowed = set(expected) | set(allowed_extra)
 
     if not keys.issubset(allowed):
         raise PreflightFailed('config_invalid_schema')

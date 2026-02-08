@@ -224,7 +224,7 @@ Recommended runner (REAL + OBS source identity):
 
 Artifacts:
 
-- `diagnostics/frames/` (before/after + click overlay)
+- `diagnostics/frames_emergency/` (before/after + click overlay)
 - `diagnostics/roi_overlays/`, `diagnostics/roi_crops/`, `diagnostics/diff_overlays/`
 - `diagnostics/runtime.log` (JSONL, includes `action` + `click_xy` for correlation)
 
@@ -265,7 +265,7 @@ Prerequisites for PASS (REAL certification):
 
 Artifacts:
 
-- `diagnostics/frames/` (before/after)
+- `diagnostics/frames_emergency/` (before/after)
 - `diagnostics/runtime.log` (JSONL)
 
 More details: `docs/looting_basic_prod_emergency.md`
@@ -283,6 +283,35 @@ Real mode also requires an ROI config file:
   - CMD: `set FRBOT_CONFIG_PATH=diagnostics\\rois.json`
 
 Calibration checklist: `docs/ROI_CALIBRATION.md`
+
+## PROD-FULL (Windows-only)
+
+`prod_full` is a stricter production profile intended to be **REAL-certifiable** via `tools/audit_all.py` with **evidence artifacts as the authority**.
+
+Certification pipeline (fail-fast):
+
+- `combat_basic` → `looting_full` → `deposit_full` → `trade_full`
+
+One-command launcher (REAL + OBS source identity):
+
+```powershell
+./scripts/run_prod_full_real_obs_source.ps1 \
+  -WindowHwnd "0x3094a" \
+  -ObsSourceName "Tibia_Fuente" \
+  -ConfigPath "./rois_prod_full.json" \
+  -DumpFrames
+```
+
+Evidence output:
+
+- `diagnostics/frames_full/evidence_<timestamp>/` (PPM BEFORE/AFTER pairs + `evidence_manifest.json` + per-gate `*_last_result.json`)
+- `diagnostics/evidence_<timestamp>.*.out` (precheck / run / audit transcripts)
+
+ROI config requirements (REAL, `FRBOT_PROFILE=prod_full`):
+
+- Required base: `minimap`, `battle_list`, `target_frame`, `hp_mp`
+- Allowlisted extras used by the pipeline: `inventory_text`, `depot_container`, `trade_inventory`, `trade_npc`, `trade_action`
+- Combat evidence requires at least one of: `combat_feedback` or `target_hp_bar`
 
 ### Real calibration (Tibia 15.x) — strict foreground-safe
 

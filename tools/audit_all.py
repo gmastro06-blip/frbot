@@ -14,10 +14,13 @@ _ALL_GATES: tuple[str, ...] = (
     'combat_basic',
     'cavebot',
     'looting_basic',
+    'looting_full',
     'combat',
     'looting',
     'deposit',
     'trade',
+    'deposit_full',
+    'trade_full',
 )
 
 
@@ -33,6 +36,11 @@ def _gates_for_profile() -> tuple[tuple[str, ...], list[str], list[str]]:
         disabled = ['combat', 'looting', 'deposit', 'trade']
         # Only require evidence for the allowed gates.
         return ('targeting', 'cavebot', 'healing', 'combat_basic', 'looting_basic'), enabled, disabled
+
+    if _profile() == 'prod_full':
+        enabled = ['capture_real', 'combat_basic', 'looting_full', 'deposit_full', 'trade_full']
+        disabled = ['combat', 'looting', 'deposit', 'trade']
+        return ('combat_basic', 'looting_full', 'deposit_full', 'trade_full'), enabled, disabled
 
     return _ALL_GATES, [], []
 

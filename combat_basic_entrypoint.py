@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import sys
+import json
+import time
 from pathlib import Path
 
 from contracts.errors import ContractViolation, PreflightFailed
@@ -51,6 +53,60 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None:
         return bool(default)
     return str(raw).strip().lower() not in {'', '0', 'false', 'no', 'off'}
+
+
+def _frames_dir() -> Path:
+    raw = (_env_str('FRBOT_REAL_FRAMES_DIR', '') or '').strip()
+    if raw:
+        return Path(str(raw))
+    profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        return Path('diagnostics') / 'frames_emergency'
+    if profile == 'prod_full':
+        return Path('diagnostics') / 'frames_full'
+    return Path('diagnostics') / 'frames'
+
+
+def _write_evidence_manifest(*, evidence_dir: Path, capture: object) -> None:
+    try:
+        src = (_env_str('FRBOT_CAPTURE_SOURCE', 'client') or 'client').strip().lower()
+        payload = {
+            'capture_source': ('obs_source' if src == 'obs_source' else ('obs' if src == 'obs' else 'client')),
+            'obs_source_name': str(getattr(capture, 'obs_source_name', '') or ''),
+            'obs_projector_title': str(_env_str('FRBOT_OBS_PROJECTOR_TITLE', '') or ''),
+            'ts': int(time.time()),
+        }
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        (evidence_dir / 'evidence_manifest.json').write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+    except Exception:
+        return
+
+
+def _try_write_last_result(
+    *,
+    evidence_dir: Path,
+    ok: bool,
+    outcome_kind: str,
+    inputs_sent: int,
+    before_ppm: str | None,
+    after_ppm: str | None,
+) -> None:
+    try:
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        payload: dict[str, object] = {
+            'gate': 'combat_basic',
+            'ok': bool(ok),
+            'outcome_kind': str(outcome_kind),
+            'inputs_sent': int(inputs_sent),
+            'before_ppm': before_ppm,
+            'after_ppm': after_ppm,
+        }
+        (evidence_dir / 'combat_basic_last_result.json').write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + '\n',
+            encoding='utf-8',
+        )
+    except Exception:
+        return
 
 
 def _load_config_from_env() -> RuntimeConfig:
@@ -103,20 +159,39 @@ def run_combat_basic_only() -> int:
         # Gate preflight must run before runtime.log.
         capture, input_, binding = combat_basic_preflight_run(ctx)
 
+        evidence_dir = _frames_dir()
+        _write_evidence_manifest(evidence_dir=evidence_dir, capture=capture)
+
         logger = configure_logger()
         ctx.status.state = RuntimeState.RUNNING
+
+        # Idle calibration evidence (no input) for REAL audit tooling.
+        try:
+            profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
+            dump_force = profile in {'prod_emergency', 'prod_full'}
+            if dump_force or dump_enabled():
+                b0 = capture.grab()
+                a0 = capture.grab()
+                dump_pair(gate='calibration', before=b0, after=a0, reason='idle', out_dir=str(evidence_dir))
+        except Exception:
+            pass
 
         outcome = execute_combat_basic_once(ctx, capture=capture, input_=input_, binding=binding)
 
         # Evidence artifacts (required):
         # - fixed names for human inspection
         # - plus a timestamped pair that matches evidence inventory regex
+        before_ppm = None
+        after_ppm = None
+
         before, after = snapshot('combat_basic')
-        if before is not None and after is not None:
-            frames_dir = Path('diagnostics') / 'frames'
-            dump_frame_ppm(before, frames_dir / 'combat_basic_success_before.ppm')
-            dump_frame_ppm(after, frames_dir / 'combat_basic_success_after.ppm')
-            dump_pair(gate='combat_basic', before=before, after=after, reason='success')
+        profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
+        dump_force = profile in {'prod_emergency', 'prod_full'}
+        if (dump_force or dump_enabled()) and (before is not None or after is not None):
+            before_ppm, after_ppm = dump_pair(gate='combat_basic', before=before, after=after, reason='success', out_dir=str(evidence_dir))
+            if before is not None and after is not None:
+                dump_frame_ppm(before, evidence_dir / 'combat_basic_success_before.ppm')
+                dump_frame_ppm(after, evidence_dir / 'combat_basic_success_after.ppm')
 
         log_json(
             logger,
@@ -145,15 +220,39 @@ def run_combat_basic_only() -> int:
             status='SUCCESS',
             result=str(outcome.evidence.evidence_kind),
         )
+
+        _try_write_last_result(
+            evidence_dir=evidence_dir,
+            ok=True,
+            outcome_kind=str(outcome.evidence.evidence_kind),
+            inputs_sent=int(getattr(getattr(ctx, 'combat', object()), 'inputs_sent', 0) or 0),
+            before_ppm=before_ppm,
+            after_ppm=after_ppm,
+        )
         return 0
 
     except PreflightFailed as exc:
-        if dump_enabled():
+        before_ppm = None
+        after_ppm = None
+        evidence_dir = _frames_dir()
+        profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
+        dump_force = profile in {'prod_emergency', 'prod_full'}
+
+        if dump_force or dump_enabled():
             before, after = snapshot('combat_basic')
             if before is not None or after is not None:
-                dump_pair(gate='combat_basic', before=before, after=after, reason=str(exc))
+                before_ppm, after_ppm = dump_pair(gate='combat_basic', before=before, after=after, reason=str(exc), out_dir=str(evidence_dir))
             else:
                 try_dump_window_frame(gate='combat_basic', reason=str(exc))
+
+        _try_write_last_result(
+            evidence_dir=evidence_dir,
+            ok=False,
+            outcome_kind=str(exc),
+            inputs_sent=0,
+            before_ppm=before_ppm,
+            after_ppm=after_ppm,
+        )
         write_fatal(str(exc), exc)
         return 1
     except ContractViolation as exc:

@@ -37,10 +37,16 @@ def main() -> int:
         write_fatal('unsupported_platform', details={'platform': str(sys.platform)})
         return 1
 
-    # Fixed profile: always PROD-EMERGENCY; ignore external overrides.
-    os.environ['FRBOT_PROFILE'] = 'prod_emergency'
+    # Supported PROD profiles: prod_emergency (default) and prod_full.
+    # If prod_full is explicitly requested, force it for the run.
+    if mode == 'prod_full':
+        os.environ['FRBOT_PROFILE'] = 'prod_full'
+    else:
+        prof = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+        if prof not in {'prod_emergency', 'prod_full'}:
+            os.environ['FRBOT_PROFILE'] = 'prod_emergency'
 
-    # PROD-EMERGENCY STARTUP GUARDS: must be REAL + HWND-bound + foreground.
+    # PROD STARTUP GUARDS: must be REAL + HWND-bound + foreground + OBS source identity.
     # (Hard-stop here, before any runners start.)
     from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
 
@@ -65,6 +71,36 @@ def main() -> int:
         write_fatal('feature_disabled', details={'feature': mode})
         print('REAL_CAVEBOT_FAILED:feature_disabled')
         return 1
+
+    if mode == 'prod_full':
+        # Full certification pipeline: fail fast on first gate failure.
+        from combat_basic_entrypoint import run_combat_basic_only
+        from looting_full_entrypoint import run_looting_full_only
+        from deposit_full_entrypoint import run_deposit_full_only
+        from trade_full_entrypoint import run_trade_full_only
+
+        code = int(run_combat_basic_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:combat_basic_failed')
+            return code
+
+        code = int(run_looting_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:looting_full_failed')
+            return code
+
+        code = int(run_deposit_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:deposit_full_failed')
+            return code
+
+        code = int(run_trade_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:trade_full_failed')
+            return code
+
+        print('REAL_CAVEBOT_OK')
+        return 0
 
     if mode == 'combat_basic':
         from combat_basic_entrypoint import run_combat_basic_only

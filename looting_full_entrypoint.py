@@ -52,6 +52,8 @@ def _frames_dir() -> Path:
     profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
     if profile == 'prod_emergency':
         return Path('diagnostics') / 'frames_emergency'
+    if profile == 'prod_full':
+        return Path('diagnostics') / 'frames_full'
     return Path('diagnostics') / 'frames'
 
 
@@ -191,7 +193,7 @@ def run_looting_full_only() -> int:
         before_ppm, after_ppm, evidence_reason = _latest_success_pair(evidence_dir)
 
         profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
-        dump_force = profile == 'prod_emergency'
+        dump_force = profile in {'prod_emergency', 'prod_full'}
         if dump_force and (not before_ppm or not after_ppm):
             raise PreflightFailed('looting_full_missing_evidence_frames')
 

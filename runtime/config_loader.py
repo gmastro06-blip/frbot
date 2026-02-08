@@ -46,6 +46,23 @@ _ALLOWED_PROD_EMERGENCY_EXTRA_ROIS: set[str] = {
 }
 
 
+_ALLOWED_PROD_FULL_EXTRA_ROIS: set[str] = {
+	# combat_basic evidence
+	'target_hp_bar',
+	'combat_cooldown',
+	'combat_feedback',
+	# looting_full/looting_basic semantic evidence
+	'inventory_text',
+	'chat_loot_area',
+	'loot_corpse',
+	# deposit/trade semantic evidence
+	'depot_container',
+	'trade_inventory',
+	'trade_npc',
+	'trade_action',
+}
+
+
 def _env_bool(name: str, default: bool = False) -> bool:
 	raw = os.environ.get(name)
 	if raw is None:
@@ -127,14 +144,14 @@ def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 			for required_roi in _REQUIRED_REAL_ROIS:
 				if required_roi not in rois:
 					raise PreflightFailed('config_invalid_schema')
-			# PROD-EMERGENCY: default is *exactly* the required ROI keys.
-			# Exception: allow a small, explicit allowlisted superset (audited).
-			if profile == 'prod_emergency':
+			# PROD profiles: allow only an explicit allowlisted superset (audited).
+			if profile in {'prod_emergency', 'prod_full'}:
 				keys = set(rois.keys())
 				required_keys = set(_REQUIRED_REAL_ROIS)
 				if keys != required_keys:
 					extra = keys - required_keys
-					if not extra.issubset(set(_ALLOWED_PROD_EMERGENCY_EXTRA_ROIS)):
+					allowed_extra = set(_ALLOWED_PROD_EMERGENCY_EXTRA_ROIS) if profile == 'prod_emergency' else set(_ALLOWED_PROD_FULL_EXTRA_ROIS)
+					if not extra.issubset(set(allowed_extra)):
 						raise PreflightFailed('config_invalid_schema')
 
 		return LoadedConfig(rois=rois, frame_width=frame_w, frame_height=frame_h)

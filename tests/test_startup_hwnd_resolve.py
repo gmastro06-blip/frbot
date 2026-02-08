@@ -19,8 +19,8 @@ def test_invalid_hwnd_env_auto_resolves_by_title(monkeypatch: MonkeyPatch) -> No
 
     _reset_artifacts()
 
-    startup_guards._PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE = False
-    startup_guards._PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED = False
+    startup_guards._PROD_PROFILE_REAL_GUARDS_PASSED_ONCE = False
+    startup_guards._PROD_PROFILE_REAL_HWND_SELF_HEAL_USED = False
 
     # Force guard path.
     monkeypatch.setenv('FRBOT_PROFILE', 'prod_emergency')
@@ -67,8 +67,8 @@ def test_invalid_hwnd_and_no_matching_title_hard_stops_with_candidates(monkeypat
 
     _reset_artifacts()
 
-    startup_guards._PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE = False
-    startup_guards._PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED = False
+    startup_guards._PROD_PROFILE_REAL_GUARDS_PASSED_ONCE = False
+    startup_guards._PROD_PROFILE_REAL_HWND_SELF_HEAL_USED = False
 
     monkeypatch.setenv('FRBOT_PROFILE', 'prod_emergency')
     monkeypatch.setenv('FRBOT_MODE', 'real')

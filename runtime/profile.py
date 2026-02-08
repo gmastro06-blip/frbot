@@ -6,11 +6,14 @@ from contracts.errors import PreflightFailed
 
 
 _PROD_EMERGENCY: str = 'prod_emergency'
+_PROD_FULL: str = 'prod_full'
 
 
 def current_profile() -> str:
-    # PROD-EMERGENCY scope closure: the only supported profile.
-    # Ignore external overrides to keep runtime immutable.
+    # Supported profiles are explicit to keep runtime auditable.
+    raw = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if raw in {_PROD_EMERGENCY, _PROD_FULL}:
+        return str(raw)
     return _PROD_EMERGENCY
 
 
@@ -18,12 +21,18 @@ def is_prod_emergency() -> bool:
     return current_profile() == _PROD_EMERGENCY
 
 
+def is_prod_full() -> bool:
+    return current_profile() == _PROD_FULL
+
+
 def enforce_feature_allowed(feature: str) -> None:
     """Abort-fast gate for features that are hard-disabled in PROD-EMERGENCY."""
 
     f = (feature or '').strip().lower()
-    if f in {'combat', 'looting', 'deposit', 'trade'}:
-        raise PreflightFailed('feature_disabled')
+    # Emergency/full profiles only support explicitly routed gates.
+    if current_profile() in {_PROD_EMERGENCY, _PROD_FULL}:
+        if f in {'combat', 'looting', 'deposit', 'trade'}:
+            raise PreflightFailed('feature_disabled')
 
 
 def cap_ticks(requested: int) -> int:
