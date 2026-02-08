@@ -344,6 +344,38 @@ def detect_loot_from_chat(
 
     changed_px, changed_ratio = _changed_stats(before_crop, after_crop, w=w, h=h, px_tol=int(px_tol))
 
+    def _green_changed_ratio(
+        before_rgb: bytes,
+        after_rgb: bytes,
+        *,
+        w: int,
+        h: int,
+        px_tol: int,
+        green_delta: int,
+        green_min_g: int,
+    ) -> tuple[int, int, float]:
+        if not before_rgb or not after_rgb or w <= 0 or h <= 0:
+            return 0, 0, 0.0
+        if len(before_rgb) != len(after_rgb):
+            return 0, 0, 0.0
+
+        changed = 0
+        greenish = 0
+        for i in range(0, len(before_rgb), 3):
+            dr = abs(int(before_rgb[i + 0]) - int(after_rgb[i + 0]))
+            dg = abs(int(before_rgb[i + 1]) - int(after_rgb[i + 1]))
+            db = abs(int(before_rgb[i + 2]) - int(after_rgb[i + 2]))
+            if dr > px_tol or dg > px_tol or db > px_tol:
+                changed += 1
+                r = int(after_rgb[i + 0])
+                g = int(after_rgb[i + 1])
+                b = int(after_rgb[i + 2])
+                if g >= int(green_min_g) and g >= (r + int(green_delta)) and g >= (b + int(green_delta)):
+                    greenish += 1
+
+        ratio = (float(greenish) / float(changed)) if changed > 0 else 0.0
+        return int(changed), int(greenish), float(ratio)
+
     try:
         min_changed_px = int((os.environ.get('FRBOT_CHAT_LOOT_MIN_CHANGED_PIXELS', '600') or '600').strip() or '600')
     except Exception:
@@ -453,10 +485,71 @@ def detect_loot_from_chat(
     debug['candidates'] = candidates
 
     if patterns:
-        ok = matched > 0
+        # PROD_EMERGENCY: require >=2 matched lines (two new loot lines) to reduce false positives.
+        req = 2 if profile == 'prod_emergency' else 1
+        ok = int(matched) >= int(req)
+        debug['required_matches'] = int(req)
         debug['reason'] = 'pattern_match' if ok else 'pattern_miss'
         return LootEvidence(ok=bool(ok), delta_items=int(matched), delta_gold=0, source='chat', debug=debug)
 
-    # No patterns configured: accept multiline + bottom-biased delta.
+    # No patterns configured:
+    # - Outside PROD_EMERGENCY: accept multiline + bottom-biased delta (legacy/dev convenience).
+    # - In PROD_EMERGENCY: require loot-like green text dominance in the changed pixels.
+    if profile == 'prod_emergency':
+        try:
+            green_delta = int((os.environ.get('FRBOT_CHAT_LOOT_GREEN_DELTA', '25') or '25').strip() or '25')
+        except Exception:
+            green_delta = 25
+        green_delta = max(0, min(int(green_delta), 255))
+
+        try:
+            green_min_g = int((os.environ.get('FRBOT_CHAT_LOOT_GREEN_MIN_G', '60') or '60').strip() or '60')
+        except Exception:
+            green_min_g = 60
+        green_min_g = max(0, min(int(green_min_g), 255))
+
+        try:
+            min_green_ratio = float((os.environ.get('FRBOT_CHAT_LOOT_GREEN_MIN_RATIO', '0.08') or '0.08').strip() or '0.08')
+        except Exception:
+            min_green_ratio = 0.08
+        min_green_ratio = max(0.0, min(float(min_green_ratio), 1.0))
+
+        try:
+            max_green_ratio = float((os.environ.get('FRBOT_CHAT_LOOT_GREEN_MAX_RATIO', '0.98') or '0.98').strip() or '0.98')
+        except Exception:
+            max_green_ratio = 0.98
+        max_green_ratio = max(0.0, min(float(max_green_ratio), 1.0))
+
+        try:
+            min_green_px = int((os.environ.get('FRBOT_CHAT_LOOT_GREEN_MIN_PIXELS', '120') or '120').strip() or '120')
+        except Exception:
+            min_green_px = 120
+        min_green_px = max(0, int(min_green_px))
+
+        changed2, green_px, green_ratio = _green_changed_ratio(
+            before_crop,
+            after_crop,
+            w=w,
+            h=h,
+            px_tol=int(px_tol),
+            green_delta=int(green_delta),
+            green_min_g=int(green_min_g),
+        )
+        debug['green_changed_pixels'] = int(green_px)
+        debug['green_changed_ratio'] = float(green_ratio)
+        debug['green_min_ratio'] = float(min_green_ratio)
+        debug['green_max_ratio'] = float(max_green_ratio)
+        debug['green_min_pixels'] = int(min_green_px)
+
+        if int(changed2) <= 0:
+            debug['reason'] = 'no_changed_pixels'
+            return LootEvidence(ok=False, delta_items=0, delta_gold=0, source='chat', debug=debug)
+        if int(green_px) < int(min_green_px) or float(green_ratio) < float(min_green_ratio) or float(green_ratio) > float(max_green_ratio):
+            debug['reason'] = 'no_patterns_and_not_green_loot'
+            return LootEvidence(ok=False, delta_items=0, delta_gold=0, source='chat', debug=debug)
+
+        debug['reason'] = 'green_multiline_no_patterns'
+        return LootEvidence(ok=True, delta_items=int(len(boxes)), delta_gold=0, source='chat', debug=debug)
+
     debug['reason'] = 'multiline_delta_no_patterns'
     return LootEvidence(ok=True, delta_items=int(len(boxes)), delta_gold=0, source='chat', debug=debug)

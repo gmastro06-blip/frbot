@@ -256,6 +256,8 @@ def looting_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
                     encoding='utf-8',
                 )
             except Exception:
+                # Best-effort diagnostics: failures while dumping emergency calibration
+                # evidence must not mask the primary preflight failure.
                 pass
             raise PreflightFailed('looting_inventory_unreadable')
 
@@ -375,6 +377,7 @@ def looting_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
                         encoding='utf-8',
                     )
                 except Exception:
+                    # Best-effort diagnostics: failure to dump calibration hints is non-fatal.
                     pass
             raise PreflightFailed('looting_inventory_unreadable')
 

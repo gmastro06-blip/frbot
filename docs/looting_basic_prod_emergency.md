@@ -45,11 +45,23 @@ After one quick-loot input, it accepts evidence by:
 
 - `inventory_delta`: semantic inventory snapshot delta indicates items increased (e.g. gold ↑) or `capacity_used` ↑.
 
-Bounded fallback (only when inventory becomes unreadable AFTER):
+Chat-only fallback (inventory becomes unreadable AFTER):
 
-- `chat_delta_inventory_unreadable`: semantic chat-delta proof gated on inventory being unreadable.
+- Default: **disabled** (FAIL if inventory is unreadable AFTER).
+- When explicitly enabled (see below):
+  - `chat_delta_inventory_unreadable`: pixel-only chat semantics proof gated on inventory being unreadable AFTER.
 
-Otherwise it aborts with `looting_no_inventory_delta`.
+Otherwise it aborts with `looting_no_inventory_delta` (or `looting_inventory_unreadable` if the AFTER inventory snapshot cannot be read).
+
+### Emergency override (OFF by default)
+
+In `prod_emergency` only, you may explicitly allow a chat-evidence fallback **only when the inventory AFTER snapshot is unreadable**.
+
+- Enable: `FRBOT_LOOTING_ALLOW_CHAT_FALLBACK=1`
+- Behavior: if chat evidence confirms loot within the allowed latency window and inventory AFTER is unreadable, the gate may PASS with `evidence_kind="chat_delta_inventory_unreadable"`.
+- Audit: `tools/audit_emergency.py` will emit warning `looting_chat_fallback_used` when this path is used.
+
+This is intentionally opt-in and is ignored outside `FRBOT_PROFILE=prod_emergency`.
 
 Note (PROD_EMERGENCY): evidence is binary-only. The `inventory_text` ROI is a 2x1 pixel ROI carrying `0xBEEF + u16 gold + u16 cap_used` (no OCR).
 

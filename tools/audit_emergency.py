@@ -43,6 +43,33 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return str(raw).strip().lower() not in {'', '0', 'false', 'no', 'off'}
 
 
+def audit_looting_basic_verdict(
+    *,
+    inventory_delta_ok: bool,
+    inventory_unreadable: bool,
+    chat_ok: bool,
+    allow_chat_fallback: bool,
+    used_chat_fallback: bool,
+) -> tuple[bool, list[str]]:
+    """Compute looting_basic audit verdict from already-derived evidence flags.
+
+    Guardrails:
+    - If inventory is readable and delta==0, FAIL always (chat cannot override).
+    - Chat-only PASS is allowed only when inventory AFTER is unreadable and the
+      explicit emergency fallback is enabled.
+    """
+
+    warnings: list[str] = []
+    if bool(inventory_delta_ok):
+        return True, warnings
+
+    if bool(inventory_unreadable) and bool(allow_chat_fallback) and bool(used_chat_fallback) and bool(chat_ok):
+        warnings.append('looting_chat_fallback_used')
+        return True, warnings
+
+    return False, warnings
+
+
 @dataclass(frozen=True, slots=True)
 class _Result:
     ok: bool
@@ -191,6 +218,7 @@ def _check_real() -> _Result:
             fg_hwnd_hex = hex(fg_hwnd) if fg_hwnd > 0 else '0x0'
             fg_title = str(w32.get_window_text(fg_hwnd) or '') if fg_hwnd > 0 else ''
         except Exception:
+            # Best-effort diagnostics: win32 helpers may be unavailable or fail.
             pass
 
         try:
@@ -220,6 +248,7 @@ def _check_real() -> _Result:
                 encoding='utf-8',
             )
         except Exception:
+            # Best-effort diagnostics: failure to write debug JSON is non-fatal.
             pass
 
         try:
@@ -228,6 +257,7 @@ def _check_real() -> _Result:
                 encoding='utf-8',
             )
         except Exception:
+            # Best-effort diagnostics: failure to write trace is non-fatal.
             pass
 
         return _Result(ok=False, verdict='NOT_READY', reasons=reasons, warnings=warnings, features_enabled=[], features_disabled=[])
@@ -267,6 +297,7 @@ def _check_real() -> _Result:
                 out_dir / f'emergency_{name}.ppm',
             )
         except Exception:
+            # Best-effort diagnostics: ROI dumps are optional.
             pass
 
         if all_zero or all_same or var < 5.0:
@@ -309,6 +340,7 @@ def _check_real() -> _Result:
                 out_dir / f'emergency_{name}.ppm',
             )
         except Exception:
+            # Best-effort diagnostics: ROI dumps are optional.
             pass
 
     # Strong audit: run combat_basic preflight as a separate certifiable gate.
@@ -374,8 +406,10 @@ def _check_real() -> _Result:
                         out_dir / f'emergency_{inventory_text_roi_name}.ppm',
                     )
                 except Exception:
+                    # Best-effort diagnostics: ROI dump is optional.
                     pass
         except Exception:
+            # Best-effort diagnostics: crop/dump failures must not block audit.
             pass
 
         # Always dump binary-only candidate evidence for assisted calibration.
@@ -429,6 +463,7 @@ def _check_real() -> _Result:
                 encoding='utf-8',
             )
         except Exception:
+            # Best-effort diagnostics: calibration assistance must not block audit.
             pass
 
         # Readability check at audit time (readiness).
@@ -493,12 +528,28 @@ def _check_real() -> _Result:
                 except Exception:
                     chat_ok = False
 
-                if inventory_delta_ok:
+                used_chat_fallback = False
+                try:
+                    used_chat_fallback = bool(meta.get('used_chat_fallback')) if isinstance(meta, dict) else False
+                except Exception:
+                    used_chat_fallback = False
+
+                # Emergency override is valid only in prod_emergency.
+                profile_now = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+                allow_chat_fallback = (profile_now == 'prod_emergency') and bool(_env_bool('FRBOT_LOOTING_ALLOW_CHAT_FALLBACK', False))
+
+                ok_gate, gate_warnings = audit_looting_basic_verdict(
+                    inventory_delta_ok=bool(inventory_delta_ok),
+                    inventory_unreadable=bool(inventory_unreadable),
+                    chat_ok=bool(chat_ok),
+                    allow_chat_fallback=bool(allow_chat_fallback),
+                    used_chat_fallback=bool(used_chat_fallback),
+                )
+                if ok_gate:
+                    warnings.extend([w for w in gate_warnings if w])
                     enabled.append(str(g))
                     return
-                if inventory_unreadable and chat_ok:
-                    enabled.append(str(g))
-                    return
+
                 reasons.append(f'{g}_not_confirmed')
             except Exception as exc:
                 reasons.append(f'{g}_evidence_eval_failed: {type(exc).__name__}: {exc}')

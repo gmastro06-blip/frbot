@@ -80,7 +80,10 @@ def _try_write_looting_basic_last_result(
     verify_attempts: int,
     inventory_after_readable: bool,
     inventory_delta_ok: bool,
+    inventory_before: InventorySnapshot | None = None,
+    inventory_after: InventorySnapshot | None = None,
     chat_evidence: LootEvidence | None,
+    used_chat_fallback: bool = False,
     before_ppm: str | None = None,
     after_ppm: str | None = None,
 ) -> None:
@@ -112,6 +115,15 @@ def _try_write_looting_basic_last_result(
             before_ppm = before_ppm or before_scan
             after_ppm = after_ppm or after_scan
 
+        delta_latency_ms: float | None = None
+        if chat_evidence is not None:
+            try:
+                v = (chat_evidence.debug or {}).get('delta_latency_ms')
+                if v is not None:
+                    delta_latency_ms = float(v)
+            except Exception:
+                delta_latency_ms = None
+
         payload: dict[str, object] = {
             'gate': str(g),
             'ok': bool(ok),
@@ -120,8 +132,22 @@ def _try_write_looting_basic_last_result(
             'verify_attempts': int(verify_attempts),
             'inventory_after_readable': bool(inventory_after_readable),
             'inventory_delta_ok': bool(inventory_delta_ok),
+            'inventory_before': None
+            if inventory_before is None
+            else {
+                'slot_counts': dict(inventory_before.slot_counts or {}),
+                'capacity_used': inventory_before.capacity_used,
+            },
+            'inventory_after': None
+            if inventory_after is None
+            else {
+                'slot_counts': dict(inventory_after.slot_counts or {}),
+                'capacity_used': inventory_after.capacity_used,
+            },
             'chat_ok': bool(chat_evidence.ok) if chat_evidence is not None else False,
             'chat_debug': dict(chat_evidence.debug or {}) if chat_evidence is not None else {},
+            'delta_latency_ms': delta_latency_ms,
+            'used_chat_fallback': bool(used_chat_fallback),
             'before_ppm': before_ppm,
             'after_ppm': after_ppm,
         }
@@ -479,7 +505,7 @@ def execute_looting_basic_once(
 
     # Certification precondition: attempt only if a corpse is detectable.
     profile0 = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
-    if profile0 == 'prod_emergency':
+    if profile0 == 'prod_emergency' and str(getattr(ctx.config, 'mode', '') or '').strip().lower() == 'real':
         corpse_roi_name = (os.environ.get('FRBOT_LOOT_CORPSE_ROI', '') or 'loot_corpse').strip() or 'loot_corpse'
         corpse_roi = ctx.rois.get(str(corpse_roi_name))
         if corpse_roi is None:
@@ -491,6 +517,8 @@ def execute_looting_basic_once(
 
     loot_action: dict | None = None
     action_ts_ns: int | None = None
+    click_x: int | None = None
+    click_y: int | None = None
 
     def _try_dump_visual_suggestions(*, reason: str, before_frame: Frame, player_xy: tuple[int, int] | None) -> list[dict[str, object]]:
         try:
@@ -645,8 +673,8 @@ def execute_looting_basic_once(
     gesture_emitted_for_defaults = '' if loot_action is None else str(loot_action.get('kind') or '')
 
     # Certification contract (strict): no sleeps, no extra inputs.
-    # We may take multiple AFTER captures to tolerate render/OBS latency,
-    # but we never emit more than one input action.
+    # We may take multiple AFTER captures to tolerate render/OBS latency.
+    # We never emit more than one input action.
     if is_real and gesture_emitted_for_defaults == 'alt_q':
         profile2 = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
         strict_default_attempts = '6' if profile2 == 'prod_emergency' else '4'
@@ -723,7 +751,10 @@ def execute_looting_basic_once(
                     verify_attempts=int(verify_attempts),
                     inventory_after_readable=True,
                     inventory_delta_ok=True,
+                    inventory_before=inv_before,
+                    inventory_after=inv_after,
                     chat_evidence=None,
+                    used_chat_fallback=False,
                     before_ppm=before_name,
                     after_ppm=after_name,
                 )
@@ -746,19 +777,70 @@ def execute_looting_basic_once(
 
     inventory_after_readable = last_inv_after is not None
 
+    profile2 = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    allow_chat_fallback = bool(_env_bool('FRBOT_LOOTING_ALLOW_CHAT_FALLBACK', False))
+    if profile2 != 'prod_emergency':
+        allow_chat_fallback = False
+
     # Secondary semantic proof: chat loot evidence (supporting-only).
     chat_evidence: LootEvidence | None = None
     try:
-        if after is not None and chat_roi is not None:
-            chat_evidence = detect_loot_from_chat(
-                before,
-                after,
-                chat_roi,
-                action_kind=None if loot_action is None else str(loot_action.get('kind') or ''),
-                action_ts_ns=action_ts_ns,
-            )
-            # Chat evidence may only be used as sole proof when inventory is unreadable.
-            if chat_evidence.ok and (not inventory_after_readable):
+        if chat_roi is not None and after is not None:
+            act_kind = None if loot_action is None else str(loot_action.get('kind') or '')
+
+            # Strict contract: no extra inputs. We can, however, evaluate multiple AFTER
+            # captures to pick the earliest frame that provides valid chat evidence.
+            frames_for_chat = list(after_frames_for_stability or [])
+            if not frames_for_chat:
+                frames_for_chat = [after]
+
+            best_ev: LootEvidence | None = None
+            best_frame: Frame | None = None
+
+            def _score(ev: LootEvidence) -> tuple[int, int, int]:
+                try:
+                    ok = 1 if bool(ev.ok) else 0
+                except Exception:
+                    ok = 0
+                try:
+                    reason = str((ev.debug or {}).get('reason') or '')
+                except Exception:
+                    reason = ''
+                in_window = 0 if reason == 'latency_out_of_window' else 1
+                try:
+                    changed = int((ev.debug or {}).get('changed_pixels') or 0)
+                except Exception:
+                    changed = 0
+                return (int(ok), int(in_window), int(changed))
+
+            for af in frames_for_chat:
+                ev = detect_loot_from_chat(
+                    before,
+                    af,
+                    chat_roi,
+                    action_kind=act_kind,
+                    action_ts_ns=action_ts_ns,
+                )
+                if best_ev is None or _score(ev) > _score(best_ev):
+                    best_ev = ev
+                    best_frame = af
+                if bool(ev.ok):
+                    chat_evidence = ev
+                    after = af
+                    break
+
+            if chat_evidence is None and best_ev is not None:
+                chat_evidence = best_ev
+                if best_frame is not None:
+                    after = best_frame
+            # Chat evidence may only be used as sole proof when inventory is unreadable AFTER,
+            # and only when the explicit emergency fallback is enabled.
+            if (
+                chat_evidence is not None
+                and bool(chat_evidence.ok)
+                and (not inventory_after_readable)
+                and bool(allow_chat_fallback)
+            ):
                 before_name, after_name = _try_dump_looting_pair(gate=gate_name, reason='chat_delta_inventory_unreadable', before=before, after=after)
                 _try_write_looting_basic_last_result(
                     gate=gate_name,
@@ -769,7 +851,10 @@ def execute_looting_basic_once(
                     verify_attempts=int(verify_attempts),
                     inventory_after_readable=False,
                     inventory_delta_ok=False,
+                    inventory_before=inv_before,
+                    inventory_after=None,
                     chat_evidence=chat_evidence,
+                    used_chat_fallback=True,
                     before_ppm=before_name,
                     after_ppm=after_name,
                 )
@@ -802,38 +887,18 @@ def execute_looting_basic_once(
             verify_attempts=int(verify_attempts),
             inventory_after_readable=False,
             inventory_delta_ok=False,
+            inventory_before=inv_before,
+            inventory_after=None,
             chat_evidence=chat_evidence,
+            used_chat_fallback=False,
             before_ppm=before_name,
             after_ppm=after_name,
         )
         raise PreflightFailed('looting_inventory_unreadable')
 
-    before_name, after_name = _try_dump_looting_pair(gate=gate_name, reason='looting_no_inventory_delta', before=before, after=after)
-    _try_write_looting_basic_last_result(
-        gate=gate_name,
-        evidence_dir=_frames_dir_for_looting_evidence(),
-        ok=False,
-        outcome_kind='looting_no_inventory_delta',
-        loot_action=loot_action,
-        verify_attempts=int(verify_attempts),
-        inventory_after_readable=True,
-        inventory_delta_ok=False,
-        chat_evidence=chat_evidence,
-        before_ppm=before_name,
-        after_ppm=after_name,
-    )
+    # Preflight check: if right-click opened a context menu (no quick-loot), abort.
     click_x = _safe_int(None if loot_action is None else loot_action.get('x'))
     click_y = _safe_int(None if loot_action is None else loot_action.get('y'))
-    _try_dump_click_overlay(reason='looting_no_inventory_delta', frame=before, x=click_x, y=click_y)
-    _try_dump_emergency_candidates(
-        reason='looting_no_inventory_delta',
-        before_frame=before,
-        after_frames=after_frames_for_stability,
-    )
-
-    # Note: do not fail based on overlay stability here; this path already fails on lack of semantic evidence.
-
-    # Preflight check: if right-click opened a context menu (no quick-loot), abort.
     try:
         if after is not None and click_x is not None and click_y is not None:
             gesture2 = '' if loot_action is None else str(loot_action.get('kind') or '')
@@ -848,13 +913,60 @@ def execute_looting_basic_once(
         pass
     # Optional explicit quick-loot validation mode: if we emitted Shift+RMB and
     # observed no semantic evidence, label it as "quick_loot_not_effective".
-    validate_quick_loot = _env_bool('FRBOT_VALIDATE_QUICK_LOOT', False)
+    profile3 = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    validate_quick_loot = _env_bool('FRBOT_VALIDATE_QUICK_LOOT', profile3 == 'prod_emergency')
     gesture_emitted = '' if loot_action is None else str(loot_action.get('kind') or '')
-    reason = (
-        'quick_loot_not_effective'
-        if (validate_quick_loot and gesture_emitted in {'shift_rmb', 'alt_q', 'key'})
-        else 'looting_no_inventory_delta'
+    if validate_quick_loot and gesture_emitted in {'shift_rmb', 'alt_q', 'key'}:
+        # Diagnóstico (no PASS):
+        # - Si hubo delta en chat dentro de ventana, es probable que Quick Loot sí se haya ejecutado
+        #   pero no tenemos evidencia semántica (inventario), así que no podemos certificar.
+        # - Si no hubo delta en chat, tratamos como binding/acción no efectiva.
+        if chat_evidence is not None:
+            # If the chat ROI changed at all, we avoid claiming the input didn't work;
+            # it's still not certifiable without a semantic inventory delta.
+            try:
+                dbg = dict(chat_evidence.debug or {})
+            except Exception:
+                dbg = {}
+            try:
+                changed_pixels = int(dbg.get('changed_pixels') or 0)
+            except Exception:
+                changed_pixels = 0
+            if bool(chat_evidence.ok) or int(changed_pixels) > 0:
+                reason = 'looting_basic_not_confirmed'
+            else:
+                reason = 'quick_loot_not_effective'
+        else:
+            reason = 'quick_loot_not_effective'
+    else:
+        reason = 'looting_no_inventory_delta'
+
+    before_name, after_name = _try_dump_looting_pair(gate=gate_name, reason=str(reason), before=before, after=after)
+    _try_write_looting_basic_last_result(
+        gate=gate_name,
+        evidence_dir=_frames_dir_for_looting_evidence(),
+        ok=False,
+        outcome_kind=str(reason),
+        loot_action=loot_action,
+        verify_attempts=int(verify_attempts),
+        inventory_after_readable=True,
+        inventory_delta_ok=False,
+        inventory_before=inv_before,
+        inventory_after=last_inv_after,
+        chat_evidence=chat_evidence,
+        used_chat_fallback=False,
+        before_ppm=before_name,
+        after_ppm=after_name,
     )
+    _try_dump_click_overlay(reason=str(reason), frame=before, x=click_x, y=click_y)
+    _try_dump_emergency_candidates(
+        reason=str(reason),
+        before_frame=before,
+        after_frames=after_frames_for_stability,
+    )
+
+    # Note: do not fail based on overlay stability here; this path already fails on lack of semantic evidence.
+
     failure = PreflightFailed(str(reason))
     try:
         setattr(
