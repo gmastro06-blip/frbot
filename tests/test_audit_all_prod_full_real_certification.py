@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from pytest import MonkeyPatch
+
 
 def _write_config_prod_full(tmp_path: Path) -> Path:
 	# Include all ROI names required by evidence_inventory for prod_full gates.
@@ -122,7 +124,7 @@ def test_prod_full_real_mode_operational_real_with_minimal_evidence(tmp_path: Pa
 	assert "FINAL DECISION: OPERATIONAL_REAL" in combined
 
 
-def test_prod_full_real_mode_blocks_without_obs_source_manifest_when_required(tmp_path: Path, monkeypatch) -> None:
+def test_prod_full_real_mode_blocks_without_obs_source_manifest_when_required(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
 	repo_root = Path(__file__).resolve().parents[1]
 	frames_dir = tmp_path / "frames"
 	frames_dir.mkdir(parents=True, exist_ok=True)
@@ -155,7 +157,7 @@ def test_prod_full_real_mode_blocks_without_obs_source_manifest_when_required(tm
 	assert "FINAL DECISION: NOT_OPERATIONAL_REAL" in combined
 
 
-def test_prod_full_real_mode_operational_real_with_obs_source_manifest(tmp_path: Path, monkeypatch) -> None:
+def test_prod_full_real_mode_operational_real_with_obs_source_manifest(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
 	repo_root = Path(__file__).resolve().parents[1]
 	frames_dir = tmp_path / "frames"
 	frames_dir.mkdir(parents=True, exist_ok=True)
