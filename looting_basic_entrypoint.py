@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import sys
+import json
+from pathlib import Path
 
 from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import InventorySnapshot, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
@@ -52,6 +54,39 @@ def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
     if inv.capacity_used is not None:
         out['capacity_used'] = int(inv.capacity_used)
     return out
+
+
+def _frames_dir() -> Path:
+    raw = (_env_str('FRBOT_REAL_FRAMES_DIR', '') or '').strip()
+    if raw:
+        return Path(str(raw))
+    profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        return Path('diagnostics') / 'frames_emergency'
+    return Path('diagnostics') / 'frames'
+
+
+def _try_write_last_result(*, evidence_dir: Path, before_ppm: str | None, after_ppm: str | None, chat_ok: bool) -> None:
+    try:
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        # If the runner already wrote a richer/authoritative last_result.json,
+        # do not overwrite it here. Overwrites can also point meta at failed
+        # dump_pair attempts, causing audits to report missing frames.
+        out_path = evidence_dir / 'looting_basic_last_result.json'
+        if out_path.exists():
+            return
+        payload: dict[str, object] = {
+            'gate': 'looting_basic',
+            'before_ppm': before_ppm,
+            'after_ppm': after_ppm,
+            'chat_ok': bool(chat_ok),
+        }
+        out_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + '\n',
+            encoding='utf-8',
+        )
+    except Exception:
+        return
 
 
 def _load_config_from_env() -> RuntimeConfig:
@@ -114,7 +149,13 @@ def run_looting_basic_only() -> int:
         if dump_force or dump_enabled():
             before, after = snapshot('looting_basic')
             if before is not None or after is not None:
-                dump_pair(gate='looting_basic', before=before, after=after, reason=str(outcome.evidence_kind))
+                before_ppm, after_ppm = dump_pair(gate='looting_basic', before=before, after=after, reason=str(outcome.evidence_kind))
+                _try_write_last_result(
+                    evidence_dir=_frames_dir(),
+                    before_ppm=before_ppm,
+                    after_ppm=after_ppm,
+                    chat_ok=bool(outcome.ok and str(outcome.evidence_kind).strip().lower().startswith('chat_delta')),
+                )
 
         log_json(
             logger,
@@ -141,7 +182,8 @@ def run_looting_basic_only() -> int:
         if dump_force or dump_enabled():
             before, after = snapshot('looting_basic')
             if before is not None or after is not None:
-                dump_pair(gate='looting_basic', before=before, after=after, reason=str(exc))
+                before_ppm, after_ppm = dump_pair(gate='looting_basic', before=before, after=after, reason=str(exc))
+                _try_write_last_result(evidence_dir=_frames_dir(), before_ppm=before_ppm, after_ppm=after_ppm, chat_ok=False)
             else:
                 try_dump_window_frame(gate='looting_basic', reason=str(exc))
         write_fatal(str(exc), exc)

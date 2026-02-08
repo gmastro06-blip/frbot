@@ -536,6 +536,7 @@ def execute_looting_basic_once(
                 encoding='utf-8',
             )
         except Exception:
+            # Best-effort diagnostics: suggestion dumps must not affect certification.
             pass
         return payload
 
@@ -566,12 +567,12 @@ def execute_looting_basic_once(
 
             # Hotkey quick-loot (no ClickXY required).
             if gesture == 'alt_q':
-                action_ts_ns = int(time.monotonic_ns())
-                loot_action = {'kind': 'alt_q', 'ts_ns': int(action_ts_ns)}
                 if not hasattr(input_, 'press_combo'):
                     raise PreflightFailed('looting_input_not_supported')
                 # Exactly one input action: Alt+Q.
                 input_.press_combo(['alt', 'q'])
+                action_ts_ns = int(time.monotonic_ns())
+                loot_action = {'kind': 'alt_q', 'ts_ns': int(action_ts_ns)}
             elif gesture == 'key':
                 action_ts_ns = int(time.monotonic_ns())
                 loot_action = {'kind': 'key', 'key': str(ctx.config.quick_loot_key), 'ts_ns': int(action_ts_ns)}
@@ -648,14 +649,15 @@ def execute_looting_basic_once(
     # but we never emit more than one input action.
     if is_real and gesture_emitted_for_defaults == 'alt_q':
         profile2 = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
-        if profile2 == 'prod_emergency':
-            verify_attempts = 1
-        else:
-            try:
-                verify_attempts = int((os.environ.get('FRBOT_LOOTING_BASIC_STRICT_VERIFY_ATTEMPTS', '4') or '4').strip() or '4')
-            except Exception:
-                verify_attempts = 4
-            verify_attempts = max(1, min(int(verify_attempts), 8))
+        strict_default_attempts = '6' if profile2 == 'prod_emergency' else '4'
+        try:
+            verify_attempts = int(
+                (os.environ.get('FRBOT_LOOTING_BASIC_STRICT_VERIFY_ATTEMPTS', strict_default_attempts) or strict_default_attempts).strip()
+                or strict_default_attempts
+            )
+        except Exception:
+            verify_attempts = int(strict_default_attempts)
+        verify_attempts = max(1, min(int(verify_attempts), 8))
         verify_delay_ms = 0.0
     else:
         # Legacy behavior for non-cert runs.
@@ -841,6 +843,8 @@ def execute_looting_basic_once(
     except PreflightFailed:
         raise
     except Exception:
+        # Best-effort precondition check: if context-menu detection fails, fall back to
+        # primary semantic evidence rules (inventory/chat delta).
         pass
     # Optional explicit quick-loot validation mode: if we emitted Shift+RMB and
     # observed no semantic evidence, label it as "quick_loot_not_effective".
@@ -890,5 +894,6 @@ def execute_looting_basic_once(
             },
         )
     except Exception:
+        # Best-effort: attaching debug details must not change the failure reason.
         pass
     raise failure

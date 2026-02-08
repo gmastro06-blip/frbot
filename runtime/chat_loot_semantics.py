@@ -298,44 +298,31 @@ def detect_loot_from_chat(
     if action_ts_ns is not None and after_ts > 0:
         latency_ms = float(int(after_ts) - int(action_ts_ns)) / 1_000_000.0
 
-    try:
-        max_latency_ms = int((os.environ.get('FRBOT_CHAT_LOOT_MAX_LATENCY_MS', '1500') or '1500').strip() or '1500')
-    except Exception:
-        max_latency_ms = 1500
-    max_latency_ms = max(50, min(int(max_latency_ms), 10000))
-
     act = str(action_kind or '').strip().lower()
-    if profile == 'prod_emergency':
-        if act != 'alt_q':
-            return LootEvidence(
-                ok=False,
-                delta_items=0,
-                delta_gold=0,
-                source='chat',
-                debug={'reason': 'action_mismatch', 'action_kind': str(action_kind or '')},
-            )
-        if latency_ms is None:
-            return LootEvidence(
-                ok=False,
-                delta_items=0,
-                delta_gold=0,
-                source='chat',
-                debug={'reason': 'latency_unknown', 'action_kind': str(action_kind or ''), 'max_latency_ms': int(max_latency_ms)},
-            )
-        if float(latency_ms) < 0.0 or float(latency_ms) > float(max_latency_ms):
-            return LootEvidence(
-                ok=False,
-                delta_items=0,
-                delta_gold=0,
-                source='chat',
-                debug={
-                    'reason': 'latency_out_of_window',
-                    'action_kind': str(action_kind or ''),
-                    'delta_latency_ms': float(latency_ms),
-                    'max_latency_ms': int(max_latency_ms),
-                },
-            )
 
+    # Chat fallback timing window.
+    # - Default: 1500ms
+    # - PROD_EMERGENCY + alt_q only: widen slightly to tolerate observed chat render latency.
+    try:
+        if profile == 'prod_emergency' and act == 'alt_q':
+            max_latency_ms = int(
+                (
+                    os.environ.get('FRBOT_CHAT_LOOT_MAX_LATENCY_MS_ALT_Q', '2500')
+                    or '2500'
+                ).strip()
+                or '2500'
+            )
+        else:
+            max_latency_ms = int(
+                (
+                    os.environ.get('FRBOT_CHAT_LOOT_MAX_LATENCY_MS', '1500')
+                    or '1500'
+                ).strip()
+                or '1500'
+            )
+    except Exception:
+        max_latency_ms = 2500 if (profile == 'prod_emergency' and act == 'alt_q') else 1500
+    max_latency_ms = max(50, min(int(max_latency_ms), 10000))
     boxes = _find_changed_bands(before_crop, after_crop, w=w, h=h, px_tol=int(px_tol))
 
     def _changed_stats(before_rgb: bytes, after_rgb: bytes, *, w: int, h: int, px_tol: int) -> tuple[int, float]:
@@ -391,6 +378,19 @@ def detect_loot_from_chat(
         'changed_pixels': int(changed_px),
         'changed_ratio': float(changed_ratio),
     }
+
+    # Timing/action binding (strict in PROD_EMERGENCY).
+    # Keep diagnostics: even if timing fails, we still report pixel-delta stats.
+    if profile == 'prod_emergency':
+        if act != 'alt_q':
+            debug['reason'] = 'action_mismatch'
+            return LootEvidence(ok=False, delta_items=0, delta_gold=0, source='chat', debug=debug)
+        if latency_ms is None:
+            debug['reason'] = 'latency_unknown'
+            return LootEvidence(ok=False, delta_items=0, delta_gold=0, source='chat', debug=debug)
+        if float(latency_ms) < 0.0 or float(latency_ms) > float(max_latency_ms):
+            debug['reason'] = 'latency_out_of_window'
+            return LootEvidence(ok=False, delta_items=0, delta_gold=0, source='chat', debug=debug)
 
     # Noise rejection: reject tiny changes and large redraws.
     if int(changed_px) < int(min_changed_px) or float(changed_ratio) < float(min_ratio) or float(changed_ratio) > float(max_ratio):

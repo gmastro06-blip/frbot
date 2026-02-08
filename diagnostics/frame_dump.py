@@ -32,12 +32,20 @@ def dump_frame_ppm(frame: Frame, path: Path) -> bool:
         if int(frame.width) <= 0 or int(frame.height) <= 0:
             return False
         expected = int(frame.width) * int(frame.height) * 3
-        if len(frame.rgb) != expected:
+
+        # Be tolerant to adapters providing byte-like buffers (e.g. memoryview,
+        # bytearray) or array-backed objects (e.g. numpy ndarray). Convert first,
+        # then validate length.
+        try:
+            rgb_bytes = bytes(frame.rgb)
+        except Exception:
+            return False
+        if len(rgb_bytes) != expected:
             return False
 
         path.parent.mkdir(parents=True, exist_ok=True)
         header = f"P6\n{int(frame.width)} {int(frame.height)}\n255\n".encode('ascii')
-        path.write_bytes(header + bytes(frame.rgb))
+        path.write_bytes(header + rgb_bytes)
         return True
     except Exception:
         return False

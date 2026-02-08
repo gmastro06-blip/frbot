@@ -464,6 +464,11 @@ try {
   _RotateRuntimeLog
   _RotateFatalLog
 
+  # Determinism: do not inherit evidence directory from other runners.
+  # If FRBOT_REAL_FRAMES_DIR is set (e.g. by looting_full), both the gate and
+  # the auditor will look there, causing missing/contaminated evidence.
+  try { Remove-Item Env:FRBOT_REAL_FRAMES_DIR -ErrorAction SilentlyContinue } catch {}
+
   $isStrictAltQ = ($Action -eq "alt_q")
   if ($isStrictAltQ) {
     $LootGesture = "alt_q"
@@ -582,9 +587,6 @@ try {
   if ($isStrictAltQ -and $AutoForeground.IsPresent) {
     $env:FRBOT_ALLOW_BACKGROUND_INPUT = "1"
     $env:FRBOT_COMBO_METHOD = "hybrid"
-    # Pixel-only verification: allow any delta in loot/chat ROI without requiring
-    # pre-calibrated hash patterns.
-    $env:FRBOT_CHAT_LOOT_ALLOW_ANY_DELTA = "1"
   }
 
   # Post-input verification sampling (REAL only): keep exactly-one-input contract,
@@ -654,6 +656,9 @@ try {
   }
   $auditOut = Join-Path $diagDir ("evidence_" + $stamp + ".audit_emergency_looting_basic.out")
   $auditCode = 2
+  # Avoid terminal-env contamination from other runners (e.g. looting_full).
+  # audit_emergency defaults to looting_basic, but we set it explicitly for determinism.
+  $env:FRBOT_AUDIT_GATE = "looting_basic"
   if ($isStrictAltQ) {
     # Pre-audit is readiness-only; looting_basic certification evidence is produced by the gate run.
     $env:FRBOT_AUDIT_SKIP_LOOTING = "1"
@@ -860,6 +865,7 @@ try {
   # Final certification audit: looting_basic is REQUIRED here.
   try { Remove-Item Env:FRBOT_AUDIT_SKIP_LOOTING -ErrorAction SilentlyContinue } catch {}
   $env:FRBOT_MODE = "real"
+  $env:FRBOT_AUDIT_GATE = "looting_basic"
   $finalAuditOut = Join-Path $diagDir ("evidence_" + $stamp + ".audit_emergency_final.out")
   $finalCode = _RunPoetryPythonToEvidenceFile -PyArgs @("tools/audit_emergency.py") -OutPath $finalAuditOut
   Write-Host "Wrote final audit evidence: $finalAuditOut" -ForegroundColor DarkCyan

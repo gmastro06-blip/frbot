@@ -444,9 +444,9 @@ def _check_real() -> _Result:
         audit_gate = (_env_str('FRBOT_AUDIT_GATE', 'looting_basic') or 'looting_basic').strip().lower()
 
         # Runner dumps evidence in FRBOT_REAL_FRAMES_DIR if provided.
-        evidence_dir = Path(_env_str('FRBOT_REAL_FRAMES_DIR', ''))
-        if not str(evidence_dir):
-            evidence_dir = out_dir
+        # IMPORTANT: Path('') becomes '.', which would incorrectly point at the repo root.
+        raw_evidence_dir = (_env_str('FRBOT_REAL_FRAMES_DIR', '') or '').strip()
+        evidence_dir = Path(raw_evidence_dir) if raw_evidence_dir else out_dir
 
         def _eval_inventory_delta_gate(*, gate: str) -> None:
             g = (gate or '').strip().lower()
