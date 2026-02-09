@@ -33,6 +33,13 @@ def _env_str(name: str) -> str:
     return str(os.environ.get(name) or '').strip()
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() not in {'', '0', 'false', 'no', 'off'}
+
+
 def _env_int_opt(name: str) -> int | None:
     raw = os.environ.get(name)
     if raw is None:
@@ -135,6 +142,7 @@ def _resolve_hwnd_by_title(title: str) -> tuple[int, str]:
             return int(exact.hwnd), str(exact.title)
     except Exception:
         pass
+
     try:
         sub = w32.find_window_by_title_substring(t)
         if sub is not None:
@@ -212,11 +220,45 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         raise exc
 
     # Allow running independent gates via main.py routing.
-    if _mode() not in {'real', 'prod_full', 'combat_basic', 'looting_basic', 'looting_full', 'deposit_basic', 'trade_basic', 'deposit_full', 'trade_full', 'targeting', 'healing', 'cavebot'}:
+    if _mode() not in {
+        'real',
+        'prod_full',
+        'combat_basic',
+        'looting_basic',
+        'looting_full',
+        'deposit_basic',
+        'trade_basic',
+        'deposit_full',
+        'trade_full',
+        'targeting',
+        'healing',
+        'cavebot',
+        'targeting_full',
+        'healing_full',
+        'combat_full',
+        'cavebot_full',
+    }:
         exc = PreflightFailed('invalid_mode')
         details: dict[str, object] = {
             'mode': _mode(),
-            'required': ['real', 'prod_full', 'combat_basic', 'looting_basic', 'looting_full', 'deposit_basic', 'trade_basic', 'deposit_full', 'trade_full', 'targeting', 'healing', 'cavebot'],
+            'required': [
+                'real',
+                'prod_full',
+                'combat_basic',
+                'looting_basic',
+                'looting_full',
+                'deposit_basic',
+                'trade_basic',
+                'deposit_full',
+                'trade_full',
+                'targeting',
+                'healing',
+                'cavebot',
+                'targeting_full',
+                'healing_full',
+                'combat_full',
+                'cavebot_full',
+            ],
         }
         setattr(exc, 'details', details)
         if write_fatal_on_fail:
@@ -330,6 +372,8 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
             or 150
         )
 
+        try_focus = _env_bool('FRBOT_TRY_FOCUS', False)
+
         last_fg = int(info.foreground_hwnd)
         last_title = str(w32.get_window_text(int(last_fg)) or '') if int(last_fg) > 0 else ''
 
@@ -337,6 +381,11 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         from runtime.pacing import sleep_ms
 
         for attempt in range(max(0, int(retries)) + 1):
+            if try_focus:
+                try:
+                    w32.try_focus_window(int(hwnd), timeout_s=0.15)
+                except Exception:
+                    pass
             try:
                 fg_now = int(w32.get_foreground_window())
             except Exception:
@@ -359,7 +408,7 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
                 'foreground_hwnd': hex(int(last_fg)),
                 'foreground_title': str(last_title),
                 'hint': 'Focus Tibia window and rerun',
-                'try_focus': False,
+                'try_focus': bool(try_focus),
                 'retries': int(retries),
                 'delay_ms': int(delay_ms),
             }
@@ -381,18 +430,15 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         _PROD_PROFILE_REAL_GUARDS_PASSED_ONCE = True
         return
 
-    # PROD profiles: legacy projector mode is disabled (capture must be OBS source identity).
-    if _capture_source() == 'obs':
-        pf = PreflightFailed('capture_source_invalid')
-        details = {
-            'reason': 'capture_source_invalid',
-            'capture_source': 'obs',
-            'required': 'obs_source',
-            'hint': 'Set FRBOT_CAPTURE_SOURCE=obs_source and provide FRBOT_OBS_SOURCE_NAME',
-        }
-        setattr(pf, 'details', details)
-        if write_fatal_on_fail:
-            write_fatal('capture_source_invalid', pf, details=details)
-        raise pf
-
-    return
+    # PROD profiles: capture must be OBS source identity only.
+    pf = PreflightFailed('capture_source_invalid')
+    details = {
+        'reason': 'capture_source_invalid',
+        'capture_source': _capture_source(),
+        'required': 'obs_source',
+        'hint': 'Set FRBOT_CAPTURE_SOURCE=obs_source and provide FRBOT_OBS_SOURCE_NAME',
+    }
+    setattr(pf, 'details', details)
+    if write_fatal_on_fail:
+        write_fatal('capture_source_invalid', pf, details=details)
+    raise pf

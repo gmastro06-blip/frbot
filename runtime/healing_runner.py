@@ -19,11 +19,12 @@ from runtime.healing_semantics import (
     read_percent_with_consistency,
     read_text_percent,
 )
+from runtime.pacing import wait_until_ns
 
 
 def _read_hp_mp(ctx: RuntimeContext, frame: Frame) -> tuple[float, float, str]:
     hp_mp_roi = ctx.rois.get(getattr(ctx.config, 'hp_mp_roi', 'hp_mp'))
-    if hp_mp_roi is not None:
+    if hp_mp_roi is not None and int(getattr(hp_mp_roi, 'height', 0) or 0) == 1:
         pair = read_hp_mp_text_pair(frame, hp_mp_roi)
         if pair is None:
             raise PreflightFailed('hp_mp_unreadable')
@@ -97,6 +98,7 @@ def execute_heal_intent(
     input_: InputAdapter,
     binding: WindowBindingAdapter,
     intent: HealIntent,
+    gate: str = 'healing',
 ) -> bool:
     """Execute a single heal intent with evidence-or-abort.
 
@@ -119,7 +121,7 @@ def execute_heal_intent(
         raise PreflightFailed('healing_window_binding_lost')
 
     before = capture.grab()
-    record_before('healing', before)
+    record_before(str(gate), before)
     before_hp, before_mp, src = _read_hp_mp(ctx, before)
 
     # Cooldown must be observable before casting.
@@ -129,14 +131,29 @@ def execute_heal_intent(
     try:
         binding.assert_bound()
         input_.press_key(str(intent.key))
-    except Exception as exc:
-        raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
+    except Exception as input_exc:
+        raise PreflightFailed(f'input emit failed: {type(input_exc).__name__}: {input_exc}') from input_exc
+
+    # Real UI and OBS capture may lag behind inputs; add bounded pacing.
+    try:
+        post_heal_ms = int(os.environ.get('FRBOT_POST_HEAL_DELAY_MS', '150') or '150')
+    except Exception:
+        post_heal_ms = 150
+    if post_heal_ms > 0:
+        wait_until_ns(int(time.monotonic_ns() + (int(post_heal_ms) * 1_000_000)))
 
     after = capture.grab()
-    record_after('healing', after)
+    record_after(str(gate), after)
     after_hp, after_mp, _ = _read_hp_mp(ctx, after)
 
     hp_up = (after_hp - before_hp) >= float(intent.expected.hp_increase_min)
+
+    # Mana cost is often observable even when HP is full (or delayed).
+    try:
+        mp_dec_min = float(os.environ.get('FRBOT_HEAL_MP_DECREASE_MIN', '0.005') or '0.005')
+    except Exception:
+        mp_dec_min = 0.005
+    mp_down = (before_mp - after_mp) >= float(mp_dec_min)
 
     # Cooldown evidence: marker present after cast.
     cooldown_roi = ctx.rois.get(ctx.config.heal_cooldown_roi)
@@ -148,9 +165,41 @@ def execute_heal_intent(
     if cooldown_after is None:
         raise PreflightFailed('heal_cooldown_unknown')
 
+    # Fallback cooldown evidence: ROI delta (theme-agnostic), opt-in via env.
+    delta_ok = False
+    if str(os.environ.get('FRBOT_HEAL_ALLOW_COOLDOWN_ROI_DELTA', '1') or '1').strip().lower() not in {'', '0', 'false', 'no', 'off'}:
+        try:
+            from runtime.healing_semantics import _crop_rgb  # type: ignore
+
+            b = _crop_rgb(before, cooldown_roi)
+            a = _crop_rgb(after, cooldown_roi)
+            if b and a and len(b) == len(a):
+                # Use changed-pixel ratio (robust to sparse cooldown overlays).
+                try:
+                    px_tol = int(os.environ.get('FRBOT_HEAL_COOLDOWN_DELTA_PX_TOL', '15') or '15')
+                except Exception:
+                    px_tol = 15
+                try:
+                    ratio_thr = float(os.environ.get('FRBOT_HEAL_COOLDOWN_DELTA_RATIO_MIN', '0.008') or '0.008')
+                except Exception:
+                    ratio_thr = 0.008
+
+                changed = 0
+                npx = max(1, len(b) // 3)
+                for i in range(0, len(b) - 2, 3):
+                    if (
+                        abs(int(b[i]) - int(a[i])) > px_tol
+                        or abs(int(b[i + 1]) - int(a[i + 1])) > px_tol
+                        or abs(int(b[i + 2]) - int(a[i + 2])) > px_tol
+                    ):
+                        changed += 1
+                delta_ok = (float(changed) / float(npx)) >= float(ratio_thr)
+        except Exception:
+            delta_ok = False
+
     feedback = _feedback_visible(ctx, after)
 
-    evidence_ok = bool(hp_up) or bool(cooldown_after) or bool(feedback)
+    evidence_ok = bool(hp_up) or bool(mp_down) or bool(cooldown_after) or bool(delta_ok) or bool(feedback)
 
     ctx.healing.last.hp_percent = float(after_hp)
     ctx.healing.last.mp_percent = float(after_mp)
@@ -160,7 +209,53 @@ def execute_heal_intent(
     if not evidence_ok:
         ctx.healing.attempt_count += 1
         if ctx.healing.attempt_count >= int(ctx.config.max_attempts_per_heal):
-            raise PreflightFailed('heal_unverified')
+            abort_exc = PreflightFailed('heal_unverified')
+            try:
+                input_method = (os.environ.get('FRBOT_INPUT_METHOD', '') or '').strip().lower() or 'postmessage'
+                details: dict[str, object] = {
+                    'heal_key': str(intent.key),
+                    'input_method': str(input_method),
+                    'post_heal_delay_ms': int(post_heal_ms),
+                    'hp_before': float(before_hp),
+                    'hp_after': float(after_hp),
+                    'mp_before': float(before_mp),
+                    'mp_after': float(after_mp),
+                    'hp_up': bool(hp_up),
+                    'mp_down': bool(mp_down),
+                    'cooldown_after': bool(cooldown_after),
+                    'cooldown_delta_ok': bool(delta_ok),
+                    'feedback': bool(feedback),
+                }
+
+                # Best-effort ROI deltas for quicker diagnosis.
+                try:
+                    from runtime.healing_semantics import _crop_rgb  # type: ignore
+
+                    def _mad(a: bytes, b: bytes) -> float | None:
+                        if not a or not b or len(a) != len(b):
+                            return None
+                        return float(sum(abs(int(x) - int(y)) for x, y in zip(a, b))) / float(len(a))
+
+                    roi_mads: dict[str, float] = {}
+                    for roi_name in (str(ctx.config.hp_bar_roi), str(ctx.config.mp_bar_roi), str(ctx.config.heal_cooldown_roi)):
+                        roi = ctx.rois.get(roi_name)
+                        if roi is None:
+                            continue
+                        b = _crop_rgb(before, roi)
+                        a = _crop_rgb(after, roi)
+                        v = _mad(b, a)
+                        if v is not None:
+                            roi_mads[str(roi_name)] = float(v)
+                    if roi_mads:
+                        details['roi_mads'] = roi_mads
+                except Exception:
+                    pass
+
+                setattr(abort_exc, 'details', details)
+            except Exception:
+                pass
+
+            raise abort_exc
         return False
 
     ctx.healing.attempt_count = 0

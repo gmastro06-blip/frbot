@@ -51,6 +51,13 @@ def _load_config_from_env() -> RuntimeConfig:
     )
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return bool(default)
+    return raw.strip().lower() not in {'', '0', 'false', 'no', 'off'}
+
+
 def _decode_target_frame_name(rgb: bytes, width: int) -> str:
     # Same encoding as battle list mock OCR.
     out: list[int] = []
@@ -78,13 +85,56 @@ def _target_frame_visible(rgb: bytes) -> bool:
 
 
 def _target_frame_hp_bar_present(rgb: bytes) -> bool:
-    # HP bar present if any bright red pixel exists.
+    # HP bar present if we detect a strong red-dominant region.
+    # Mock uses saturated red; real UI often uses anti-aliased reds/oranges.
+    strict_hit = False
+    red_dom_hits = 0
+    # Tuneable via env for real runs, but safe defaults.
+    min_r = int(os.environ.get('FRBOT_TARGET_HP_MIN_R', '140') or '140')
+    min_delta = int(os.environ.get('FRBOT_TARGET_HP_MIN_DELTA', '40') or '40')
+    min_count = int(os.environ.get('FRBOT_TARGET_HP_MIN_COUNT', '80') or '80')
+
+    # Real clients/themes may render the target HP bar with low saturation or
+    # non-red colors. Provide a robust fallback based on luminance contrast.
+    try:
+        luma_range_min = int(os.environ.get('FRBOT_TARGET_HP_LUMA_RANGE_MIN', '28') or '28')
+    except Exception:
+        luma_range_min = 28
+
     for i in range(0, len(rgb) - 2, 3):
-        r = rgb[i]
-        g = rgb[i + 1]
-        b = rgb[i + 2]
-        if r > 180 and g < 60 and b < 60:
-            return True
+        r = int(rgb[i])
+        g = int(rgb[i + 1])
+        b = int(rgb[i + 2])
+        # Strict mock signal.
+        if (r > 180) and (g < 60) and (b < 60):
+            strict_hit = True
+            break
+        # Realistic red-dominant signal.
+        if r >= min_r and (r - max(g, b)) >= min_delta:
+            red_dom_hits += 1
+            if red_dom_hits >= min_count:
+                return True
+
+    if strict_hit:
+        return True
+
+    # Contrast-based fallback (sampled).
+    if luma_range_min > 0 and rgb:
+        step = max(1, (len(rgb) // 9000))
+        lo = 255
+        hi = 0
+        for i in range(0, len(rgb) - 2, 3 * step):
+            r = int(rgb[i])
+            g = int(rgb[i + 1])
+            b = int(rgb[i + 2])
+            y = int((r * 2126 + g * 7152 + b * 722) // 10000)
+            if y < lo:
+                lo = y
+            if y > hi:
+                hi = y
+            if (hi - lo) >= int(luma_range_min):
+                return True
+
     return False
 
 
@@ -95,6 +145,7 @@ def execute_intent(
     input_: InputAdapter,
     binding: WindowBindingAdapter,
     intent: IntentTarget,
+    gate: str = 'targeting',
 ) -> bool:
     """Execute a single targeting intent with semantic evidence validation.
 
@@ -125,7 +176,7 @@ def execute_intent(
         raise PreflightFailed('battle_list_not_detected')
 
     before = capture.grab()
-    record_before('targeting', before)
+    record_before(str(gate), before)
     obs = detect_battle_list(before, battle_roi)
     if obs is None:
         raise PreflightFailed('battle_list_not_detected')
@@ -147,8 +198,17 @@ def execute_intent(
     except Exception as exc:
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
 
+    # Real UI may take a moment to reflect selection; OBS screenshots can also lag.
+    # Use tick-pacing helper (time.sleep is forbidden by CI guardrails).
+    try:
+        post_click_ms = int(os.environ.get('FRBOT_POST_CLICK_DELAY_MS', '150') or '150')
+    except Exception:
+        post_click_ms = 150
+    if post_click_ms > 0:
+        wait_until_ns(int(time.monotonic_ns() + (int(post_click_ms) * 1_000_000)))
+
     after = capture.grab()
-    record_after('targeting', after)
+    record_after(str(gate), after)
     obs2 = detect_battle_list(after, battle_roi)
     if obs2 is None:
         raise PreflightFailed('battle_list_not_detected')
@@ -175,14 +235,24 @@ def execute_intent(
             success = False
         else:
             tf_visible = _target_frame_visible(tf_rgb)
-            tf_hp = _target_frame_hp_bar_present(tf_rgb)
+            # Prefer a dedicated HP-bar ROI when available.
+            hp_roi = ctx.rois.get(getattr(ctx.config, 'target_hp_bar_roi', 'target_hp_bar'))
+            hp_rgb = crop_roi_rgb(after, hp_roi) if hp_roi is not None else b''
+            tf_hp = _target_frame_hp_bar_present(hp_rgb if hp_rgb else tf_rgb)
             tf_name = _decode_target_frame_name(tf_rgb, int(target_roi.width))
             if intent.expected_evidence.target_frame_visible and not tf_visible:
                 success = False
             if intent.expected_evidence.target_hp_bar_present and not tf_hp:
                 success = False
-            if tf_name != intent.target_name:
-                success = False
+            # Only enforce name match when a decodable name is present.
+            # (In real mode without mock encoding, tf_name is usually empty.)
+            if tf_name:
+                if tf_name != intent.target_name:
+                    success = False
+            else:
+                # Optional strictness toggle.
+                if _env_bool('FRBOT_REQUIRE_TARGET_FRAME_NAME', False):
+                    success = False
 
     if not success:
         ctx.targeting.attempt_count += 1

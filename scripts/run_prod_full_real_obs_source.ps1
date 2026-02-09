@@ -65,7 +65,8 @@ function _RunPoetryPython {
   if (Test-Path $stderrPath) { Remove-Item -Force $stderrPath }
 
   $cmd = @("poetry", "run", "python") + $PyArgs
-  & $cmd 1> $stdoutPath 2> $stderrPath
+  # Invoke safely: PowerShell can treat arrays as a single string otherwise.
+  & $cmd[0] @($cmd[1..($cmd.Length - 1)]) 1> $stdoutPath 2> $stderrPath
   $code = $LASTEXITCODE
 
   $out = ""
@@ -104,13 +105,32 @@ try {
   if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:FRBOT_CONFIG_PATH)) {
       $ConfigPath = $env:FRBOT_CONFIG_PATH
+      # Some terminals/README snippets use placeholders like "C:\...\file.json".
+      # If env points to a non-existent path, fall back to the repo default.
+      if (-not (Test-Path $ConfigPath)) {
+        $ConfigPath = ""
+      }
     } else {
-      $defaultCfg = Join-Path $RepoRoot "rois_prod_full.json"
-      if (Test-Path $defaultCfg) {
-        $ConfigPath = $defaultCfg
-      } else {
+        $defaultCfg = Join-Path $RepoRoot "config\rois_prod_full.json"
+        $legacyCfg = Join-Path $RepoRoot "rois_prod_full.json"
+        if (Test-Path $defaultCfg) {
+          $ConfigPath = $defaultCfg
+        } elseif (Test-Path $legacyCfg) {
+          $ConfigPath = $legacyCfg
+        } else {
         throw "Provide -ConfigPath (prod_full requires a unified ROI config). Missing default: $defaultCfg"
       }
+    }
+  }
+  if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
+    $defaultCfg = Join-Path $RepoRoot "config\rois_prod_full.json"
+    $legacyCfg = Join-Path $RepoRoot "rois_prod_full.json"
+    if (Test-Path $defaultCfg) {
+      $ConfigPath = $defaultCfg
+    } elseif (Test-Path $legacyCfg) {
+      $ConfigPath = $legacyCfg
+    } else {
+      throw "Provide -ConfigPath (prod_full requires a unified ROI config). Missing default: $defaultCfg"
     }
   }
   if (-not (Test-Path $ConfigPath)) {
@@ -119,7 +139,14 @@ try {
   $absConfig = Resolve-Path $ConfigPath
 
   if ([string]::IsNullOrWhiteSpace($WindowHwnd) -and -not [string]::IsNullOrWhiteSpace($env:FRBOT_WINDOW_HWND)) {
-    $WindowHwnd = $env:FRBOT_WINDOW_HWND
+    $candidateHwnd = [string]$env:FRBOT_WINDOW_HWND
+    $trim = $candidateHwnd.Trim()
+    # Ignore common placeholder values like 0xXXXXXXXX.
+    if ($trim -match '^(?i)0xX+$') {
+      $WindowHwnd = ""
+    } else {
+      $WindowHwnd = $candidateHwnd
+    }
   }
   if ([string]::IsNullOrWhiteSpace($WindowTitle) -and -not [string]::IsNullOrWhiteSpace($env:FRBOT_WINDOW_TITLE)) {
     $WindowTitle = $env:FRBOT_WINDOW_TITLE
@@ -210,7 +237,7 @@ print("PRECHECK_OK")
   }
 
   # ----------------
-  # 2) Run pipeline (combat_basic -> looting_full -> deposit_full -> trade_full)
+  # 2) Run pipeline (targeting_full -> healing_full -> combat_full -> cavebot_full -> looting_full -> deposit_full -> trade_full)
   # ----------------
   Write-Host "Running prod_full pipeline..." -ForegroundColor Cyan
   $env:FRBOT_MODE = "prod_full"
@@ -226,10 +253,10 @@ print("PRECHECK_OK")
   # ----------------
   # 3) Final audit (auditor is authority)
   # ----------------
-  Write-Host "Final audit (tools/audit_all.py)..." -ForegroundColor Cyan
+  Write-Host "Final audit (tools/audit_prod_full.py)..." -ForegroundColor Cyan
   $env:FRBOT_MODE = "real"
-  $auditOut = Join-Path $diagDir ("evidence_" + $stamp + ".audit_all_prod_full.out")
-  $auditCode = _RunPoetryPython -PyArgs @("tools/audit_all.py") -OutPath $auditOut
+  $auditOut = Join-Path $diagDir ("evidence_" + $stamp + ".audit_prod_full.out")
+  $auditCode = _RunPoetryPython -PyArgs @("tools/audit_prod_full.py") -OutPath $auditOut
 
   Write-Host "Evidence dir: $framesDir" -ForegroundColor DarkCyan
   Write-Host "Audit output: $auditOut" -ForegroundColor DarkCyan

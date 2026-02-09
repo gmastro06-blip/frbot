@@ -22,9 +22,11 @@ from runtime.inventory_semantics import (
     diff_inventory,
     is_loot_success,
     rank_beef_candidates_by_temporal_stability_fast,
+    read_inventory_pair,
     read_inventory_pair_binary,
     scan_beef_candidates_in_frame,
 )
+from runtime.pacing import sleep_ms
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -78,6 +80,7 @@ def _try_write_looting_basic_last_result(
     evidence_dir: str,
     ok: bool,
     outcome_kind: str,
+    evidence_kind: str,
     loot_action: dict | None,
     verify_attempts: int,
     inventory_after_readable: bool,
@@ -100,7 +103,11 @@ def _try_write_looting_basic_last_result(
 
         g = (gate or 'looting_basic').strip().lower() or 'looting_basic'
 
-        if not before_ppm or not after_ppm:
+        profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+        strict_ppm_pointers = profile in {'prod_emergency', 'prod_full'}
+
+        # In prod profiles, NEVER guess via glob: evidence pointers must be exact.
+        if (not strict_ppm_pointers) and (not before_ppm or not after_ppm):
             before_scan = None
             after_scan = None
             try:
@@ -118,6 +125,7 @@ def _try_write_looting_basic_last_result(
             after_ppm = after_ppm or after_scan
 
         delta_latency_ms: float | None = None
+        max_latency_ms: float | None = None
         if chat_evidence is not None:
             try:
                 v = (chat_evidence.debug or {}).get('delta_latency_ms')
@@ -125,11 +133,19 @@ def _try_write_looting_basic_last_result(
                     delta_latency_ms = float(v)
             except Exception:
                 delta_latency_ms = None
+            try:
+                v2 = (chat_evidence.debug or {}).get('max_latency_ms')
+                if v2 is not None:
+                    max_latency_ms = float(v2)
+            except Exception:
+                max_latency_ms = None
 
         payload: dict[str, object] = {
             'gate': str(g),
             'ok': bool(ok),
             'outcome_kind': str(outcome_kind),
+            'reason': str(outcome_kind),
+            'evidence_kind': str(evidence_kind),
             'loot_action': dict(loot_action or {}),
             'verify_attempts': int(verify_attempts),
             'inventory_after_readable': bool(inventory_after_readable),
@@ -148,7 +164,8 @@ def _try_write_looting_basic_last_result(
             },
             'chat_ok': bool(chat_evidence.ok) if chat_evidence is not None else False,
             'chat_debug': dict(chat_evidence.debug or {}) if chat_evidence is not None else {},
-            'delta_latency_ms': delta_latency_ms,
+            'chat_latency_ms': delta_latency_ms,
+            'chat_max_latency_ms': max_latency_ms,
             'used_chat_fallback': bool(used_chat_fallback),
             'before_ppm': before_ppm,
             'after_ppm': after_ppm,
@@ -217,6 +234,8 @@ class LootingBasicOutcome:
     inventory_before: Optional[InventorySnapshot]
     inventory_after: Optional[InventorySnapshot]
     delta: Optional[InventoryDelta]
+    before_ppm: str | None = None
+    after_ppm: str | None = None
 
 
 def execute_looting_basic_once(
@@ -497,7 +516,12 @@ def execute_looting_basic_once(
             return False
 
     # Read BEFORE inventory (pair read happens after AFTER grab).
-    inv_pair_before = read_inventory_pair_binary(before, before, inv_roi)
+    # - PROD-EMERGENCY: binary-only overlay is mandatory.
+    # - PROD-FULL/other: allow visual fallback when binary overlay is absent.
+    profile0 = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    read_pair = read_inventory_pair_binary if profile0 == 'prod_emergency' else read_inventory_pair
+
+    inv_pair_before = read_pair(before, before, inv_roi)
     if inv_pair_before is None:
         _try_dump_looting_pair(gate=gate_name, reason='looting_inventory_unreadable', before=before, after=None)
         _try_dump_emergency_candidates(reason='looting_inventory_unreadable', before_frame=before, after_frames=[])
@@ -506,7 +530,6 @@ def execute_looting_basic_once(
     ctx.looting.last_inventory = inv_before
 
     # Certification precondition: attempt only if a corpse is detectable.
-    profile0 = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
     if profile0 == 'prod_emergency' and str(getattr(ctx.config, 'mode', '') or '').strip().lower() == 'real':
         corpse_roi_name = (os.environ.get('FRBOT_LOOT_CORPSE_ROI', '') or 'loot_corpse').strip() or 'loot_corpse'
         corpse_roi = ctx.rois.get(str(corpse_roi_name))
@@ -584,10 +607,12 @@ def execute_looting_basic_once(
             player_xy = None if player_x is None or player_y is None else (int(player_x), int(player_y))
 
             action = (os.environ.get('FRBOT_LOOTING_BASIC_ACTION', '') or '').strip().lower()
-            if not action:
-                action = (os.environ.get('FRBOT_TIBIA_LOOT_GESTURE', '') or 'shift_rmb').strip().lower()
-
             profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+            if not action:
+                # PROD-FULL: Alt+Q is the default and only supported operator action.
+                # Other profiles keep legacy default of Shift+RMB.
+                default_gesture = 'alt_q' if profile == 'prod_full' else 'shift_rmb'
+                action = (os.environ.get('FRBOT_TIBIA_LOOT_GESTURE', '') or default_gesture).strip().lower()
             if profile == 'prod_emergency':
                 # Strict certification contract: Alt+Q is the only allowed input action.
                 action = 'alt_q'
@@ -688,7 +713,14 @@ def execute_looting_basic_once(
         except Exception:
             verify_attempts = int(strict_default_attempts)
         verify_attempts = max(1, min(int(verify_attempts), 8))
-        verify_delay_ms = 0.0
+        # Even for strict certification runs, allow a small wait for the UI/capture
+        # pipeline to reflect the loot action; this does not emit any extra inputs.
+        try:
+            raw_delay = (os.environ.get('FRBOT_LOOTING_BASIC_STRICT_VERIFY_DELAY_MS', '120') or '120').strip()
+            verify_delay_ms = float(raw_delay)
+        except Exception:
+            verify_delay_ms = 120.0
+        verify_delay_ms = max(0.0, min(float(verify_delay_ms), 2000.0))
     else:
         # Legacy behavior for non-cert runs.
         if is_real and gesture_emitted_for_defaults in {'key'}:
@@ -716,12 +748,17 @@ def execute_looting_basic_once(
     last_delta: InventoryDelta | None = None
 
     for i in range(int(verify_attempts)):
+        # PROD contracts: 1 input max; no extra sleeps.
+        profile_v = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+        if profile_v not in {'prod_emergency', 'prod_full'}:
+            if float(verify_delay_ms) > 0.0:
+                sleep_ms(float(verify_delay_ms))
         after = capture.grab()
         record_after(gate_name, after)
         record_after('runtime', after)
         after_frames_for_stability.append(after)
 
-        inv_pair = read_inventory_pair_binary(before, after, inv_roi)
+        inv_pair = read_pair(before, after, inv_roi)
         if inv_pair is not None:
             _inv_before2, inv_after = inv_pair
             ctx.looting.last_inventory = inv_after
@@ -749,6 +786,7 @@ def execute_looting_basic_once(
                     evidence_dir=_frames_dir_for_looting_evidence(),
                     ok=True,
                     outcome_kind='inventory_delta',
+                    evidence_kind='inventory_delta',
                     loot_action=loot_action,
                     verify_attempts=int(verify_attempts),
                     inventory_after_readable=True,
@@ -773,6 +811,8 @@ def execute_looting_basic_once(
                     inventory_before=inv_before,
                     inventory_after=inv_after,
                     delta=delta,
+                    before_ppm=before_name,
+                    after_ppm=after_name,
                 )
 
         # Strict certification contract: do not sleep between verification frames.
@@ -849,6 +889,7 @@ def execute_looting_basic_once(
                     evidence_dir=_frames_dir_for_looting_evidence(),
                     ok=True,
                     outcome_kind='chat_delta_inventory_unreadable',
+                    evidence_kind='chat_delta',
                     loot_action=loot_action,
                     verify_attempts=int(verify_attempts),
                     inventory_after_readable=False,
@@ -873,6 +914,69 @@ def execute_looting_basic_once(
                     inventory_before=inv_before,
                     inventory_after=None,
                     delta=None,
+                    before_ppm=before_name,
+                    after_ppm=after_name,
+                )
+
+            # PROD-FULL certification: allow chat-delta as PASS when inventory is readable
+            # but does not move (e.g. Cap is integer-rounded and loot weight < 1).
+            profile_pf = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+            allow_chat_primary_prod_full = profile_pf == 'prod_full'
+
+            def _chat_latency_ok(ev: LootEvidence) -> bool:
+                try:
+                    dbg = dict(ev.debug or {})
+                except Exception:
+                    dbg = {}
+                lat = dbg.get('delta_latency_ms')
+                mx = dbg.get('max_latency_ms')
+                if lat is None or mx is None:
+                    return False
+                try:
+                    lat_f = float(lat)
+                    mx_f = float(mx)
+                except Exception:
+                    return False
+                return (lat_f >= 0.0) and (lat_f <= mx_f)
+
+            # In REAL runs we additionally require the emitted gesture to be Alt+Q.
+            # In MOCK runs (CI), keep this path testable.
+            gesture_ok_for_profile = (not is_real) or (act_kind == 'alt_q')
+
+            if (
+                allow_chat_primary_prod_full
+                and gesture_ok_for_profile
+                and (chat_evidence is not None)
+                and bool(chat_evidence.ok)
+                and bool(_chat_latency_ok(chat_evidence))
+            ):
+                before_name, after_name = _try_dump_looting_pair(gate=gate_name, reason='chat_delta', before=before, after=after)
+                _try_write_looting_basic_last_result(
+                    gate=gate_name,
+                    evidence_dir=_frames_dir_for_looting_evidence(),
+                    ok=True,
+                    outcome_kind='chat_delta',
+                    evidence_kind='chat_delta',
+                    loot_action=loot_action,
+                    verify_attempts=int(verify_attempts),
+                    inventory_after_readable=bool(inventory_after_readable),
+                    inventory_delta_ok=False,
+                    inventory_before=inv_before,
+                    inventory_after=last_inv_after,
+                    chat_evidence=chat_evidence,
+                    used_chat_fallback=True,
+                    before_ppm=before_name,
+                    after_ppm=after_name,
+                )
+
+                return LootingBasicOutcome(
+                    ok=True,
+                    evidence_kind='chat_delta',
+                    inventory_before=inv_before,
+                    inventory_after=last_inv_after,
+                    delta=last_delta,
+                    before_ppm=before_name,
+                    after_ppm=after_name,
                 )
     except Exception:
         chat_evidence = None
@@ -885,6 +989,7 @@ def execute_looting_basic_once(
             evidence_dir=_frames_dir_for_looting_evidence(),
             ok=False,
             outcome_kind='looting_inventory_unreadable',
+            evidence_kind='none',
             loot_action=loot_action,
             verify_attempts=int(verify_attempts),
             inventory_after_readable=False,
@@ -949,6 +1054,7 @@ def execute_looting_basic_once(
         evidence_dir=_frames_dir_for_looting_evidence(),
         ok=False,
         outcome_kind=str(reason),
+        evidence_kind='none',
         loot_action=loot_action,
         verify_attempts=int(verify_attempts),
         inventory_after_readable=True,

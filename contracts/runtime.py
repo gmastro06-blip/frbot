@@ -88,6 +88,13 @@ class Waypoint:
 @dataclass(slots=True)
 class CavebotTelemetry:
     waypoint_id: str = ''
+    # Marker RGB used for semantic minimap tracking. When None, runner falls back
+    # to RuntimeConfig.player_marker_rgb.
+    marker_rgb: tuple[int, int, int] | None = None
+    # Virtual marker position used when the real minimap keeps the marker centered
+    # and movement must be inferred from minimap scroll.
+    virtual_x_px: int | None = None
+    virtual_y_px: int | None = None
     marker_before: Optional[MinimapMarker] = None
     marker_after: Optional[MinimapMarker] = None
     distance_before_px: float = 0.0

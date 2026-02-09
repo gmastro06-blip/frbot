@@ -29,10 +29,10 @@ def enforce_feature_allowed(feature: str) -> None:
     """Abort-fast gate for features that are hard-disabled in PROD-EMERGENCY."""
 
     f = (feature or '').strip().lower()
-    # Emergency/full profiles only support explicitly routed gates.
-    if current_profile() in {_PROD_EMERGENCY, _PROD_FULL}:
-        if f in {'combat', 'looting', 'deposit', 'trade'}:
-            raise PreflightFailed('feature_disabled')
+    # PROD-EMERGENCY hard-disables high-risk autonomous features.
+    # PROD-FULL runs a strict, evidence-driven pipeline and MUST allow these gates.
+    if is_prod_emergency() and f in {'combat', 'looting', 'deposit', 'trade'}:
+        raise PreflightFailed('feature_disabled')
 
 
 def cap_ticks(requested: int) -> int:

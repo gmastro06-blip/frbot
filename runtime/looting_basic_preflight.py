@@ -23,11 +23,46 @@ from runtime.inventory_semantics import (
     beef_candidate_u16,
     rank_beef_candidates_by_temporal_stability,
     rank_beef_candidates_by_temporal_stability_fast,
+    read_inventory,
     read_inventory_binary,
     scan_beef_candidates_in_frame,
 )
 from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
 from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
+
+
+def _frames_dir_for_looting_preflight() -> Path:
+    raw = (os.environ.get('FRBOT_REAL_FRAMES_DIR', '') or '').strip()
+    if raw:
+        return Path(str(raw))
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        return Path('diagnostics') / 'frames_emergency'
+    if profile == 'prod_full':
+        return Path('diagnostics') / 'frames_full'
+    return Path('diagnostics') / 'frames'
+
+
+def _dump_looting_preflight_failure_frame(*, reason: str, before: Frame) -> None:
+    try:
+        from diagnostics.frame_dump import dump_enabled, dump_pair
+
+        profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+        dump_force = profile in {'prod_emergency', 'prod_full'}
+        if not dump_force and not dump_enabled():
+            return
+
+        gate = (os.environ.get('FRBOT_MODE', '') or 'looting_basic').strip().lower()
+        out_dir = _frames_dir_for_looting_preflight()
+        dump_pair(
+            gate=str(gate or 'looting_basic'),
+            before=before,
+            after=None,
+            reason=str(reason),
+            out_dir=str(out_dir),
+        )
+    except Exception:
+        return
 
 
 CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | ObsSourceRealCapture | MockWorldAnyCapture
@@ -327,8 +362,11 @@ def looting_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
             except Exception:
                 raise PreflightFailed('inventory_overlay_missing')
 
-        if read_inventory_binary(f0, inv_roi) is None:
-            if is_emergency:
+        # Inventory readability contract:
+        # - PROD-EMERGENCY: must be binary overlay (0xBEEF) and readable immediately.
+        # - PROD-FULL/other: allow visual fallback (templates-based) when binary is absent.
+        if is_emergency:
+            if read_inventory_binary(f0, inv_roi) is None:
                 try:
                     from diagnostics.frame_dump import dump_frame_ppm
 
@@ -379,7 +417,14 @@ def looting_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
                 except Exception:
                     # Best-effort diagnostics: failure to dump calibration hints is non-fatal.
                     pass
-            raise PreflightFailed('looting_inventory_unreadable')
+                raise PreflightFailed('looting_inventory_unreadable')
+        else:
+            if read_inventory(f0, inv_roi) is None:
+                _dump_looting_preflight_failure_frame(
+                    reason='preflight_abort_looting_inventory_unreadable',
+                    before=f0,
+                )
+                raise PreflightFailed('looting_inventory_unreadable')
 
         ctx.status.state = RuntimeState.READY
         return capture_real, input_real, binding_real

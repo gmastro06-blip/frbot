@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import time
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -13,7 +16,85 @@ from contracts.window import WindowBindingAdapter
 from diagnostics.last_frames import record_after, record_before
 from diagnostics.frame_dump import dump_enabled, dump_pair
 from runtime.cavebot_semantics import ProgressResult, compute_progress, detect_player_marker, is_progress_valid, select_player_marker
+from runtime.pacing import wait_until_ns
 from runtime.profile import is_prod_emergency
+
+
+def _estimate_minimap_translation_px(
+    before_f: Frame,
+    after_f: Frame,
+    *,
+    max_shift_px: int = 6,
+    sample_step_px: int = 4,
+) -> tuple[int, int, float, float]:
+    """Estimate translation between minimap crops (in pixels).
+
+    Returns (dx, dy, sad_best, sad_0).
+
+    Convention: dx,dy are defined so that after(x,y) ~= before(x+dx, y+dy).
+    This means a positive dx implies minimap content moved left (player moved right).
+    """
+
+    if not bool(before_f.minimap_detected and after_f.minimap_detected):
+        return (0, 0, 0.0, 0.0)
+
+    w = int(before_f.minimap_width)
+    h = int(before_f.minimap_height)
+    if w <= 0 or h <= 0:
+        return (0, 0, 0.0, 0.0)
+    if int(after_f.minimap_width) != w or int(after_f.minimap_height) != h:
+        return (0, 0, 0.0, 0.0)
+
+    b = bytes(before_f.minimap_rgb)
+    a = bytes(after_f.minimap_rgb)
+    if not b or not a:
+        return (0, 0, 0.0, 0.0)
+    if len(b) != (w * h * 3) or len(a) != (w * h * 3):
+        return (0, 0, 0.0, 0.0)
+
+    max_s = max(0, int(max_shift_px))
+    step = max(1, int(sample_step_px))
+
+    def sad_for(dx: int, dy: int) -> float:
+        x0 = max(0, -int(dx))
+        x1 = min(w, w - int(dx))
+        y0 = max(0, -int(dy))
+        y1 = min(h, h - int(dy))
+        if x1 <= x0 or y1 <= y0:
+            return 1e30
+
+        sad = 0.0
+        n = 0
+        for y in range(int(y0), int(y1), int(step)):
+            row_a = int(y) * int(w)
+            row_b = int(y + int(dy)) * int(w)
+            for x in range(int(x0), int(x1), int(step)):
+                ia = (row_a + int(x)) * 3
+                ib = (row_b + int(x + int(dx))) * 3
+                sad += abs(int(a[ia]) - int(b[ib]))
+                sad += abs(int(a[ia + 1]) - int(b[ib + 1]))
+                sad += abs(int(a[ia + 2]) - int(b[ib + 2]))
+                n += 1
+        if n <= 0:
+            return 1e30
+        return float(sad) / float(n)
+
+    sad_0 = sad_for(0, 0)
+    best_dx = 0
+    best_dy = 0
+    best_sad = float(sad_0)
+
+    for dy in range(-max_s, max_s + 1):
+        for dx in range(-max_s, max_s + 1):
+            if dx == 0 and dy == 0:
+                continue
+            s = sad_for(int(dx), int(dy))
+            if float(s) < float(best_sad):
+                best_sad = float(s)
+                best_dx = int(dx)
+                best_dy = int(dy)
+
+    return (int(best_dx), int(best_dy), float(best_sad), float(sad_0))
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,28 +135,46 @@ def _select_key_toward_waypoint(marker_before: object, waypoint: Waypoint) -> st
     return 'DOWN' if dy > 0 else 'UP'
 
 
+def _frames_dir() -> Path:
+    raw = str(os.environ.get('FRBOT_REAL_FRAMES_DIR') or '').strip()
+    if raw:
+        return Path(raw)
+    prof = str(os.environ.get('FRBOT_PROFILE') or '').strip().lower()
+    if prof == 'prod_emergency':
+        return Path('diagnostics') / 'frames_emergency'
+    if prof == 'prod_full':
+        return Path('diagnostics') / 'frames_full'
+    return Path('diagnostics') / 'frames'
+
+
 def _append_trace(*, gate: str, payload: dict) -> None:
     try:
         # Required audit trace (generated artifact; must not be committed).
-        out_dir = Path('diagnostics') / 'frames'
+        out_dir = _frames_dir()
         out_dir.mkdir(parents=True, exist_ok=True)
-        path = out_dir / f'{str(gate).strip().lower()}_trace.jsonl'
+        g = str(gate).strip().lower()
+        # Keep the canonical artifact name for the cavebot semantic trace.
+        # (Multiple gates may reuse the runner, but inventory/auditors expect this file.)
+        if g.startswith('cavebot'):
+            path = out_dir / 'cavebot_trace.jsonl'
+        else:
+            path = out_dir / f'{g}_trace.jsonl'
         with path.open('a', encoding='utf-8') as f:
             f.write(json.dumps(payload, sort_keys=True) + '\n')
     except Exception:
         return
 
 
-def _dump_marker_abort_pair(*, before: Frame | None, after: Frame | None, reason: str) -> None:
+def _dump_marker_abort_pair(*, gate: str, before: Frame | None, after: Frame | None, reason: str) -> None:
     # PROD_EMERGENCY REAL contract: marker aborts must dump BEFORE/AFTER.
     try:
-        dump_pair(gate='cavebot', before=before, after=after, reason=str(reason))
+        dump_pair(gate=str(gate), before=before, after=after, reason=str(reason))
     except Exception:
         return
 
 
 def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, waypoint: Waypoint) -> tuple[Optional[ProgressResult], str]:
-    cfg_rgb = _parse_rgb(ctx.config.player_marker_rgb)
+    cfg_rgb = _marker_rgb(ctx)
     sel_b = select_player_marker(
         before_f,
         marker_rgb=cfg_rgb,
@@ -104,7 +203,81 @@ def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, 
     if marker_after is None:
         return None, 'cavebot_marker_not_found'
 
-    progress = compute_progress(marker_before, marker_after, waypoint)
+    # Scroll-based inference is ONLY for REAL mode. Mock world already provides
+    # deterministic moving markers and should not be influenced by translation heuristics.
+    real_mode = str(getattr(ctx.config, 'mode', '')).strip().lower() == 'real'
+
+    # If the marker is stable/centered (common in real minimaps), infer movement from
+    # minimap scroll (translation) and accumulate it in telemetry to avoid false "no progress".
+    min_delta = int(getattr(ctx.config, 'cavebot_min_pixel_delta', 2) or 2)
+    dx_m = int(getattr(marker_after, 'x_px', 0)) - int(getattr(marker_before, 'x_px', 0))
+    dy_m = int(getattr(marker_after, 'y_px', 0)) - int(getattr(marker_before, 'y_px', 0))
+
+    tel = getattr(getattr(ctx, 'cavebot_gate', None), 'telemetry', None)
+    base_x = int(getattr(marker_before, 'x_px', 0))
+    base_y = int(getattr(marker_before, 'y_px', 0))
+    try:
+        if tel is not None and getattr(tel, 'virtual_x_px', None) is not None:
+            base_x = int(getattr(tel, 'virtual_x_px'))
+        if tel is not None and getattr(tel, 'virtual_y_px', None) is not None:
+            base_y = int(getattr(tel, 'virtual_y_px'))
+    except Exception:
+        base_x = int(getattr(marker_before, 'x_px', 0))
+        base_y = int(getattr(marker_before, 'y_px', 0))
+
+    try:
+        virt_before = type(marker_before)(x_px=int(base_x), y_px=int(base_y), pixel_count=int(getattr(marker_before, 'pixel_count', 0)))
+    except Exception:
+        virt_before = marker_before
+
+    virt_after = marker_after
+
+    if not bool(real_mode):
+        # In non-real mode, marker coordinates are authoritative.
+        try:
+            if tel is not None:
+                tel.virtual_x_px = int(getattr(marker_after, 'x_px', 0))
+                tel.virtual_y_px = int(getattr(marker_after, 'y_px', 0))
+        except Exception:
+            pass
+        progress = compute_progress(marker_before, marker_after, waypoint)
+        if float(progress.angle_deg) > 90.0:
+            return progress, 'cavebot_wrong_direction'
+        if not is_progress_valid(progress, waypoint):
+            return progress, 'cavebot_no_progress'
+        return progress, 'ok'
+
+    # Primary: if the marker itself moves, trust it and keep telemetry in sync.
+    if (abs(int(dx_m)) + abs(int(dy_m))) >= int(max(1, min_delta)):
+        virt_after = marker_after
+        try:
+            if tel is not None:
+                tel.virtual_x_px = int(getattr(marker_after, 'x_px', 0))
+                tel.virtual_y_px = int(getattr(marker_after, 'y_px', 0))
+        except Exception:
+            pass
+    else:
+        # Fallback: infer minimap scroll and accumulate virtual position.
+        dx_s, dy_s, sad_best, sad_0 = _estimate_minimap_translation_px(before_f, after_f)
+        improved = (float(sad_best) + 0.25) < float(sad_0)
+        if improved and (abs(int(dx_s)) + abs(int(dy_s))) >= int(max(1, min_delta)):
+            new_x = int(base_x) + int(dx_s)
+            new_y = int(base_y) + int(dy_s)
+            try:
+                virt_after = type(marker_before)(x_px=int(new_x), y_px=int(new_y), pixel_count=int(getattr(marker_after, 'pixel_count', 0)))
+            except Exception:
+                virt_after = marker_after
+            try:
+                if tel is not None:
+                    tel.virtual_x_px = int(new_x)
+                    tel.virtual_y_px = int(new_y)
+            except Exception:
+                pass
+        else:
+            # No evidence of movement: keep virtual marker unchanged.
+            virt_after = virt_before
+
+    progress = compute_progress(virt_before, virt_after, waypoint)
 
     # Aborts are decided in the runner (evidence-or-abort).
     if float(progress.angle_deg) > 90.0:
@@ -125,6 +298,17 @@ def _parse_rgb(raw: str) -> tuple[int, int, int]:
         return (255, 0, 255)
 
 
+def _marker_rgb(ctx: RuntimeContext) -> tuple[int, int, int]:
+    try:
+        tel = getattr(getattr(ctx, 'cavebot_gate', None), 'telemetry', None)
+        rgb = getattr(tel, 'marker_rgb', None)
+        if isinstance(rgb, (tuple, list)) and len(rgb) == 3:
+            return (int(rgb[0]), int(rgb[1]), int(rgb[2]))
+    except Exception:
+        pass
+    return _parse_rgb(ctx.config.player_marker_rgb)
+
+
 def execute_cavebot_tick(
     ctx: RuntimeContext,
     *,
@@ -133,6 +317,7 @@ def execute_cavebot_tick(
     binding: WindowBindingAdapter,
     waypoint: Waypoint,
     tick_index: int,
+    gate: str = 'cavebot',
 ) -> CavebotTickOutcome:
     """Execute exactly one cavebot tick.
 
@@ -146,9 +331,9 @@ def execute_cavebot_tick(
         raise PreflightFailed('cavebot_window_binding_lost') from exc
 
     before = capture.grab()
-    record_before('cavebot', before)
+    record_before(str(gate), before)
 
-    cfg_rgb = _parse_rgb(ctx.config.player_marker_rgb)
+    cfg_rgb = _marker_rgb(ctx)
     prev_marker = getattr(ctx.cavebot_gate.telemetry, 'marker_after', None)
     sel_before = select_player_marker(
         before,
@@ -164,7 +349,7 @@ def execute_cavebot_tick(
     # Marker aborts: must be explicit with evidence.
     if sel_before.abort_reason in {'cavebot_marker_ambiguous', 'cavebot_marker_roi_black'}:
         after = capture.grab()
-        record_after('cavebot', after)
+        record_after(str(gate), after)
 
         ev = CavebotTickEvidence(
             marker_before=None,
@@ -174,12 +359,12 @@ def execute_cavebot_tick(
         )
         out = CavebotTickOutcome(reached_waypoint=False, evidence=ev, abort_reason=str(sel_before.abort_reason))
         if is_prod_emergency() and str(ctx.config.mode).strip().lower() == 'real':
-            _dump_marker_abort_pair(before=before, after=after, reason=str(out.abort_reason))
+            _dump_marker_abort_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
         elif dump_enabled():
-            dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
+            dump_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
 
         _append_trace(
-            gate='cavebot',
+            gate=str(gate),
             payload={
                 'event': 'abort',
                 'tick_index': int(tick_index),
@@ -216,15 +401,15 @@ def execute_cavebot_tick(
 
     if marker_before is None:
         after = capture.grab()
-        record_after('cavebot', after)
+        record_after(str(gate), after)
         ev = CavebotTickEvidence(marker_before=None, marker_after=None, progress=None, status='cavebot_marker_not_found')
         out = CavebotTickOutcome(reached_waypoint=False, evidence=ev, abort_reason='cavebot_marker_not_found')
         if is_prod_emergency() and str(ctx.config.mode).strip().lower() == 'real':
-            _dump_marker_abort_pair(before=before, after=after, reason=str(out.abort_reason))
+            _dump_marker_abort_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
         elif dump_enabled():
-            dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
+            dump_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
         _append_trace(
-            gate='cavebot',
+            gate=str(gate),
             payload={
                 'event': 'abort',
                 'tick_index': int(tick_index),
@@ -251,13 +436,13 @@ def execute_cavebot_tick(
     # Waypoint timeout is deterministic (no further input).
     if int(ctx.cavebot.gate_ticks_in_waypoint) >= int(waypoint.max_ticks):
         after = capture.grab()
-        record_after('cavebot', after)
+        record_after(str(gate), after)
         ev = CavebotTickEvidence(marker_before=marker_before, marker_after=None, progress=None, status='cavebot_waypoint_timeout')
         out = CavebotTickOutcome(reached_waypoint=False, evidence=ev, abort_reason='cavebot_waypoint_timeout')
         if dump_enabled():
-            dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
+            dump_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
         _append_trace(
-            gate='cavebot',
+            gate=str(gate),
             payload={
                 'event': 'abort',
                 'tick_index': int(tick_index),
@@ -275,19 +460,36 @@ def execute_cavebot_tick(
         return out
 
     # Arrival stability check: reached only if distance <= radius_px for >=2 consecutive ticks.
-    dist_before = _waypoint_distance_px(marker_before, waypoint)
+    # Use virtual marker position in REAL mode only (centered minimap scroll inference).
+    virt_before = marker_before
+    try:
+        tel = getattr(getattr(ctx, 'cavebot_gate', None), 'telemetry', None)
+        vx = getattr(tel, 'virtual_x_px', None) if tel is not None else None
+        vy = getattr(tel, 'virtual_y_px', None) if tel is not None else None
+        real_mode = str(getattr(ctx.config, 'mode', '')).strip().lower() == 'real'
+        if bool(real_mode) and vx is not None and vy is not None:
+            virt_before = type(marker_before)(
+                x_px=int(vx),
+                y_px=int(vy),
+                pixel_count=int(getattr(marker_before, 'pixel_count', 0)),
+            )
+    except Exception:
+        virt_before = marker_before
+
+    dist_before = _waypoint_distance_px(virt_before, waypoint)
     if float(dist_before) <= float(waypoint.radius_px):
         ctx.cavebot.gate_reach_streak = int(ctx.cavebot.gate_reach_streak) + 1
         after = capture.grab()
-        record_after('cavebot', after)
+        record_after(str(gate), after)
         marker_after = detect_player_marker(
             after,
-            marker_rgb=_parse_rgb(ctx.config.player_marker_rgb),
+            marker_rgb=_marker_rgb(ctx),
             tol=int(ctx.config.player_marker_tol),
             min_pixels=int(ctx.config.player_marker_min_pixels),
             max_pixels=int(ctx.config.player_marker_max_pixels),
         )
-        dist_after = _waypoint_distance_px(marker_after, waypoint)
+        # While holding position (no input), keep the virtual distance stable.
+        dist_after = float(dist_before)
         ctx.cavebot_gate.telemetry.last_n_distances.append(float(dist_after))
         if len(ctx.cavebot_gate.telemetry.last_n_distances) > 50:
             ctx.cavebot_gate.telemetry.last_n_distances = ctx.cavebot_gate.telemetry.last_n_distances[-50:]
@@ -299,7 +501,7 @@ def execute_cavebot_tick(
             out = CavebotTickOutcome(reached_waypoint=True, evidence=ev, abort_reason=None, event='WAYPOINT_REACHED')
         ctx.cavebot.gate_ticks_in_waypoint += 1
         _append_trace(
-            gate='cavebot',
+            gate=str(gate),
             payload={
                 'event': str(out.event or 'tick'),
                 'tick_index': int(tick_index),
@@ -335,10 +537,26 @@ def execute_cavebot_tick(
     input_.press_key(str(key))
     ctx.cavebot.gate_inputs_sent += 1
 
+    # Real UI/minimap may take a moment to reflect movement; OBS screenshots can also lag.
+    # Use tick-pacing helper (time.sleep is forbidden by CI guardrails).
+    try:
+        raw = os.environ.get('FRBOT_POST_MOVE_DELAY_MS', '')
+        if str(raw).strip() == '':
+            post_move_ms = 200 if str(ctx.config.mode).strip().lower() == 'real' else 0
+        else:
+            post_move_ms = int(raw)
+    except Exception:
+        post_move_ms = 200 if str(ctx.config.mode).strip().lower() == 'real' else 0
+    if int(post_move_ms) > 0:
+        wait_until_ns(int(time.monotonic_ns() + (int(post_move_ms) * 1_000_000)))
+
     after = capture.grab()
-    record_after('cavebot', after)
+    record_after(str(gate), after)
 
     progress, status = _progress_from_frames(ctx, before, after, waypoint)
+
+    # Best-effort: record inferred minimap scroll for audit/debug.
+    inferred_dx, inferred_dy, inferred_sad_best, inferred_sad_0 = _estimate_minimap_translation_px(before, after)
 
     sel_after = select_player_marker(
         after,
@@ -374,12 +592,16 @@ def execute_cavebot_tick(
         ctx.cavebot_gate.telemetry.last_n_distances = ctx.cavebot_gate.telemetry.last_n_distances[-50:]
 
     _append_trace(
-        gate='cavebot',
+        gate=str(gate),
         payload={
             'event': 'tick',
             'tick_index': int(tick_index),
             'input_sent': True,
             'key': str(key),
+            'minimap_shift_dx': int(inferred_dx),
+            'minimap_shift_dy': int(inferred_dy),
+            'minimap_shift_sad_best': float(inferred_sad_best),
+            'minimap_shift_sad_0': float(inferred_sad_0),
             'candidates_count': int(len(sel_before.candidates)),
             'selected_marker_confidence': float(sel_before.confidence),
             'selected_marker_id': sel_before.selected_candidate_id,
@@ -402,11 +624,11 @@ def execute_cavebot_tick(
     if status == 'cavebot_marker_not_found':
         out = CavebotTickOutcome(reached_waypoint=False, evidence=evidence, abort_reason='cavebot_marker_not_found')
         if is_prod_emergency() and str(ctx.config.mode).strip().lower() == 'real':
-            _dump_marker_abort_pair(before=before, after=after, reason=str(out.abort_reason))
+            _dump_marker_abort_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
         elif dump_enabled():
-            dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
+            dump_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
         _append_trace(
-            gate='cavebot',
+            gate=str(gate),
             payload={
                 'event': 'abort',
                 'tick_index': int(tick_index),
@@ -430,11 +652,11 @@ def execute_cavebot_tick(
     if status in {'cavebot_marker_ambiguous', 'cavebot_marker_roi_black'}:
         out = CavebotTickOutcome(reached_waypoint=False, evidence=evidence, abort_reason=str(status))
         if is_prod_emergency() and str(ctx.config.mode).strip().lower() == 'real':
-            _dump_marker_abort_pair(before=before, after=after, reason=str(out.abort_reason))
+            _dump_marker_abort_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
         elif dump_enabled():
-            dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
+            dump_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
         _append_trace(
-            gate='cavebot',
+            gate=str(gate),
             payload={
                 'event': 'abort',
                 'tick_index': int(tick_index),
@@ -458,9 +680,9 @@ def execute_cavebot_tick(
     if status == 'cavebot_wrong_direction':
         out = CavebotTickOutcome(reached_waypoint=False, evidence=evidence, abort_reason='cavebot_wrong_direction')
         if dump_enabled():
-            dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
+            dump_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
         _append_trace(
-            gate='cavebot',
+            gate=str(gate),
             payload={
                 'event': 'abort',
                 'tick_index': int(tick_index),
@@ -492,9 +714,9 @@ def execute_cavebot_tick(
             if (not dec) or (dec and inc):
                 out = CavebotTickOutcome(reached_waypoint=False, evidence=evidence, abort_reason='cavebot_stuck_detected')
                 if dump_enabled():
-                    dump_pair(gate='cavebot', before=before, after=after, reason=str(out.abort_reason))
+                    dump_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
                 _append_trace(
-                    gate='cavebot',
+                    gate=str(gate),
                     payload={
                         'event': 'abort',
                         'tick_index': int(tick_index),

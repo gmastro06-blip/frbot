@@ -346,6 +346,10 @@ def _load_config_from_env() -> RuntimeConfig:
         raw = os.environ.get(name)
         return default if raw is None else raw
 
+    def env_key(name: str, default: str) -> str:
+        v = str(env_str(name, default) or default).strip()
+        return str(v) if v else str(default)
+
     return RuntimeConfig(
         mode=mode,
         tick_hz=float(tick_hz_raw),
@@ -353,6 +357,10 @@ def _load_config_from_env() -> RuntimeConfig:
         bot_config_path=bot_config_path,
         enable_cavebot=env_bool('FRBOT_ENABLE_CAVEBOT', True),
         minimap_roi=env_str('FRBOT_MINIMAP_ROI', 'minimap'),
+
+        # Looting (premium): allow overriding the quick-loot hotkey.
+        # Accepts key aliases like 'avPag' / 'pgdn' / 'pagedown'.
+        quick_loot_key=env_key('FRBOT_TIBIA_QUICK_LOOT_KEY', env_str('FRBOT_QUICK_LOOT_KEY', 'R')),
 
         window_hwnd=parse_window_hwnd_env('FRBOT_WINDOW_HWND'),
         window_title_substring=env_str('FRBOT_WINDOW_TITLE', ''),

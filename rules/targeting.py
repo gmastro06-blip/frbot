@@ -42,12 +42,15 @@ def select_targeting_intent(current: TargetState, entries: tuple[BattleListEntry
     chosen = min(candidates, key=lambda e: int(e.row_index))
 
     # 5) Emit intent.
+    # In real mode without OCR, battle list rows may be named deterministically (row_N).
+    # Highlight inference can be unreliable there; rely on target-frame evidence instead.
+    is_no_ocr_row = str(getattr(chosen, 'name', '') or '').startswith('row_')
     return TargetingRuleResult(
         intent=IntentTarget(
             target_name=str(chosen.name),
             battle_list_row_index=int(chosen.row_index),
             expected_evidence=TargetEvidenceExpectation(
-                battle_list_row_highlighted=True,
+                battle_list_row_highlighted=(not is_no_ocr_row),
                 target_frame_visible=True,
                 target_hp_bar_present=True,
             ),

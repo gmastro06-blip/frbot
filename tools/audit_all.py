@@ -11,6 +11,10 @@ from pathlib import Path
 _ALL_GATES: tuple[str, ...] = (
     'targeting',
     'healing',
+    'targeting_full',
+    'healing_full',
+    'combat_full',
+    'cavebot_full',
     'combat_basic',
     'cavebot',
     'looting_basic',
@@ -38,9 +42,9 @@ def _gates_for_profile() -> tuple[tuple[str, ...], list[str], list[str]]:
         return ('targeting', 'cavebot', 'healing', 'combat_basic', 'looting_basic'), enabled, disabled
 
     if _profile() == 'prod_full':
-        enabled = ['capture_real', 'combat_basic', 'looting_full', 'deposit_full', 'trade_full']
+        enabled = ['capture_real', 'targeting_full', 'healing_full', 'combat_full', 'cavebot_full', 'looting_full', 'deposit_full', 'trade_full']
         disabled = ['combat', 'looting', 'deposit', 'trade']
-        return ('combat_basic', 'looting_full', 'deposit_full', 'trade_full'), enabled, disabled
+        return ('targeting_full', 'healing_full', 'combat_full', 'cavebot_full', 'looting_full', 'deposit_full', 'trade_full'), enabled, disabled
 
     return _ALL_GATES, [], []
 

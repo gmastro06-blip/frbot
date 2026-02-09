@@ -40,9 +40,20 @@ def _allowed_prod_full_extra_rois() -> set[str]:
         'target_hp_bar',
         'combat_cooldown',
         'combat_feedback',
+
+        # Healing FULL ROIs.
+        'hp_bar',
+        'mp_bar',
+        'hp_text',
+        'mp_text',
+        'heal_cooldown',
+        'heal_feedback',
+
         'chat_loot_area',
         'inventory_text',
         'loot_corpse',
+        'loot_container_open',
+        'loot_take',
         'depot_container',
         'trade_inventory',
         'trade_npc',

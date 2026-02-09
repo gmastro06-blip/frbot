@@ -286,11 +286,13 @@ Calibration checklist: `docs/ROI_CALIBRATION.md`
 
 ## PROD-FULL (Windows-only)
 
-`prod_full` is a stricter production profile intended to be **REAL-certifiable** via `tools/audit_all.py` with **evidence artifacts as the authority**.
+`prod_full` is a stricter production profile intended to be **REAL-certifiable** via `tools/audit_prod_full.py` with **evidence artifacts as the authority**.
+
+Dedicated auditor for the FULL pipeline: `tools/audit_prod_full.py`.
 
 Certification pipeline (fail-fast):
 
-- `combat_basic` → `looting_full` → `deposit_full` → `trade_full`
+- `targeting_full` → `healing_full` → `combat_full` → `cavebot_full` → `looting_full` → `deposit_full` → `trade_full`
 
 One-command launcher (REAL + OBS source identity):
 
@@ -298,7 +300,7 @@ One-command launcher (REAL + OBS source identity):
 ./scripts/run_prod_full_real_obs_source.ps1 \
   -WindowHwnd "0x3094a" \
   -ObsSourceName "Tibia_Fuente" \
-  -ConfigPath "./rois_prod_full.json" \
+  -ConfigPath "./config/rois_prod_full.json" \
   -DumpFrames
 ```
 

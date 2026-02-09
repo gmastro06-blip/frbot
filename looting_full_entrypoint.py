@@ -98,14 +98,46 @@ def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
 
 def _latest_success_pair(evidence_dir: Path) -> tuple[str | None, str | None, str]:
     # Prefer inventory-delta evidence frames.
-    for reason in ('inventory_delta', 'chat_delta_inventory_unreadable'):
+    for reason in ('inventory_delta', 'chat_delta', 'chat_delta_inventory_unreadable'):
         items = sorted(evidence_dir.glob(f'looting_full_*_{reason}_before.ppm'))
+        # Guard against substring collisions (e.g. looting_no_inventory_delta ending with inventory_delta).
+        if reason == 'inventory_delta':
+            items = [p for p in items if '_looting_no_inventory_delta_' not in str(p.name)]
         if not items:
             continue
         before = str(items[-1].name)
         after = before.replace('_before.ppm', '_after.ppm')
         if (evidence_dir / after).exists():
             return before, after, str(reason)
+    return None, None, 'none'
+
+
+def _latest_any_pair(evidence_dir: Path) -> tuple[str | None, str | None, str]:
+    # Evidence frames we want to reference for audit/diagnosis even on failure.
+    reasons = (
+        'inventory_delta',
+        'chat_delta',
+        'chat_delta_inventory_unreadable',
+        'looting_no_inventory_delta',
+        'quick_loot_not_effective',
+        'looting_inventory_unreadable',
+        'looting_click_point_missing',
+        'looting_input_emit_failed',
+    )
+
+    for reason in reasons:
+        items = sorted(evidence_dir.glob(f'looting_full_*_{reason}_before.ppm'))
+        if reason == 'inventory_delta':
+            items = [p for p in items if '_looting_no_inventory_delta_' not in str(p.name)]
+        if not items:
+            continue
+        before = str(items[-1].name)
+        after = before.replace('_before.ppm', '_after.ppm')
+        if (evidence_dir / after).exists():
+            return before, after, str(reason)
+        # Some failures only produce a BEFORE frame.
+        return before, None, str(reason)
+
     return None, None, 'none'
 
 
@@ -119,6 +151,10 @@ def _write_last_result(
     before_ppm: str | None,
     after_ppm: str | None,
     evidence_reason: str,
+    evidence_kind: str | None = None,
+    chat_ok: bool | None = None,
+    chat_latency_ms: float | None = None,
+    chat_max_latency_ms: float | None = None,
 ) -> None:
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -126,11 +162,16 @@ def _write_last_result(
             'gate': 'looting_full',
             'ok': bool(ok),
             'outcome_kind': str(outcome_kind),
+            'reason': str(outcome_kind),
             'actions_sent': int(actions_sent),
             'successes': int(successes),
             'before_ppm': before_ppm,
             'after_ppm': after_ppm,
             'evidence_reason': str(evidence_reason),
+            'evidence_kind': None if evidence_kind is None else str(evidence_kind),
+            'chat_ok': None if chat_ok is None else bool(chat_ok),
+            'chat_latency_ms': None if chat_latency_ms is None else float(chat_latency_ms),
+            'chat_max_latency_ms': None if chat_max_latency_ms is None else float(chat_max_latency_ms),
         }
         (evidence_dir / 'looting_full_last_result.json').write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + '\n',
@@ -143,6 +184,9 @@ def _write_last_result(
 def _load_config_from_env() -> RuntimeConfig:
     backend = (_env_str('FRBOT_LOOTING_FULL_BACKEND', 'real') or 'real').strip().lower()
 
+    # Accept both legacy and Tibia-specific env names.
+    quick_loot_key = _env_str('FRBOT_TIBIA_QUICK_LOOT_KEY', _env_str('FRBOT_QUICK_LOOT_KEY', 'R'))
+
     return RuntimeConfig(
         mode=backend,
         tick_hz=_env_float('FRBOT_TICK_HZ', 20.0),
@@ -154,7 +198,7 @@ def _load_config_from_env() -> RuntimeConfig:
         enable_combat=False,
 
         inventory_text_roi=_env_str('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text'),
-        quick_loot_key=_env_str('FRBOT_QUICK_LOOT_KEY', 'R'),
+        quick_loot_key=str(quick_loot_key),
         looting_max_attempts_per_corpse=1,
         looting_max_ticks=1,
         looting_require_inventory_delta=True,
@@ -211,7 +255,31 @@ def run_looting_full_only() -> int:
         for att in outcome.attempts:
             _append_trace(gate='looting_full', payload={'event': 'attempt', 'gate': 'looting_full', **dict(att)})
 
-        before_ppm, after_ppm, evidence_reason = _latest_success_pair(evidence_dir)
+        # Prefer explicit evidence pointers from the runner (no globbing on PASS).
+        before_ppm = str(outcome.before_ppm) if getattr(outcome, 'before_ppm', None) else None
+        after_ppm = str(outcome.after_ppm) if getattr(outcome, 'after_ppm', None) else None
+        evidence_kind = str(outcome.evidence_kind) if getattr(outcome, 'evidence_kind', None) else None
+        evidence_reason = str(evidence_kind or 'none')
+
+        chat_ok: bool | None = None
+        chat_latency_ms: float | None = None
+        chat_max_latency_ms: float | None = None
+        try:
+            # If looting_basic wrote a rich meta for the gate, propagate its chat fields.
+            meta_p = evidence_dir / 'looting_full_last_result.json'
+            if meta_p.exists():
+                meta = _load_json(meta_p)
+                if isinstance(meta, dict):
+                    if 'chat_ok' in meta:
+                        chat_ok = bool(meta.get('chat_ok'))
+                    v = meta.get('chat_latency_ms')
+                    if v is not None:
+                        chat_latency_ms = float(v)
+                    v2 = meta.get('chat_max_latency_ms')
+                    if v2 is not None:
+                        chat_max_latency_ms = float(v2)
+        except Exception:
+            pass
 
         profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
         dump_force = profile in {'prod_emergency', 'prod_full'}
@@ -227,16 +295,45 @@ def run_looting_full_only() -> int:
             before_ppm=before_ppm,
             after_ppm=after_ppm,
             evidence_reason=str(evidence_reason),
+            evidence_kind=evidence_kind,
+            chat_ok=chat_ok,
+            chat_latency_ms=chat_latency_ms,
+            chat_max_latency_ms=chat_max_latency_ms,
         )
 
         log_json(logger, event='success', gate='looting_full', status='SUCCESS', successes=int(outcome.successes))
         return 0
 
     except PreflightFailed as exc:
-        # Ensure we leave a meta pointer for audit even on failure.
+        # Best-effort: ensure we leave a meta pointer for audit even on failure,
+        # and try to dump at least one BEFORE frame when preflight aborts early.
+        evidence_dir = _frames_dir()
+
+        profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
+        dump_force = profile in {'prod_emergency', 'prod_full'}
+
+        if dump_force or dump_enabled():
+            try:
+                from diagnostics.emergency_capture import try_dump_window_frame
+
+                try_dump_window_frame(gate='looting_full', reason=str(exc))
+            except Exception:
+                pass
+
+        before_ppm, after_ppm, evidence_reason = _latest_any_pair(evidence_dir)
+
+        # If we don't have a success pair, point to the most recent preflight-abort BEFORE frame.
         try:
-            evidence_dir = _frames_dir()
-            before_ppm, after_ppm, evidence_reason = _latest_success_pair(evidence_dir)
+            if not before_ppm:
+                dumps = sorted(evidence_dir.glob('looting_full_*_preflight_abort_*_before.ppm'))
+                if dumps:
+                    before_ppm = str(dumps[-1].name)
+            if evidence_reason == 'none' and before_ppm and after_ppm is None:
+                evidence_reason = 'preflight_abort'
+        except Exception:
+            pass
+
+        try:
             _write_last_result(
                 evidence_dir=evidence_dir,
                 ok=False,
@@ -250,7 +347,7 @@ def run_looting_full_only() -> int:
         except Exception:
             pass
 
-        # If dumping is enabled, evidence frames are already persisted by execute_looting_basic_once.
+        # If dumping is enabled, evidence frames may already be persisted by the runner.
         if dump_enabled():
             _append_trace(gate='looting_full', payload={'event': 'abort', 'gate': 'looting_full', 'reason': str(exc)})
 

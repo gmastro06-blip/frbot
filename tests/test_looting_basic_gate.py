@@ -105,6 +105,68 @@ def test_looting_basic_chat_evidence_not_sufficient_when_inventory_readable(
     assert int(ctx.looting.attempts_used) == 1
 
 
+def test_looting_basic_prod_full_allows_chat_success_when_inventory_readable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv('MOCK_LOOT_INVENTORY_DELTA', '0')
+    monkeypatch.setenv('FRBOT_PROFILE', 'prod_full')
+
+    # Force chat detector to say OK, regardless of pixels.
+    from runtime import looting_basic_runner
+    from runtime.chat_loot_semantics import LootEvidence
+
+    def _ok_chat(*_a: object, **_kw: object) -> LootEvidence:
+        return LootEvidence(
+            ok=True,
+            delta_items=2,
+            delta_gold=0,
+            source='chat',
+            debug={'reason': 'test', 'delta_latency_ms': 0.0, 'max_latency_ms': 1500},
+        )
+
+    monkeypatch.setattr(looting_basic_runner, 'detect_loot_from_chat', _ok_chat)
+
+    ctx = _make_ctx(tmp_path)
+    cap, inp, binding = looting_basic_preflight(ctx)
+
+    out = execute_looting_basic_once(ctx, capture=cap, input_=inp, binding=binding)
+
+    assert out.ok is True
+    assert out.evidence_kind == 'chat_delta'
+    assert int(ctx.looting.attempts_used) == 1
+
+
+def test_looting_basic_prod_full_rejects_chat_if_out_of_latency_window(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv('MOCK_LOOT_INVENTORY_DELTA', '0')
+    monkeypatch.setenv('FRBOT_PROFILE', 'prod_full')
+
+    from runtime import looting_basic_runner
+    from runtime.chat_loot_semantics import LootEvidence
+
+    def _ok_chat_but_late(*_a: object, **_kw: object) -> LootEvidence:
+        return LootEvidence(
+            ok=True,
+            delta_items=2,
+            delta_gold=0,
+            source='chat',
+            debug={'reason': 'test', 'delta_latency_ms': 2000.0, 'max_latency_ms': 1500},
+        )
+
+    monkeypatch.setattr(looting_basic_runner, 'detect_loot_from_chat', _ok_chat_but_late)
+
+    ctx = _make_ctx(tmp_path)
+    cap, inp, binding = looting_basic_preflight(ctx)
+
+    with pytest.raises(PreflightFailed) as e:
+        execute_looting_basic_once(ctx, capture=cap, input_=inp, binding=binding)
+
+    assert str(e.value) == 'looting_no_inventory_delta'
+
+
 def test_looting_basic_chat_evidence_requires_fallback_flag_when_inventory_unreadable_after(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

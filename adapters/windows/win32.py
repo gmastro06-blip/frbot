@@ -373,15 +373,29 @@ def find_window_by_title_substring(substr: str) -> Optional[HwndMatch]:
         return None
 
     best: Optional[HwndMatch] = None
+    best_rank: tuple[int, int] | None = None
 
     def on_enum(hwnd: int) -> bool:
-        nonlocal best
+        nonlocal best, best_rank
         title = get_window_text(hwnd)
         if not title:
             return True
         if needle in title.lower():
-            best = HwndMatch(hwnd=int(hwnd), title=title)
-            return False
+            try:
+                visible = bool(is_window_visible(int(hwnd)))
+            except Exception:
+                visible = False
+            try:
+                minimized = bool(is_window_minimized(int(hwnd)))
+            except Exception:
+                minimized = False
+
+            # Prefer visible, non-minimized windows. Keep first match for ties.
+            rank = (0 if visible else 1, 0 if (not minimized) else 1)
+            if best is None or (best_rank is not None and rank < best_rank) or best_rank is None:
+                best = HwndMatch(hwnd=int(hwnd), title=title)
+                best_rank = rank
+            return True
         return True
 
     def _cb(hwnd: wintypes.HWND, lparam: wintypes.LPARAM) -> bool:

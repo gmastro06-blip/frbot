@@ -11,7 +11,7 @@ from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import InventorySnapshot, NpcIdentity, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_enabled, dump_pair
-from diagnostics.emergency_capture import try_dump_window_frame
+from diagnostics.emergency_capture import try_dump_window_frame, try_dump_window_frame_pair
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from diagnostics.logger import configure_logger
@@ -113,7 +113,10 @@ def _try_write_last_result(
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)
 
-        if not before_ppm or not after_ppm:
+        # Only attempt to auto-fill *missing* pointers when at least one pointer
+        # exists for this attempt. If both are missing, scanning can accidentally
+        # pick stale files from older runs and mislead auditors.
+        if (before_ppm is not None or after_ppm is not None) and (not before_ppm or not after_ppm):
             before_scan = None
             after_scan = None
             try:
@@ -286,7 +289,37 @@ def run_trade_full_only() -> int:
             if before is not None or after is not None:
                 before_ppm, after_ppm = dump_pair(gate='trade_full', before=before, after=after, reason=str(exc), out_dir=str(evidence_dir))
             else:
-                try_dump_window_frame(gate='trade_full', reason=str(exc))
+                # When preflight fails early, last_frames may be empty. In prod_full we still
+                # need BEFORE+AFTER evidence. Prefer direct OBS source identity capture.
+                src = (_env_str('FRBOT_CAPTURE_SOURCE', 'client') or 'client').strip().lower()
+                obs_name = (_env_str('FRBOT_OBS_SOURCE_NAME', '') or '').strip()
+                captured = False
+                if src == 'obs_source' and obs_name and ctx is not None:
+                    try:
+                        from adapters.capture.obs_source_real import ObsSourceRealCapture
+                        from runtime.config_loader import load_rois
+
+                        loaded = load_rois(ctx)
+                        rois = dict(loaded.rois)
+                        if loaded.frame_width is not None and loaded.frame_height is not None:
+                            cap = ObsSourceRealCapture(
+                                obs_source_name=str(obs_name),
+                                expected_width=int(loaded.frame_width),
+                                expected_height=int(loaded.frame_height),
+                                rois=rois,
+                                minimap_roi_name=str(getattr(ctx.config, 'minimap_roi', 'minimap') or 'minimap'),
+                            )
+                            if bool(cap.verify().ok):
+                                b = cap.grab()
+                                a = cap.grab()
+                                before_ppm, after_ppm = dump_pair(gate='trade_full', before=b, after=a, reason=str(exc), out_dir=str(evidence_dir))
+                                captured = True
+                    except Exception:
+                        captured = False
+
+                if not captured:
+                    if not try_dump_window_frame_pair(gate='trade_full', reason=str(exc)):
+                        try_dump_window_frame(gate='trade_full', reason=str(exc))
 
         npc = getattr(getattr(ctx, 'trade', None), 'last_npc', None) if ctx is not None else None
         inv_b = getattr(getattr(ctx, 'trade', None), 'last_inventory_before', None) if ctx is not None else None

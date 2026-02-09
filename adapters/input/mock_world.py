@@ -41,6 +41,10 @@ class MockWorldInput(InputAdapter):
 	def right_click_frame(self, x: int, y: int, *, frame_w: int, frame_h: int) -> None:
 		return self.right_click(int(x), int(y))
 
+	def click_cursor(self) -> None:
+		# Mock world has no cursor; use a sentinel click.
+		self._world.on_click(-1, -1)
+
 	def shift_right_click_frame(self, x: int, y: int, *, frame_w: int, frame_h: int) -> None:
 		# Mock world does not model modifier state; treat as a click.
 		return self.right_click_frame(int(x), int(y), frame_w=int(frame_w), frame_h=int(frame_h))

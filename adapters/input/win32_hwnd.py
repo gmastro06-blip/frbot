@@ -902,6 +902,37 @@ class Win32HwndKeyboard(InputAdapter):
         cx, cy = _screen_to_client(hwnd_i, int(xs), int(ys))
         return self._click_impl(int(cx), int(cy), right=True)
 
+    def click_cursor(self) -> None:
+        """Left-click at current cursor position (single logical action).
+
+        Useful for operator-assisted flows where the human pre-positions the
+        mouse over an on-screen control and the bot must still emit exactly
+        one input.
+        """
+
+        if self._hwnd <= 0 or not is_window(self._hwnd):
+            raise RuntimeError('window_binding_lost')
+
+        method = (os.environ.get('FRBOT_INPUT_METHOD', '') or '').strip().lower()
+        hwnd_i = int(self._hwnd)
+
+        if method in {'sendinput', 'sendinput_vk'}:
+            fg = int(user32.GetForegroundWindow() or 0)
+            if fg != hwnd_i:
+                user32.SetForegroundWindow(wintypes.HWND(hwnd_i))
+                fg2 = int(user32.GetForegroundWindow() or 0)
+                if fg2 != hwnd_i:
+                    raise RuntimeError('window_not_foreground')
+
+            xs, ys = _get_cursor_pos_screen()
+            _sendinput_mouse_click(x_screen=int(xs), y_screen=int(ys), right=False)
+            return
+
+        # PostMessage fallback: translate screen->client and use HWND-targeted click.
+        xs, ys = _get_cursor_pos_screen()
+        cx, cy = _screen_to_client(hwnd_i, int(xs), int(ys))
+        return self._click_impl(int(cx), int(cy), right=False)
+
     def right_click_frame(self, x: int, y: int, *, frame_w: int, frame_h: int) -> None:
         if int(frame_w) <= 0 or int(frame_h) <= 0:
             return self.right_click(int(x), int(y))

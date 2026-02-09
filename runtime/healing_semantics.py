@@ -66,19 +66,36 @@ def read_bar_percent(frame: Frame, roi: Roi, *, channel: str) -> Optional[Percen
     if channel not in {'r', 'g', 'b'}:
         return None
 
+    # REAL-safe defaults: allow anti-aliased bars (not fully saturated).
+    # Tunable for field calibration.
+    try:
+        hp_min_r = int(__import__('os').environ.get('FRBOT_HP_BAR_MIN_R', '140') or '140')
+    except Exception:
+        hp_min_r = 140
+    try:
+        mp_min_b = int(__import__('os').environ.get('FRBOT_MP_BAR_MIN_B', '140') or '140')
+    except Exception:
+        mp_min_b = 140
+    try:
+        dom_min_delta = int(__import__('os').environ.get('FRBOT_BAR_DOM_MIN_DELTA', '40') or '40')
+    except Exception:
+        dom_min_delta = 40
+
     filled = 0
     for i in range(0, len(rgb) - 2, 3):
         r = rgb[i]
         g = rgb[i + 1]
         b = rgb[i + 2]
         if channel == 'r':
-            if r > 200 and g < 80 and b < 80:
+            # Strict mock signal OR red-dominant (real UI).
+            if (r > 200 and g < 80 and b < 80) or (r >= hp_min_r and (int(r) - int(max(g, b))) >= dom_min_delta):
                 filled += 1
         elif channel == 'g':
             if g > 200 and r < 80 and b < 80:
                 filled += 1
         else:
-            if b > 200 and r < 80 and g < 80:
+            # Strict mock signal OR blue-dominant (real UI).
+            if (b > 200 and r < 80 and g < 80) or (b >= mp_min_b and (int(b) - int(max(r, g))) >= dom_min_delta):
                 filled += 1
 
     return PercentRead(value=_clamp01(filled / float(total_px)), source='bar')

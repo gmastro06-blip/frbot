@@ -19,6 +19,9 @@ class LootingFullOutcome:
     successes: int
     stop_reason: str
     attempts: list[dict[str, Any]]
+    evidence_kind: str | None = None
+    before_ppm: str | None = None
+    after_ppm: str | None = None
 
 
 def execute_looting_full(
@@ -47,6 +50,9 @@ def execute_looting_full(
     successes = 0
     no_delta_streak = 0
     attempts: list[dict[str, Any]] = []
+    best_before: str | None = None
+    best_after: str | None = None
+    best_kind: str | None = None
 
     for i in range(int(max_actions)):
         try:
@@ -56,6 +62,8 @@ def execute_looting_full(
                     'attempt_index': int(i),
                     'ok': bool(out.ok),
                     'evidence_kind': str(out.evidence_kind),
+                    'before_ppm': out.before_ppm,
+                    'after_ppm': out.after_ppm,
                     'delta_capacity_used': None if out.delta is None else int(out.delta.capacity_used_delta),
                     'delta_slots': {} if out.delta is None else dict(out.delta.slot_deltas),
                 }
@@ -66,7 +74,10 @@ def execute_looting_full(
 
             if reason in {'looting_no_inventory_delta', 'quick_loot_not_effective'}:
                 no_delta_streak += 1
-                if successes <= 0:
+                # Tolerate a small number of no-delta attempts even before the
+                # first success. This reduces false negatives from capture/UI
+                # latency while keeping the loop bounded.
+                if successes <= 0 and int(no_delta_streak) >= int(stop_no_delta):
                     raise PreflightFailed('looting_full_no_evidence') from exc
                 if int(no_delta_streak) >= int(stop_no_delta):
                     actions_sent = int(getattr(getattr(ctx, 'looting', object()), 'attempts_used', 0) or 0) - int(start_actions)
@@ -76,6 +87,9 @@ def execute_looting_full(
                         successes=int(successes),
                         stop_reason='no_delta',
                         attempts=attempts,
+                        evidence_kind=best_kind,
+                        before_ppm=best_before,
+                        after_ppm=best_after,
                     )
                 continue
 
@@ -84,6 +98,12 @@ def execute_looting_full(
         if bool(out.ok):
             successes += 1
             no_delta_streak = 0
+
+            # Preserve a certifiable evidence pair from a successful attempt.
+            if out.before_ppm and out.after_ppm:
+                best_before = str(out.before_ppm)
+                best_after = str(out.after_ppm)
+                best_kind = str(out.evidence_kind)
             continue
 
         # Defensive: execute_looting_basic_once should not return ok=False.

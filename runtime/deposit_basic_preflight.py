@@ -18,8 +18,8 @@ from contracts.input import InputStatus
 from contracts.runtime import RuntimeContext, RuntimeState
 from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_obs_projector_hwnd
 from runtime.config_loader import load_rois
-from runtime.depot_semantics import read_depot_container
-from runtime.inventory_semantics import read_inventory_binary
+from runtime.depot_semantics import find_d00d_marker_roi_within, read_depot_container
+from runtime.inventory_semantics import find_beef_marker_roi_within, read_inventory_binary
 from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
 from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
 
@@ -51,6 +51,7 @@ def deposit_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
     ctx.status.reason = ''
 
     mode = str(ctx.config.mode).strip().lower()
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
 
     loaded = load_rois(ctx)
     ctx.rois = dict(loaded.rois)
@@ -130,19 +131,34 @@ def deposit_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
         f = capture_real.grab()
         validate_prod_emergency_real_rois_in_bounds(rois=ctx.rois, frame=f)
 
-        inv = read_inventory_binary(f, inv_roi)
-        if inv is None:
-            # PROD-EMERGENCY contract: no OCR/visual fallback.
-            raise PreflightFailed('deposit_inventory_unreadable')
+        # prod_full: allow deposit_full to certify via pixel-delta evidence on depot_container.
+        # Keep strict binary-only preflight for other profiles.
+        if profile != 'prod_full':
+            inv = read_inventory_binary(f, inv_roi)
+            if inv is None:
+                marker = find_beef_marker_roi_within(f, inv_roi)
+                if marker is not None:
+                    ctx.rois[str(ctx.config.inventory_text_roi)] = marker
+                    inv_roi = marker
+                    inv = read_inventory_binary(f, inv_roi)
+            if inv is None:
+                # PROD-EMERGENCY contract: no OCR/visual fallback.
+                raise PreflightFailed('deposit_inventory_unreadable')
 
-        depot = read_depot_container(f, depot_roi)
-        if depot is None:
-            raise PreflightFailed('deposit_unreadable_state')
-        if not bool(depot.open):
-            raise PreflightFailed('deposit_depot_not_open')
+            depot = read_depot_container(f, depot_roi)
+            if depot is None:
+                marker = find_d00d_marker_roi_within(f, depot_roi)
+                if marker is not None:
+                    ctx.rois[str(ctx.config.depot_container_roi)] = marker
+                    depot_roi = marker
+                    depot = read_depot_container(f, depot_roi)
+            if depot is None:
+                raise PreflightFailed('deposit_unreadable_state')
+            if not bool(depot.open):
+                raise PreflightFailed('deposit_depot_not_open')
 
-        ctx.deposit.last_inventory_before = inv
-        ctx.deposit.last_depot_before = depot
+            ctx.deposit.last_inventory_before = inv
+            ctx.deposit.last_depot_before = depot
 
         ctx.status.state = RuntimeState.READY
         return capture_real, input_real, binding_real

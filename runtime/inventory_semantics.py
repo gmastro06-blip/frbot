@@ -178,6 +178,47 @@ def scan_beef_candidates_all_in_frame(
     return out
 
 
+def find_beef_marker_roi_within(
+    frame: Frame,
+    search_roi: Roi,
+    *,
+    cap_max: int | None = None,
+    gold_max: int | None = None,
+) -> Optional[Roi]:
+    """Locate a 0xBEEF 2x1 marker within a broader ROI.
+
+    Returns a minimal 2x1 ROI (6 bytes) anchored at the marker pixel.
+    Intended for REAL robustness when the configured ROI is a search window.
+    """
+
+    rgb = bytes(getattr(frame, 'rgb', b'') or b'')
+    w = int(getattr(frame, 'width', 0) or 0)
+    h = int(getattr(frame, 'height', 0) or 0)
+    if not rgb or w <= 1 or h <= 0:
+        return None
+
+    x0 = max(0, int(search_roi.x))
+    y0 = max(0, int(search_roi.y))
+    x1 = min(int(w) - 2, int(search_roi.x) + int(search_roi.width) - 2)
+    y1 = min(int(h) - 1, int(search_roi.y) + int(search_roi.height) - 1)
+    if x1 < x0 or y1 < y0:
+        return None
+
+    row_stride = w * 3
+    for yy in range(int(y0), int(y1) + 1):
+        base = yy * row_stride
+        for xx in range(int(x0), int(x1) + 1):
+            i = base + (xx * 3)
+            if i + 5 >= len(rgb):
+                break
+            blob6 = rgb[i : i + 6]
+            if _decode_beef_from_blob(blob6, cap_max=cap_max, gold_max=gold_max) is None:
+                continue
+            return Roi(name=str(search_roi.name), x=int(xx), y=int(yy), width=2, height=1)
+
+    return None
+
+
 def rank_beef_candidates_by_temporal_stability(
     *,
     before: Frame,

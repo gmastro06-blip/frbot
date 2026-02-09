@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import TypeAlias
 
 from adapters.capture.mock_world_any import MockWorldAnyCapture
 from adapters.capture.mss_bound_window_real import MssBoundWindowRealCapture
+from adapters.capture.meld_real import MeldBoundWindowRealCapture
+from adapters.capture.obs_source_real import ObsSourceRealCapture
 from adapters.input.mock_world import MockWorldInput
 from adapters.input.win32_hwnd import Win32HwndKeyboard
 from adapters.mock_world import MockBattleListRow, MockWorld
@@ -18,9 +21,12 @@ from runtime.combat_runner import _get_locked_target_name, _read_attack_cooldown
 from runtime.config_loader import load_rois
 from runtime.healing_runner import _read_hp_mp
 from runtime.combat_semantics import read_target_hp_percent
+from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
+from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_obs_projector_hwnd
+from runtime.pacing import wait_until_ns
 
 
-CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MockWorldAnyCapture
+CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MeldBoundWindowRealCapture | ObsSourceRealCapture | MockWorldAnyCapture
 InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
 
@@ -67,6 +73,9 @@ def combat_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter,
 
     mode = ctx.config.mode.strip().lower()
 
+    if mode == 'real':
+        enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=False)
+
     loaded = load_rois(ctx)
     ctx.rois = dict(loaded.rois)
 
@@ -88,6 +97,14 @@ def combat_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter,
             raise PreflightFailed('combat_ambiguous_result')
 
     if mode == 'real':
+        backend = (os.environ.get('FRBOT_CAPTURE_BACKEND', 'mss') or 'mss').strip().lower()
+        profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+        if profile == 'prod_emergency' and backend not in {'mss', 'meld'}:
+            raise PreflightFailed('capture_invalid')
+
+        cap_source = capture_source()
+
+        # InputAuthority (strict): always bind to Tibia HWND/title; capture is separate.
         binding_real = Win32WindowBinding(
             hwnd=int(ctx.config.window_hwnd),
             title_substring=ctx.config.window_title_substring,
@@ -96,16 +113,45 @@ def combat_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter,
         if not bvr.ok:
             raise PreflightFailed('combat_ambiguous_result')
 
-        try:
-            capture_real = MssBoundWindowRealCapture(binding=binding_real)
-        except ImportError as exc:
-            raise PreflightFailed(str(exc)) from exc
+        capture_real: MssBoundWindowRealCapture | MeldBoundWindowRealCapture | ObsSourceRealCapture
 
-        snap = binding_real.snapshot()
+        if cap_source == 'obs_source':
+            src = (os.environ.get('FRBOT_OBS_SOURCE_NAME', '') or '').strip()
+            if not src:
+                raise PreflightFailed('obs_source_not_found')
+            if loaded.frame_width is None or loaded.frame_height is None:
+                raise PreflightFailed('config_invalid_schema')
+            capture_real = ObsSourceRealCapture(
+                obs_source_name=str(src),
+                expected_width=int(loaded.frame_width),
+                expected_height=int(loaded.frame_height),
+                rois=ctx.rois,
+                minimap_roi_name=str(ctx.config.minimap_roi),
+            )
+        else:
+            cap_binding = binding_real
+            if cap_source == 'obs':
+                obs_hwnd, _obs_title = resolve_obs_projector_hwnd()
+                cap_binding = Win32WindowBinding(hwnd=int(obs_hwnd), title_substring=(os.environ.get('FRBOT_OBS_PROJECTOR_TITLE', '') or ''))
+
+            if backend == 'meld':
+                try:
+                    capture_real = MeldBoundWindowRealCapture(binding=cap_binding)
+                except ImportError as input_exc:
+                    raise PreflightFailed('capture_black_or_unavailable') from input_exc
+            else:
+                try:
+                    capture_real = MssBoundWindowRealCapture(binding=cap_binding)
+                except ImportError as input_exc:
+                    raise PreflightFailed(str(input_exc)) from input_exc
+
         try:
-            input_real = Win32HwndKeyboard(hwnd=int(snap.hwnd))
-        except Exception as exc:
-            raise PreflightFailed(f'failed to initialize win32 input: {type(exc).__name__}: {exc}') from exc
+            input_hwnd = resolve_input_hwnd(hwnd=int(ctx.config.window_hwnd), title_substring=ctx.config.window_title_substring)
+            if input_hwnd <= 0:
+                raise PreflightFailed('combat_ambiguous_result')
+            input_real = Win32HwndKeyboard(hwnd=int(input_hwnd))
+        except Exception as input_exc:
+            raise PreflightFailed(f'failed to initialize win32 input: {type(input_exc).__name__}: {input_exc}') from input_exc
 
         cap_v = capture_real.verify()
         inp_v = input_real.verify()
@@ -125,8 +171,53 @@ def combat_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter,
 
         f = capture_real.grab()
 
+        # Evidence-or-abort: even if we fail preflight, stash a frame so entrypoints
+        # can dump certifiable BEFORE/AFTER artifacts.
+        try:
+            from diagnostics.last_frames import record_after, record_before
+
+            record_before('combat', f)
+            record_after('combat', f)
+            record_before('combat_full', f)
+            record_after('combat_full', f)
+        except Exception:
+            pass
+
         # Target must be locked and identifiable.
-        name = _get_locked_target_name(ctx, f)
+        # In REAL, target lock can be lost between gates (e.g., while healing).
+        # For semantic next-target keybinds, attempt one acquisition and retry.
+        try:
+            name = _get_locked_target_name(ctx, f)
+        except PreflightFailed as exc:
+            if str(exc) != 'combat_target_not_locked':
+                raise
+
+            key_norm = str(ctx.config.attack_key or '').strip().lower()
+            is_next_target_key = key_norm in {'avpag', 'pgdn', 'pagedown'}
+            if not is_next_target_key:
+                raise
+
+            try:
+                binding_real.assert_bound()
+                input_real.press_key(str(ctx.config.attack_key))
+            except Exception:
+                raise
+
+            # Bounded wait for UI/capture to reflect the new lock.
+            wait_until_ns(int(time.monotonic_ns() + (200 * 1_000_000)))
+            f2 = capture_real.grab()
+            try:
+                from diagnostics.last_frames import record_after, record_before
+
+                record_before('combat', f2)
+                record_after('combat', f2)
+                record_before('combat_full', f2)
+                record_after('combat_full', f2)
+            except Exception:
+                pass
+
+            name = _get_locked_target_name(ctx, f2)
+
         if not name:
             raise PreflightFailed('combat_target_not_locked')
 

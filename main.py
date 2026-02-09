@@ -74,14 +74,32 @@ def main() -> int:
 
     if mode == 'prod_full':
         # Full certification pipeline: fail fast on first gate failure.
-        from combat_basic_entrypoint import run_combat_basic_only
+        from targeting_full_entrypoint import run_targeting_full_only
+        from healing_full_entrypoint import run_healing_full_only
+        from combat_full_entrypoint import run_combat_full_only
+        from cavebot_full_entrypoint import run_cavebot_full_only
         from looting_full_entrypoint import run_looting_full_only
         from deposit_full_entrypoint import run_deposit_full_only
         from trade_full_entrypoint import run_trade_full_only
 
-        code = int(run_combat_basic_only())
+        code = int(run_targeting_full_only())
         if code != 0:
-            print('REAL_CAVEBOT_FAILED:combat_basic_failed')
+            print('REAL_CAVEBOT_FAILED:targeting_full_failed')
+            return code
+
+        code = int(run_healing_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:healing_full_failed')
+            return code
+
+        code = int(run_combat_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:combat_full_failed')
+            return code
+
+        code = int(run_cavebot_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:cavebot_full_failed')
             return code
 
         code = int(run_looting_full_only())
@@ -149,6 +167,13 @@ def main() -> int:
         if code != 0:
             print('REAL_CAVEBOT_FAILED:targeting_failed')
         return code
+    if mode == 'targeting_full':
+        from targeting_full_entrypoint import run_targeting_full_only
+
+        code = int(run_targeting_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:targeting_full_failed')
+        return code
     if mode == 'cavebot':
         from cavebot_entrypoint import run_cavebot_only
 
@@ -156,12 +181,34 @@ def main() -> int:
         if code != 0:
             print('REAL_CAVEBOT_FAILED:cavebot_failed')
         return code
+    if mode == 'cavebot_full':
+        from cavebot_full_entrypoint import run_cavebot_full_only
+
+        code = int(run_cavebot_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:cavebot_full_failed')
+        return code
     if mode == 'healing':
         from healing_entrypoint import run_healing_only
 
         code = int(run_healing_only())
         if code != 0:
             print('REAL_CAVEBOT_FAILED:healing_failed')
+        return code
+    if mode == 'healing_full':
+        from healing_full_entrypoint import run_healing_full_only
+
+        code = int(run_healing_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:healing_full_failed')
+        return code
+
+    if mode == 'combat_full':
+        from combat_full_entrypoint import run_combat_full_only
+
+        code = int(run_combat_full_only())
+        if code != 0:
+            print('REAL_CAVEBOT_FAILED:combat_full_failed')
         return code
 
     code = int(run())

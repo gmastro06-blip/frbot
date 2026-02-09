@@ -71,6 +71,9 @@ def trade_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAda
     if mode == 'real':
         enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=False)
 
+        profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+        pixel_fallback_ok = profile == 'prod_full'
+
         cap_source = capture_source()
 
         binding_hwnd = int(ctx.config.window_hwnd)
@@ -128,18 +131,19 @@ def trade_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAda
         f = capture_real.grab()
         validate_prod_emergency_real_rois_in_bounds(rois=ctx.rois, frame=f)
 
-        npc = detect_npc_window(f, npc_roi)
-        if npc is None:
-            raise PreflightFailed('trade_npc_not_detected')
-        if int(npc.npc_id) != int(ctx.config.trade_expected_npc_id):
-            raise PreflightFailed('trade_wrong_npc')
+        if not pixel_fallback_ok:
+            npc = detect_npc_window(f, npc_roi)
+            if npc is None:
+                raise PreflightFailed('trade_npc_not_detected')
+            if int(npc.npc_id) != int(ctx.config.trade_expected_npc_id):
+                raise PreflightFailed('trade_wrong_npc')
 
-        inv = read_trade_inventory(f, inv_roi)
-        if inv is None:
-            raise PreflightFailed('trade_unverified_action')
+            inv = read_trade_inventory(f, inv_roi)
+            if inv is None:
+                raise PreflightFailed('trade_unverified_action')
 
-        ctx.trade.last_npc = npc
-        ctx.trade.last_inventory_before = inv
+            ctx.trade.last_npc = npc
+            ctx.trade.last_inventory_before = inv
 
         ctx.status.state = RuntimeState.READY
         return capture_real, input_real, binding_real

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+import os
+
 from contracts.capture import Frame
 from contracts.evidence import Roi
 from runtime.healing_semantics import _crop_rgb, _clamp01
@@ -24,12 +26,22 @@ def read_target_hp_percent(frame: Frame, roi: Roi) -> Optional[TargetHpRead]:
     if total_px <= 0:
         return None
 
+    try:
+        red_min = int(os.environ.get('FRBOT_TARGET_HP_RED_MIN', '80') or '80')
+    except Exception:
+        red_min = 80
+    try:
+        dom_delta = int(os.environ.get('FRBOT_TARGET_HP_RED_DOM_DELTA', '25') or '25')
+    except Exception:
+        dom_delta = 25
+
     filled = 0
     for i in range(0, len(rgb) - 2, 3):
         r = rgb[i]
         g = rgb[i + 1]
         b = rgb[i + 2]
-        if r > 200 and g < 80 and b < 80:
+        # Prefer dominance over absolute RGB values to support multiple UI themes.
+        if int(r) >= int(red_min) and int(r) >= (int(g) + int(dom_delta)) and int(r) >= (int(b) + int(dom_delta)):
             filled += 1
 
     return TargetHpRead(value=_clamp01(filled / float(total_px)))

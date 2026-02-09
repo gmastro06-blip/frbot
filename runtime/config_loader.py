@@ -51,10 +51,19 @@ _ALLOWED_PROD_FULL_EXTRA_ROIS: set[str] = {
 	'target_hp_bar',
 	'combat_cooldown',
 	'combat_feedback',
+	# healing (FULL)
+	'hp_bar',
+	'mp_bar',	
+	'hp_text',
+	'mp_text',
+	'heal_cooldown',
+	'heal_feedback',
 	# looting_full/looting_basic semantic evidence
 	'inventory_text',
 	'chat_loot_area',
 	'loot_corpse',
+	'loot_container_open',
+	'loot_take',
 	# deposit/trade semantic evidence
 	'depot_container',
 	'trade_inventory',

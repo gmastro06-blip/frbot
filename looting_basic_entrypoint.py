@@ -92,6 +92,9 @@ def _try_write_last_result(*, evidence_dir: Path, before_ppm: str | None, after_
 def _load_config_from_env() -> RuntimeConfig:
     backend = (_env_str('FRBOT_LOOTING_BASIC_BACKEND', 'real') or 'real').strip().lower()
 
+    # Accept both legacy and Tibia-specific env names.
+    quick_loot_key = _env_str('FRBOT_TIBIA_QUICK_LOOT_KEY', _env_str('FRBOT_QUICK_LOOT_KEY', 'R'))
+
     return RuntimeConfig(
         mode=backend,
         tick_hz=_env_float('FRBOT_TICK_HZ', 20.0),
@@ -104,7 +107,7 @@ def _load_config_from_env() -> RuntimeConfig:
 
         # loot evidence + input
         inventory_text_roi=_env_str('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text'),
-        quick_loot_key=_env_str('FRBOT_QUICK_LOOT_KEY', 'R'),
+        quick_loot_key=str(quick_loot_key),
         looting_max_attempts_per_corpse=1,
         looting_max_ticks=1,
         looting_require_inventory_delta=True,

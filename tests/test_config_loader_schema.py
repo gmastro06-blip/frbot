@@ -145,10 +145,19 @@ def test_prod_full_real_rois_allows_deposit_trade_superset(tmp_path: Path, monke
 					'battle_list': {'x': 0, 'y': 10, 'width': 10, 'height': 10},
 					'hp_mp': {'x': 0, 'y': 20, 'width': 10, 'height': 10},
 					'target_frame': {'x': 0, 'y': 30, 'width': 10, 'height': 10},
+					# healing FULL
+					'hp_bar': {'x': 0, 'y': 31, 'width': 10, 'height': 10},
+					'mp_bar': {'x': 0, 'y': 32, 'width': 10, 'height': 10},
+					'hp_text': {'x': 0, 'y': 33, 'width': 10, 'height': 10},
+					'mp_text': {'x': 0, 'y': 34, 'width': 10, 'height': 10},
+					'heal_cooldown': {'x': 0, 'y': 35, 'width': 10, 'height': 10},
+					'heal_feedback': {'x': 0, 'y': 36, 'width': 10, 'height': 10},
 					# looting semantic
 					'inventory_text': {'x': 0, 'y': 40, 'width': 10, 'height': 10},
 					'chat_loot_area': {'x': 0, 'y': 50, 'width': 10, 'height': 10},
 					'loot_corpse': {'x': 0, 'y': 60, 'width': 10, 'height': 10},
+					'loot_container_open': {'x': 0, 'y': 61, 'width': 10, 'height': 10},
+					'loot_take': {'x': 0, 'y': 62, 'width': 10, 'height': 10},
 					# deposit
 					'depot_container': {'x': 0, 'y': 70, 'width': 10, 'height': 10},
 					# trade
@@ -169,3 +178,5 @@ def test_prod_full_real_rois_allows_deposit_trade_superset(tmp_path: Path, monke
 	assert 'inventory_text' in loaded.rois
 	assert 'depot_container' in loaded.rois
 	assert 'trade_action' in loaded.rois
+	assert 'heal_cooldown' in loaded.rois
+	assert 'loot_take' in loaded.rois
