@@ -58,6 +58,11 @@ def _frames_dir() -> Path:
     return Path('diagnostics') / 'frames'
 
 
+def _load_json(path: Path) -> dict[str, object]:
+    data = json.loads(path.read_text(encoding='utf-8', errors='replace'))
+    return data if isinstance(data, dict) else {}
+
+
 def _append_trace(*, gate: str, payload: dict) -> None:
     try:
         out_dir = _frames_dir()
@@ -273,10 +278,10 @@ def run_looting_full_only() -> int:
                     if 'chat_ok' in meta:
                         chat_ok = bool(meta.get('chat_ok'))
                     v = meta.get('chat_latency_ms')
-                    if v is not None:
+                    if isinstance(v, (int, float, str)):
                         chat_latency_ms = float(v)
                     v2 = meta.get('chat_max_latency_ms')
-                    if v2 is not None:
+                    if isinstance(v2, (int, float, str)):
                         chat_max_latency_ms = float(v2)
         except Exception:
             pass

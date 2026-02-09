@@ -257,7 +257,7 @@ def cavebot_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
         for rgb in tried:
             sel = select_player_marker(
                 f,
-                marker_rgb=tuple(rgb),
+                marker_rgb=rgb,
                 tol=int(ctx.config.player_marker_tol),
                 min_pixels=int(ctx.config.player_marker_min_pixels),
                 max_pixels=int(ctx.config.player_marker_max_pixels),
@@ -266,13 +266,13 @@ def cavebot_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
             last_details = dict(sel.details or {})
             if sel.abort_reason is None and sel.marker is not None:
                 marker = sel.marker
-                chosen_rgb = tuple(rgb)
+                chosen_rgb = rgb
                 break
 
         if marker is None:
-            exc = PreflightFailed('cavebot_marker_not_found')
+            err = PreflightFailed('cavebot_marker_not_found')
             setattr(
-                exc,
+                err,
                 'details',
                 {
                     'reason': 'cavebot_marker_not_found',
@@ -282,11 +282,11 @@ def cavebot_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
                     **(last_details or {}),
                 },
             )
-            raise exc
+            raise err
 
         # Persist chosen marker RGB for subsequent ticks.
         if chosen_rgb is not None:
-            ctx.cavebot_gate.telemetry.marker_rgb = tuple(chosen_rgb)
+            ctx.cavebot_gate.telemetry.marker_rgb = chosen_rgb
 
         # Initialize virtual marker position for scroll-based progress inference.
         try:
