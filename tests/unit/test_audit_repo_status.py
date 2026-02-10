@@ -232,6 +232,49 @@ def test_status_json_is_written_each_run(tmp_path: Path) -> None:
     assert len(status_writes) == 2
 
 
+def test_explicit_hwnd_is_accepted_when_enumeration_fails(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    mod = _load_module(repo_root)
+
+    writer = _Writer()
+
+    env = {
+        "FRBOT_PROFILE": "prod_full",
+        "FRBOT_CAPTURE_SOURCE": "obs_source",
+        "FRBOT_OBS_SOURCE_NAME": "TIBIA_CAPTURE",
+        "FRBOT_WINDOW_HWND": "123",
+        "FRBOT_CONFIG_PATH": str(tmp_path / "config.json"),
+        "FRBOT_REAL_FRAMES_DIR": str(tmp_path / "frames_full"),
+    }
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
+
+    def run_cmd(argv: list[str], *, cwd: Path, env: Mapping[str, str] | None = None, timeout_s: int = 0) -> Any:
+        if argv[:2] == ["git", "status"]:
+            return mod.CmdResult(argv=list(argv), returncode=0, stdout="", stderr="")
+        if argv[:2] == ["git", "rev-parse"]:
+            return mod.CmdResult(argv=list(argv), returncode=0, stdout="main\n", stderr="")
+        if argv[:2] == ["poetry", "run"] and "pytest" in argv:
+            return mod.CmdResult(argv=list(argv), returncode=0, stdout="1 passed in 0.01s\n", stderr="")
+        if argv[:3] == ["poetry", "run", "python"]:
+            return mod.CmdResult(argv=list(argv), returncode=0, stdout="FINAL DECISION: OPERATIONAL_REAL\n", stderr="")
+        return mod.CmdResult(argv=list(argv), returncode=0, stdout="", stderr="")
+
+    exit_code, report = mod.run_repo_status_audit(
+        repo_root=tmp_path,
+        env=env,
+        run_cmd=run_cmd,
+        list_windows=lambda: ([], {"ok": False, "reason": "stub"}),
+        now_iso=lambda: "2026-01-01T00:00:00+00:00",
+        write_json=writer,
+    )
+
+    assert report["window"]["effective_hwnd"] == 123
+    assert report["window"]["selection"]["match_kind"] == "explicit_hwnd_unverified"
+    assert "window_hwnd_invalid" not in set(report.get("root_blockers", []))
+    assert report["final_decision"] in {"READY", "NOT_READY"}
+    assert exit_code in {mod.EXIT_READY, mod.EXIT_NOT_READY}
+
+
 def test_exit_code_constants_are_stable() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     mod = _load_module(repo_root)

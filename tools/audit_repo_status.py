@@ -207,6 +207,7 @@ def _resolve_effective_hwnd(
     *,
     env: Mapping[str, str],
     windows: list[VisibleWindow],
+    can_validate_hwnd: bool,
 ) -> tuple[int | None, dict[str, Any], list[str]]:
     blockers: list[str] = []
 
@@ -235,7 +236,20 @@ def _resolve_effective_hwnd(
                 return bool(not w.minimized)
         return False
 
-    # 1) Explicit HWND wins if valid.
+    # 1) Explicit HWND wins.
+    # If we cannot validate via enumeration, accept the provided HWND to let downstream
+    # auditors (prod_full) do the real validation.
+    if int(hwnd_parsed) > 0 and not bool(can_validate_hwnd):
+        selection.update(
+            {
+                "effective_hwnd": int(hwnd_parsed),
+                "match_kind": "explicit_hwnd_unverified",
+                "reason": "HWND provisto (sin enumeración de ventanas)",
+            }
+        )
+        blockers = [b for b in blockers if b != "window_hwnd_invalid"]
+        return int(hwnd_parsed), selection, blockers
+
     if int(hwnd_parsed) > 0 and _is_hwnd_ok(int(hwnd_parsed)):
         selection.update({"effective_hwnd": int(hwnd_parsed), "match_kind": "explicit_hwnd", "reason": "HWND válido y visible"})
         return int(hwnd_parsed), selection, blockers
@@ -371,7 +385,16 @@ def run_repo_status_audit(
         windows, windows_meta = [], {"ok": False, "reason": "unsupported_platform", "platform": str(sys.platform)}
         root_blockers.append("unsupported_platform")
 
-    effective_hwnd, selection, window_blockers = _resolve_effective_hwnd(env=env_snapshot, windows=windows)
+    windows_meta_ok = bool(isinstance(windows_meta, dict) and windows_meta.get("ok") is True)
+    if _is_windows() and (not windows_meta_ok):
+        # Informational: window enumeration failed. Do not block by itself.
+        root_blockers.append("window_enumeration_failed")
+
+    effective_hwnd, selection, window_blockers = _resolve_effective_hwnd(
+        env=env_snapshot,
+        windows=windows,
+        can_validate_hwnd=bool(windows_meta_ok and len(windows) > 0),
+    )
     root_blockers.extend(window_blockers)
 
     # Window diagnostics payload (persist at the end so pytest/tools can't overwrite it).
@@ -405,7 +428,10 @@ def run_repo_status_audit(
     except Exception:
         root_blockers.append("frames_dir_missing")
 
-    if not config_path.exists():
+    if (not frames_dir.exists()) or (not frames_dir.is_dir()):
+        root_blockers.append("frames_dir_missing")
+
+    if (not config_path.exists()) or (not config_path.is_file()):
         root_blockers.append("config_missing")
 
     # Repo metadata.
