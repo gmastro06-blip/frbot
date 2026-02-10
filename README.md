@@ -309,6 +309,32 @@ Evidence output:
 - `diagnostics/frames_full/evidence_<timestamp>/` (PPM BEFORE/AFTER pairs + `evidence_manifest.json` + per-gate `*_last_result.json`)
 - `diagnostics/evidence_<timestamp>.*.out` (precheck / run / audit transcripts)
 
+### Release (prod_full)
+
+Official single-command release gate (prints ONLY `RELEASE_GO` or `RELEASE_NO_GO`):
+
+```powershell
+./tools/run_release_prod_full.ps1 -ObsSource "Tibia_Fuente" -WindowTitle "Tibia - Onniwabanshu"
+```
+
+What it does (stops on first failure):
+
+- `poetry run pytest -q`
+- `poetry run python tools/audit_prod_full.py`
+- `poetry run python tools/audit_repo_status.py`
+
+Outputs:
+
+- Frames dir: `diagnostics/frames_full/<timestamp>/`
+- Release zip: `diagnostics/releases/<timestamp>.zip`
+
+The zip contains:
+
+- `status_repo.json`, `window_diagnostics.json`
+- `runtime.log`, `fatal.log`
+- `*_last_result.json`
+- `*.ppm`
+
 ROI config requirements (REAL, `FRBOT_PROFILE=prod_full`):
 
 - Required base: `minimap`, `battle_list`, `target_frame`, `hp_mp`

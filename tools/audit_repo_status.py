@@ -311,13 +311,16 @@ def evaluate_go_no_go(
 ) -> str:
     """Reglas puras para el veredicto global.
 
-    - Si hay blockers de entorno REAL => NOT_OPERATIONAL_REAL
+    - Si falta entorno/config => NOT_READY
     - Si audit prod_full no es OPERATIONAL_REAL => NOT_OPERATIONAL_REAL
     - Si repo sucio o tests fallan => NOT_READY
     - Si todo OK => READY
     """
 
-    env_blockers = {
+    if "repo_dirty" in set(root_blockers) or bool(repo_dirty) or (not bool(pytest_ok)):
+        return "NOT_READY"
+
+    missing_or_invalid = {
         "unsupported_platform",
         "profile_not_prod_full",
         "obs_source_missing",
@@ -330,14 +333,11 @@ def evaluate_go_no_go(
         "internal_error",
     }
 
-    if any(b in env_blockers for b in root_blockers):
-        return "NOT_OPERATIONAL_REAL"
+    if any(b in missing_or_invalid for b in root_blockers):
+        return "NOT_READY"
 
     if str(prod_full_final_decision or "").strip() != "OPERATIONAL_REAL":
         return "NOT_OPERATIONAL_REAL"
-
-    if bool(repo_dirty) or (not bool(pytest_ok)):
-        return "NOT_READY"
 
     return "READY"
 
@@ -439,10 +439,15 @@ def run_repo_status_audit(
     git_branch = ""
     git_commit = ""
     git_status_out = ""
+    untracked_count = 0
     try:
         r1 = run_cmd(["git", "status", "--porcelain"], cwd=repo_root)
         git_status_out = r1.stdout
-        git_dirty = bool((r1.stdout or "").strip())
+        lines = (r1.stdout or "").splitlines()
+        git_dirty = bool(any(l.strip() for l in lines))
+        untracked_count = sum(1 for l in lines if l.startswith("??"))
+        if git_dirty:
+            root_blockers.append("repo_dirty")
 
         r2 = run_cmd(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root)
         git_branch = (r2.stdout or "").strip()
@@ -453,42 +458,68 @@ def run_repo_status_audit(
         # Don't block readiness solely for git probing.
         pass
 
+    # Determine if the REAL env is complete enough to run expensive checks.
+    required_env_ok = True
+    if "unsupported_platform" in set(root_blockers):
+        required_env_ok = False
+    if "profile_not_prod_full" in set(root_blockers):
+        required_env_ok = False
+    if "obs_source_missing" in set(root_blockers) or "obs_source_mismatch" in set(root_blockers):
+        required_env_ok = False
+    if "obs_source_name_missing" in set(root_blockers):
+        required_env_ok = False
+    if "window_selector_missing" in set(root_blockers) or "window_hwnd_invalid" in set(root_blockers):
+        required_env_ok = False
+    if "config_missing" in set(root_blockers) or "frames_dir_missing" in set(root_blockers):
+        required_env_ok = False
+
     # Pytest.
     pytest_ok = False
     pytest_rc: int | None = None
     pytest_tail = ""
-    try:
-        pr = run_cmd(["poetry", "run", "pytest", "-q"], cwd=repo_root, timeout_s=0)
-        pytest_rc = int(pr.returncode)
-        pytest_ok = pr.returncode == 0
-        pytest_tail = _tail_lines(_normalize_output(pr.combined))
-    except Exception as exc:
+    if not required_env_ok:
         pytest_ok = False
         pytest_rc = None
-        pytest_tail = f"pytest_exception: {type(exc).__name__}: {exc}"
+        pytest_tail = "skipped_missing_env"
+    else:
+        try:
+            pr = run_cmd(["poetry", "run", "pytest", "-q"], cwd=repo_root, timeout_s=0)
+            pytest_rc = int(pr.returncode)
+            pytest_ok = pr.returncode == 0
+            pytest_tail = _tail_lines(_normalize_output(pr.combined))
+        except Exception as exc:
+            pytest_ok = False
+            pytest_rc = None
+            pytest_tail = f"pytest_exception: {type(exc).__name__}: {exc}"
 
     # audit_prod_full (only meaningful if REAL env is valid enough to expect a consistent audit).
     prod_ok = False
     prod_rc: int | None = None
     prod_tail = ""
     prod_final = ""
-    try:
-        env_for_prod = dict(env_snapshot)
-        if effective_hwnd is not None:
-            env_for_prod["FRBOT_WINDOW_HWND"] = str(int(effective_hwnd))
-        env_for_prod["FRBOT_REAL_FRAMES_DIR"] = str(frames_dir)
-        env_for_prod["FRBOT_CONFIG_PATH"] = str(config_path)
-
-        ar = run_cmd(["poetry", "run", "python", "tools/audit_prod_full.py"], cwd=repo_root, env=env_for_prod, timeout_s=0)
-        prod_rc = int(ar.returncode)
-        prod_tail = _tail_lines(ar.combined)
-        prod_final = _parse_final_decision(ar.combined)
-        prod_ok = prod_final == "OPERATIONAL_REAL" and ar.returncode == 0
-    except Exception as exc:
+    if not required_env_ok:
         prod_ok = False
         prod_rc = None
-        prod_tail = f"audit_prod_full_exception: {type(exc).__name__}: {exc}"
+        prod_tail = "skipped_missing_env"
         prod_final = ""
+    else:
+        try:
+            env_for_prod = dict(env_snapshot)
+            if effective_hwnd is not None:
+                env_for_prod["FRBOT_WINDOW_HWND"] = str(int(effective_hwnd))
+            env_for_prod["FRBOT_REAL_FRAMES_DIR"] = str(frames_dir)
+            env_for_prod["FRBOT_CONFIG_PATH"] = str(config_path)
+
+            ar = run_cmd(["poetry", "run", "python", "tools/audit_prod_full.py"], cwd=repo_root, env=env_for_prod, timeout_s=0)
+            prod_rc = int(ar.returncode)
+            prod_tail = _tail_lines(ar.combined)
+            prod_final = _parse_final_decision(ar.combined)
+            prod_ok = prod_final == "OPERATIONAL_REAL" and ar.returncode == 0
+        except Exception as exc:
+            prod_ok = False
+            prod_rc = None
+            prod_tail = f"audit_prod_full_exception: {type(exc).__name__}: {exc}"
+            prod_final = ""
 
     # Decide.
     # Dedupe blockers while preserving order.
@@ -524,6 +555,10 @@ def run_repo_status_audit(
         "final_decision": final_decision,
         "exit_code": int(exit_code),
         "root_blockers": deduped_blockers,
+        "git_branch": git_branch,
+        "git_commit": git_commit,
+        "is_dirty": bool(git_dirty),
+        "untracked_count": int(untracked_count),
         "env_snapshot": env_snapshot,
         "paths": {
             "status_repo_json": STATUS_REPO_JSON_REL,
@@ -539,6 +574,8 @@ def run_repo_status_audit(
             "dirty": bool(git_dirty),
             "branch": git_branch,
             "commit": git_commit,
+            "is_dirty": bool(git_dirty),
+            "untracked_count": int(untracked_count),
             "status_porcelain": _tail_lines(git_status_out, max_lines=30),
         },
         "pytest": {
@@ -579,8 +616,8 @@ def main(argv: list[str] | None = None) -> int:
         sys.path.insert(0, str(repo_root))
 
     exit_code, report = run_repo_status_audit(repo_root=repo_root, env=dict(os.environ))
-    # Single, consistent final line (Spanish).
-    print(f"DECISIÓN FINAL: {report.get('final_decision', '')}")
+    # Single, stable final line (ASCII).
+    print(f"FINAL DECISION: {report.get('final_decision', '')}")
     return int(exit_code)
 
 

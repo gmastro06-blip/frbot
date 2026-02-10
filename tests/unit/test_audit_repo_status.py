@@ -44,8 +44,8 @@ def test_env_missing_is_not_operational_and_writes_json(tmp_path: Path) -> None:
         write_json=writer,
     )
 
-    assert report["final_decision"] == "NOT_OPERATIONAL_REAL"
-    assert exit_code == mod.EXIT_NOT_OPERATIONAL
+    assert report["final_decision"] == "NOT_READY"
+    assert exit_code == mod.EXIT_NOT_READY
 
     # Must write both files.
     written_paths = {p.as_posix() for (p, _payload) in writer.writes}
@@ -169,6 +169,7 @@ def test_repo_dirty_makes_not_ready(tmp_path: Path) -> None:
 
     assert report["final_decision"] == "NOT_READY"
     assert exit_code == mod.EXIT_NOT_READY
+    assert "repo_dirty" in set(report.get("root_blockers", []))
 
 
 def test_status_json_is_written_each_run(tmp_path: Path) -> None:
