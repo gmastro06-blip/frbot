@@ -145,6 +145,32 @@ Logs:
 - diagnostics/runtime.log
 - diagnostics/fatal.log
 
+## Waypoint/Script Editor (Desktop UI)
+
+This repo includes a standalone desktop UI for editing waypoint/scripts.
+
+Scope:
+
+- UI + typed model + JSON load/save only.
+- No third-party automation: action buttons only add waypoints and emit signals/logs for future integration.
+
+Install:
+
+```powershell
+pip install PySide6
+```
+
+Run:
+
+```powershell
+python app.py
+```
+
+Artifacts:
+
+- `runtime_ui.log`
+- Saved scripts follow the canonical schema in `example_script.json`
+
 ### Targeting-only mode
 
 Run the semantic targeting system *only* (Battle List + objective evidence, or abort):
