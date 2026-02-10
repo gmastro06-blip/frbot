@@ -18,6 +18,7 @@ from diagnostics.fatal import write_fatal
 from diagnostics.jsonlog import log as log_json
 from diagnostics.logger import configure_logger
 from diagnostics.frame_dump import dump_pair
+from diagnostics.schema import base_context_fields
 
 
 DEFAULT_OBS_SOURCE_NAME = "Tibia_Fuente"
@@ -90,6 +91,7 @@ def _write_evidence_manifest(*, frames_dir: Path) -> None:
         'capture_source': 'obs_source',
         'obs_source_name': str(_env_str('FRBOT_OBS_SOURCE_NAME', DEFAULT_OBS_SOURCE_NAME) or '').strip(),
         'obs_projector_title': '',
+        **base_context_fields(),
         'ts': int(time.time()),
     }
     frames_dir.mkdir(parents=True, exist_ok=True)

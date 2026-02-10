@@ -14,6 +14,7 @@ from diagnostics.emergency_capture import try_dump_window_frame, try_dump_window
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from diagnostics.logger import configure_logger
+from diagnostics.schema import base_context_fields
 
 from runtime.deposit_basic_preflight import run as deposit_basic_preflight_run
 from runtime.deposit_runner import execute_deposit_tick
@@ -150,6 +151,7 @@ def _write_evidence_manifest(*, evidence_dir: Path, capture: object) -> None:
             'capture_source': ('obs_source' if src == 'obs_source' else ('obs' if src == 'obs' else 'client')),
             'obs_source_name': str(getattr(capture, 'obs_source_name', '') or _env_str('FRBOT_OBS_SOURCE_NAME', '') or ''),
             'obs_projector_title': str(_env_str('FRBOT_OBS_PROJECTOR_TITLE', '') or ''),
+            **base_context_fields(),
             'ts': int(time.time()),
         }
         evidence_dir.mkdir(parents=True, exist_ok=True)

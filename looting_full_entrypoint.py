@@ -12,6 +12,7 @@ from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_enabled
 from diagnostics.jsonlog import log as log_json
 from diagnostics.logger import configure_logger
+from diagnostics.schema import base_context_fields
 
 from runtime.looting_full_preflight import run as looting_full_preflight_run
 from runtime.looting_full_runner import execute_looting_full
@@ -81,6 +82,7 @@ def _write_evidence_manifest(*, evidence_dir: Path, capture: object) -> None:
             'capture_source': ('obs_source' if src == 'obs_source' else ('obs' if src == 'obs' else 'client')),
             'obs_source_name': str(getattr(capture, 'obs_source_name', '') or _env_str('FRBOT_OBS_SOURCE_NAME', '') or ''),
             'obs_projector_title': str(_env_str('FRBOT_OBS_PROJECTOR_TITLE', '') or ''),
+            **base_context_fields(),
             'ts': int(time.time()),
         }
         evidence_dir.mkdir(parents=True, exist_ok=True)

@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any, Optional
 import traceback
 
+from diagnostics.schema import base_context_fields
+
 
 def _ts() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')
@@ -37,6 +39,7 @@ def write_fatal(message: str, exc: Optional[BaseException] = None, *, details: O
 
     payload: dict[str, Any] = {
         'ts': _ts(),
+        **base_context_fields(),
         'level': 'FATAL',
         'reason': str(message),
         'message': str(message),
