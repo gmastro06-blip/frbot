@@ -2,30 +2,25 @@ from __future__ import annotations
 
 import json
 import os
-import platform
 import re
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Callable, Final, Mapping
 
 
-_REQUIRED_GATES: Final[tuple[str, ...]] = (
-    "targeting_full",
-    "healing_full",
-    "combat_full",
-    "cavebot_full",
-    "looting_full",
-    "deposit_full",
-    "trade_full",
-)
+STATUS_REPO_JSON_REL: Final[str] = "diagnostics/status_repo.json"
+WINDOW_DIAGNOSTICS_JSON_REL: Final[str] = "diagnostics/window_diagnostics.json"
+
+EXIT_READY: Final[int] = 0
+EXIT_NOT_READY: Final[int] = 2
+EXIT_NOT_OPERATIONAL: Final[int] = 3
 
 
-@dataclass(frozen=True, slots=True)
-class _CmdResult:
+@dataclass(frozen=True)
+class CmdResult:
     argv: list[str]
     returncode: int
     stdout: str
@@ -42,6 +37,24 @@ class _CmdResult:
         return out + "\n[stderr]\n" + err
 
 
+@dataclass(frozen=True)
+class VisibleWindow:
+    hwnd: int
+    title: str
+    minimized: bool
+    rect_left: int
+    rect_top: int
+    rect_right: int
+    rect_bottom: int
+    z_order: int
+
+    @property
+    def area(self) -> int:
+        w = max(0, int(self.rect_right) - int(self.rect_left))
+        h = max(0, int(self.rect_bottom) - int(self.rect_top))
+        return int(w * h)
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
@@ -50,429 +63,500 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def _env_str(name: str, default: str = "") -> str:
-    raw = os.environ.get(name)
-    return (default if raw is None else str(raw)).strip()
-
-
 def _is_windows() -> bool:
-    return sys.platform.startswith("win")
+    return sys.platform == "win32"
 
 
-def _normalize_output(s: str) -> str:
+def _tail_lines(text: str, *, max_lines: int = 60) -> str:
+    lines = (text or "").splitlines()
+    if len(lines) <= max_lines:
+        return "\n".join(lines).rstrip()
+    return "\n".join(lines[-max_lines:]).rstrip()
+
+
+def _normalize_output(text: str) -> str:
     # Keep reports stable-ish across runs by removing volatile durations.
     # Example: "119 passed in 10.87s" -> "119 passed in <time>s"
-    s = re.sub(r"\bin\s+\d+(?:\.\d+)?s\b", "in <time>s", s)
-    return s
+    return re.sub(r"\bin\s+\d+(?:\.\d+)?s\b", "in <time>s", text or "")
 
 
-def _run_cmd(argv: list[str], *, cwd: Path, env: dict[str, str] | None = None, timeout_s: int = 0) -> _CmdResult:
+def _run_cmd(
+    argv: list[str],
+    *,
+    cwd: Path,
+    env: Mapping[str, str] | None = None,
+    timeout_s: int = 0,
+) -> CmdResult:
     p = subprocess.run(
         argv,
         cwd=str(cwd),
-        env=env,
+        env=(dict(os.environ) | dict(env)) if env is not None else None,
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=None if timeout_s <= 0 else timeout_s,
+        timeout=(timeout_s if timeout_s and timeout_s > 0 else None),
     )
-    return _CmdResult(argv=list(argv), returncode=int(p.returncode), stdout=p.stdout or "", stderr=p.stderr or "")
+    return CmdResult(argv=list(argv), returncode=int(p.returncode), stdout=str(p.stdout or ""), stderr=str(p.stderr or ""))
 
 
-def _which_or_missing(name: str) -> str | None:
-    return shutil.which(name)
+def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + f".tmp.{os.getpid()}")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8", errors="replace")
+    tmp.replace(path)
 
 
-def _default_config_path(repo_root: Path) -> Path:
-    # Align with scripts/run_prod_full_real_obs_source.ps1 behavior.
-    p = repo_root / "config" / "rois_prod_full.json"
-    if p.exists():
-        return p
-    legacy = repo_root / "rois_prod_full.json"
-    return legacy
+def _parse_final_decision(output: str) -> str:
+    # Must be robust against substring collisions like OPERATIONAL_REAL in NOT_OPERATIONAL_REAL.
+    # We only accept an explicit FINAL DECISION line.
+    decision = ""
+    for line in (output or "").splitlines():
+        m = re.match(r"^\s*FINAL\s+DECISION:\s*(\S+)\s*$", line)
+        if m:
+            decision = str(m.group(1)).strip()
+    return decision
 
 
-def _is_placeholder_path(s: str) -> bool:
-    t = (s or "").strip()
-    if not t:
-        return False
-    # Common README-style placeholder: C:\...\file.json
-    if "..." in t:
-        return True
-    return False
-
-
-def _parse_hwnd(s: str) -> int | None:
-    t = (s or "").strip()
-    if not t:
-        return None
-    # Ignore common placeholder values like 0xXXXXXXXX.
-    if re.fullmatch(r"(?i)0xX+", t):
-        return None
+def _parse_int_hwnd(raw: str) -> int:
+    s = (raw or "").strip()
+    if not s:
+        return 0
+    # Common placeholders.
+    if s.lower().startswith("0x") and len(s) > 2 and set(s[2:].lower()) == {"x"}:
+        return 0
+    if s.strip().lower() in {"0xyourhwnd", "yourhwnd", "0x<yourhwnd>"}:
+        return 0
     try:
-        base = 16 if t.lower().startswith("0x") else 10
-        v = int(t, base)
+        v = int(s, 0)
     except Exception:
-        return None
-    return v if v > 0 else None
+        return -1
+    return int(v)
 
 
-def _is_within_diagnostics(repo_root: Path, path: Path) -> bool:
-    try:
-        diag = (repo_root / "diagnostics").resolve()
-        rp = path.resolve()
-        return diag == rp or diag in rp.parents
-    except Exception:
-        return False
+def _default_frames_dir(repo_root: Path, env: Mapping[str, str]) -> Path:
+    raw = str(env.get("FRBOT_REAL_FRAMES_DIR", "") or "").strip()
+    if raw:
+        return Path(raw)
+    prof = str(env.get("FRBOT_PROFILE", "") or "").strip().lower()
+    if prof == "prod_full":
+        return repo_root / "diagnostics" / "frames_full"
+    if prof == "prod_emergency":
+        return repo_root / "diagnostics" / "frames_emergency"
+    return repo_root / "diagnostics" / "frames"
 
 
-def _select_effective_frames_dir(frames_dir: Path) -> Path:
-    if (frames_dir / "evidence_manifest.json").exists():
-        return frames_dir
-
-    if frames_dir.exists() and frames_dir.is_dir():
-        candidates: list[Path] = []
-        for p in frames_dir.iterdir():
-            if not p.is_dir():
-                continue
-            if p.name.startswith("evidence_") and (p / "evidence_manifest.json").exists():
-                candidates.append(p)
-        if candidates:
-            # evidence_YYYYMMDD-HHmmss naming is lexicographically sortable.
-            return sorted(candidates, key=lambda x: x.name)[-1]
-
-    return frames_dir
+def _default_config_path(repo_root: Path, env: Mapping[str, str]) -> Path:
+    raw = str(env.get("FRBOT_CONFIG_PATH", "") or "").strip()
+    if raw:
+        return Path(raw)
+    return repo_root / "config" / "rois_prod_full.json"
 
 
-def _load_json_object(path: Path) -> dict[str, Any] | None:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-    except Exception:
-        return None
-    return data if isinstance(data, dict) else None
+def _list_visible_windows_real() -> tuple[list[VisibleWindow], dict[str, Any]]:
+    """List visible windows (Windows-only).
 
-
-def parse_gate_last_result(*, frames_dir: Path, gate: str) -> dict[str, Any]:
-    meta_path = frames_dir / f"{gate}_last_result.json"
-    entry: dict[str, Any] = {
-        "gate_name": gate,
-        "ok": False,
-        "outcome_kind": "",
-        "reason": "missing_last_result" if not meta_path.exists() else "last_result_unreadable",
-        "evidence_files": [],
-        "before_ppm": None,
-        "after_ppm": None,
-        "next_action": "run prod_full to generate evidence",
-    }
-
-    if not meta_path.exists():
-        return entry
-
-    data = _load_json_object(meta_path)
-    if data is None:
-        entry["reason"] = "last_result_unreadable"
-        entry["next_action"] = "re-run gate to regenerate last_result"
-        return entry
-
-    ok = bool(data.get("ok"))
-    outcome_kind = str(data.get("outcome_kind") or "").strip()
-    reason = str(data.get("reason") or "").strip()
-    before_ppm = data.get("before_ppm")
-    after_ppm = data.get("after_ppm")
-
-    entry["ok"] = ok
-    entry["outcome_kind"] = outcome_kind
-    entry["reason"] = reason or ("ok" if ok else "gate_not_ok")
-
-    if isinstance(before_ppm, str) and before_ppm.strip():
-        entry["before_ppm"] = before_ppm
-    if isinstance(after_ppm, str) and after_ppm.strip():
-        entry["after_ppm"] = after_ppm
-
-    evidence: list[str] = []
-    for k in ("before_ppm", "after_ppm"):
-        v = entry.get(k)
-        if isinstance(v, str) and v:
-            if (frames_dir / v).exists():
-                evidence.append(v)
-    entry["evidence_files"] = evidence
-
-    if ok:
-        entry["next_action"] = ""
-    else:
-        if not entry.get("before_ppm") or not entry.get("after_ppm"):
-            entry["next_action"] = "re-run gate with dumping enabled"
-        elif not evidence:
-            entry["next_action"] = "re-run gate to regenerate evidence frames"
-        else:
-            entry["next_action"] = "inspect before/after evidence in frames dir"
-
-    return entry
-
-
-def _parse_pytest_counts(output: str) -> dict[str, int]:
-    # Typical -q footer: "119 passed, 2 skipped in 10.87s"
-    counts = {"passed": 0, "skipped": 0, "failed": 0}
-    m = re.search(r"(?P<body>\d+\s+passed(?:,\s+\d+\s+skipped)?(?:,\s+\d+\s+failed)?)", output)
-    if not m:
-        # Try a broader parse (failed first).
-        m2 = re.search(r"\b(\d+)\s+failed\b", output)
-        if m2:
-            counts["failed"] = int(m2.group(1))
-        m3 = re.search(r"\b(\d+)\s+passed\b", output)
-        if m3:
-            counts["passed"] = int(m3.group(1))
-        m4 = re.search(r"\b(\d+)\s+skipped\b", output)
-        if m4:
-            counts["skipped"] = int(m4.group(1))
-        return counts
-
-    body = m.group("body")
-    for key in ("passed", "skipped", "failed"):
-        mk = re.search(rf"\b(\d+)\s+{key}\b", body)
-        if mk:
-            counts[key] = int(mk.group(1))
-    return counts
-
-
-def _ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-
-
-def new_status_report() -> dict[str, Any]:
-    return {
-        "timestamp": _utc_now_iso(),
-        "platform": platform.platform(),
-        "git_clean": False,
-        "last_commit": "",
-        "tests": {
-            "tests_ok": False,
-            "passed": 0,
-            "skipped": 0,
-            "failed": 0,
-            "output": "",
-        },
-        "audit_mock": {
-            "audit_mock_ok": False,
-            "returncode": None,
-            "output": "",
-        },
-        "audit_prod_full": {
-            "audit_prod_full_ok": False,
-            "returncode": None,
-            "output": "",
-            "frames_dir": "",
-            "config_path": "",
-        },
-        "gates": [],
-        "root_blockers": [],
-        "preconditions": {
-            "ok": False,
-            "reasons": [],
-        },
-    }
-
-
-def main() -> int:
-    repo_root = _repo_root()
-
-    report: dict[str, Any] = new_status_report()
-
-    root_blockers: list[str] = []
+    Returns (windows, diag_meta). Never raises.
+    """
 
     if not _is_windows():
+        return [], {"ok": False, "reason": "unsupported_platform", "platform": str(sys.platform)}
+
+    try:
+        from adapters.windows.win32 import list_visible_windows_diagnostic, monitor_info_to_dict, window_diag_to_dict
+    except Exception as exc:
+        return [], {"ok": False, "reason": "win32_import_failed", "error": f"{type(exc).__name__}: {exc}"}
+
+    try:
+        win_diags, monitors = list_visible_windows_diagnostic()
+        windows: list[VisibleWindow] = []
+        for w in win_diags:
+            d = window_diag_to_dict(w)
+            r_obj = d.get("rect")
+            r: dict[str, Any] = r_obj if isinstance(r_obj, dict) else {}
+            windows.append(
+                VisibleWindow(
+                    hwnd=int(w.hwnd),
+                    title=str(w.title),
+                    minimized=bool(w.minimized),
+                    rect_left=int(r.get("left", 0)),
+                    rect_top=int(r.get("top", 0)),
+                    rect_right=int(r.get("right", 0)),
+                    rect_bottom=int(r.get("bottom", 0)),
+                    z_order=int(getattr(w, "z_order", 0)),
+                )
+            )
+        meta = {
+            "ok": True,
+            "monitors": [monitor_info_to_dict(m) for m in monitors],
+            "windows": [window_diag_to_dict(w) for w in win_diags],
+        }
+        return windows, meta
+    except Exception as exc:
+        return [], {"ok": False, "reason": "win32_enumeration_failed", "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _choose_best_window(candidates: list[VisibleWindow]) -> VisibleWindow | None:
+    if not candidates:
+        return None
+    # Prefer largest area; tie-break by z-order (smaller is closer to top), then hwnd.
+    return sorted(candidates, key=lambda w: (-int(w.area), int(w.z_order), int(w.hwnd)))[0]
+
+
+def _resolve_effective_hwnd(
+    *,
+    env: Mapping[str, str],
+    windows: list[VisibleWindow],
+) -> tuple[int | None, dict[str, Any], list[str]]:
+    blockers: list[str] = []
+
+    hwnd_raw = str(env.get("FRBOT_WINDOW_HWND", "") or "").strip()
+    title_raw = str(env.get("FRBOT_WINDOW_TITLE", "") or "").strip()
+
+    selection: dict[str, Any] = {
+        "requested_hwnd_raw": hwnd_raw,
+        "requested_title": title_raw,
+        "effective_hwnd": None,
+        "match_kind": "",
+        "reason": "",
+    }
+
+    hwnd_parsed = _parse_int_hwnd(hwnd_raw)
+    if hwnd_parsed < 0:
+        # Invalid parse is a hard blocker unless title can self-heal.
+        hwnd_parsed = 0
+        blockers.append("window_hwnd_invalid")
+        selection["reason"] = "FRBOT_WINDOW_HWND inválido"
+
+    # Always require a visible + not-minimized hwnd.
+    def _is_hwnd_ok(hwnd: int) -> bool:
+        for w in windows:
+            if int(w.hwnd) == int(hwnd):
+                return bool(not w.minimized)
+        return False
+
+    # 1) Explicit HWND wins if valid.
+    if int(hwnd_parsed) > 0 and _is_hwnd_ok(int(hwnd_parsed)):
+        selection.update({"effective_hwnd": int(hwnd_parsed), "match_kind": "explicit_hwnd", "reason": "HWND válido y visible"})
+        return int(hwnd_parsed), selection, blockers
+
+    # 2) If explicit HWND is set but not valid, attempt self-heal by title once.
+    if int(hwnd_parsed) > 0 and not _is_hwnd_ok(int(hwnd_parsed)):
+        blockers.append("window_hwnd_invalid")
+
+    if not title_raw:
+        if int(hwnd_parsed) <= 0:
+            blockers.append("window_selector_missing")
+            selection["reason"] = selection.get("reason") or "Falta FRBOT_WINDOW_HWND o FRBOT_WINDOW_TITLE"
+        else:
+            selection["reason"] = selection.get("reason") or "HWND no visible / minimizado"
+        return None, selection, blockers
+
+    # 3) Resolve by exact title match.
+    title_norm = title_raw.strip()
+    exact = [w for w in windows if (not w.minimized) and w.title == title_norm]
+    best = _choose_best_window(exact)
+    if best is not None:
+        selection.update(
+            {
+                "effective_hwnd": int(best.hwnd),
+                "match_kind": "title_exact",
+                "reason": "Auto-resolución por título exacto",
+            }
+        )
+        # Self-heal clears window blockers.
+        blockers = [b for b in blockers if b not in {"window_hwnd_invalid", "window_selector_missing"}]
+        return int(best.hwnd), selection, blockers
+
+    # 4) Resolve by substring match.
+    needle = title_norm.lower()
+    subs = [w for w in windows if (not w.minimized) and (needle in w.title.lower())]
+    best2 = _choose_best_window(subs)
+    if best2 is not None:
+        selection.update(
+            {
+                "effective_hwnd": int(best2.hwnd),
+                "match_kind": "title_substring",
+                "reason": "Auto-resolución por título (substring)",
+            }
+        )
+        blockers = [b for b in blockers if b not in {"window_hwnd_invalid", "window_selector_missing"}]
+        return int(best2.hwnd), selection, blockers
+
+    blockers.append("window_hwnd_invalid")
+    selection["reason"] = "No se encontró una ventana visible que coincida con FRBOT_WINDOW_TITLE"
+    return None, selection, blockers
+
+
+def evaluate_go_no_go(
+    *,
+    root_blockers: list[str],
+    prod_full_final_decision: str,
+    repo_dirty: bool,
+    pytest_ok: bool,
+) -> str:
+    """Reglas puras para el veredicto global.
+
+    - Si hay blockers de entorno REAL => NOT_OPERATIONAL_REAL
+    - Si audit prod_full no es OPERATIONAL_REAL => NOT_OPERATIONAL_REAL
+    - Si repo sucio o tests fallan => NOT_READY
+    - Si todo OK => READY
+    """
+
+    env_blockers = {
+        "unsupported_platform",
+        "profile_not_prod_full",
+        "obs_source_missing",
+        "obs_source_mismatch",
+        "obs_source_name_missing",
+        "window_selector_missing",
+        "window_hwnd_invalid",
+        "config_missing",
+        "frames_dir_missing",
+        "internal_error",
+    }
+
+    if any(b in env_blockers for b in root_blockers):
+        return "NOT_OPERATIONAL_REAL"
+
+    if str(prod_full_final_decision or "").strip() != "OPERATIONAL_REAL":
+        return "NOT_OPERATIONAL_REAL"
+
+    if bool(repo_dirty) or (not bool(pytest_ok)):
+        return "NOT_READY"
+
+    return "READY"
+
+
+def run_repo_status_audit(
+    *,
+    repo_root: Path,
+    env: Mapping[str, str],
+    run_cmd: Callable[..., CmdResult] = _run_cmd,
+    list_windows: Callable[[], tuple[list[VisibleWindow], dict[str, Any]]] = _list_visible_windows_real,
+    now_iso: Callable[[], str] = _utc_now_iso,
+    write_json: Callable[[Path, dict[str, Any]], None] = _write_json_atomic,
+) -> tuple[int, dict[str, Any]]:
+    """Ejecuta auditoría del repo y del entorno REAL en una sola pasada.
+
+    Siempre escribe:
+    - diagnostics/status_repo.json
+    - diagnostics/window_diagnostics.json
+    """
+
+    status_path = repo_root / STATUS_REPO_JSON_REL
+    window_diag_path = repo_root / WINDOW_DIAGNOSTICS_JSON_REL
+
+    timestamp = now_iso()
+    root_blockers: list[str] = []
+
+    env_snapshot = {
+        k: str(env.get(k, "") or "")
+        for k in (
+            "FRBOT_PROFILE",
+            "FRBOT_CAPTURE_SOURCE",
+            "FRBOT_OBS_SOURCE_NAME",
+            "FRBOT_WINDOW_HWND",
+            "FRBOT_WINDOW_TITLE",
+            "FRBOT_CONFIG_PATH",
+            "FRBOT_REAL_FRAMES_DIR",
+        )
+    }
+
+    windows: list[VisibleWindow] = []
+    windows_meta: dict[str, Any] = {}
+    if _is_windows():
+        windows, windows_meta = list_windows()
+    else:
+        windows, windows_meta = [], {"ok": False, "reason": "unsupported_platform", "platform": str(sys.platform)}
         root_blockers.append("unsupported_platform")
-        report["root_blockers"] = list(root_blockers)
-        # Still emit report to diagnostics.
-        diag = repo_root / "diagnostics"
-        _ensure_dir(diag)
-        (diag / "status_repo.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
-        print(f"FINAL_DECISION: NOT_OPERATIONAL_REAL + ROOT_BLOCKERS: {root_blockers}")
-        return 2
 
-    missing_dep: list[str] = []
-    for dep in ("git", "poetry"):
-        if _which_or_missing(dep) is None:
-            missing_dep.append(dep)
-    if missing_dep:
-        root_blockers.extend([f"missing_dependency:{d}" for d in missing_dep])
-        report["root_blockers"] = list(root_blockers)
-        diag = repo_root / "diagnostics"
-        _ensure_dir(diag)
-        (diag / "status_repo.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
-        print(f"FINAL_DECISION: NOT_OPERATIONAL_REAL + ROOT_BLOCKERS: {root_blockers}")
-        return 2
+    effective_hwnd, selection, window_blockers = _resolve_effective_hwnd(env=env_snapshot, windows=windows)
+    root_blockers.extend(window_blockers)
 
-    # 1) git status + last commit
-    env_base = dict(os.environ)
-    env_base["PYTHONIOENCODING"] = "utf-8"
+    # Window diagnostics payload (persist at the end so pytest/tools can't overwrite it).
+    window_diag_payload: dict[str, Any] = {
+        "timestamp_utc": timestamp,
+        "selection": selection,
+        "meta": windows_meta,
+    }
 
-    git_status = _run_cmd(["git", "status", "--porcelain"], cwd=repo_root, env=env_base)
-    git_log = _run_cmd(["git", "log", "-1", "--oneline"], cwd=repo_root, env=env_base)
+    # Validate REAL env for strict OBS-source identity.
+    profile = str(env_snapshot.get("FRBOT_PROFILE", "") or "").strip().lower()
+    if profile != "prod_full":
+        root_blockers.append("profile_not_prod_full")
 
-    porcelain = (git_status.stdout or "").strip("\r\n")
-    git_clean = porcelain.strip() == ""
-    report["git_clean"] = bool(git_clean)
-    report["last_commit"] = (git_log.stdout or "").strip()
-    report["git_status_porcelain"] = porcelain
+    capture_source = str(env_snapshot.get("FRBOT_CAPTURE_SOURCE", "") or "").strip().lower()
+    if not capture_source:
+        root_blockers.append("obs_source_missing")
+    elif capture_source != "obs_source":
+        root_blockers.append("obs_source_mismatch")
 
-    if not git_clean:
-        root_blockers.append("git_dirty")
+    obs_source_name = str(env_snapshot.get("FRBOT_OBS_SOURCE_NAME", "") or "").strip()
+    if not obs_source_name:
+        root_blockers.append("obs_source_name_missing")
 
-    # 2) tests
-    tests_res = _run_cmd(["poetry", "run", "pytest", "-q"], cwd=repo_root, env=env_base)
-    combined_tests = _normalize_output(tests_res.combined)
-    counts = _parse_pytest_counts(combined_tests)
-    tests_ok = tests_res.returncode == 0 and counts.get("failed", 0) == 0
+    frames_dir = _default_frames_dir(repo_root, env_snapshot)
+    config_path = _default_config_path(repo_root, env_snapshot)
 
-    report["tests"]["tests_ok"] = bool(tests_ok)
-    report["tests"]["passed"] = int(counts.get("passed", 0))
-    report["tests"]["skipped"] = int(counts.get("skipped", 0))
-    report["tests"]["failed"] = int(counts.get("failed", 0))
-    report["tests"]["output"] = combined_tests
-
-    if not tests_ok:
-        root_blockers.append("tests_failed")
-
-    # 3) mock audit
-    env_mock = dict(env_base)
-    env_mock["FRBOT_MODE"] = "mock"
-    mock_res = _run_cmd(["poetry", "run", "python", str(repo_root / "tools" / "audit_all.py")], cwd=repo_root, env=env_mock)
-    combined_mock = _normalize_output(mock_res.combined)
-    report["audit_mock"]["returncode"] = int(mock_res.returncode)
-    report["audit_mock"]["output"] = combined_mock
-    report["audit_mock"]["audit_mock_ok"] = bool(mock_res.returncode == 0)
-    if mock_res.returncode != 0:
-        root_blockers.append("audit_mock_failed")
-
-    # Preconditions for REAL prod_full audit
-    pre_reasons: list[str] = []
-
-    capture_source = (_env_str("FRBOT_CAPTURE_SOURCE", "") or "").strip().lower()
-    if capture_source != "obs_source":
-        pre_reasons.append("obs_source_missing")
-
-    obs_name = _env_str("FRBOT_OBS_SOURCE_NAME", "")
-    if not obs_name:
-        pre_reasons.append("obs_source_name_missing")
-
-    config_raw = _env_str("FRBOT_CONFIG_PATH", "")
-    if config_raw and _is_placeholder_path(config_raw):
-        config_raw = ""
-    config_path = Path(config_raw) if config_raw else _default_config_path(repo_root)
-    if not config_path.is_absolute():
-        config_path = (repo_root / config_path).resolve()
-    if config_raw and not config_path.exists():
-        # Env var points to a non-existent path; fall back to repo default.
-        config_raw = ""
-        config_path = _default_config_path(repo_root)
-        if not config_path.is_absolute():
-            config_path = (repo_root / config_path).resolve()
+    # Ensure frames dir exists (requirement: create if missing).
+    try:
+        frames_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        root_blockers.append("frames_dir_missing")
 
     if not config_path.exists():
-        pre_reasons.append("config_missing")
+        root_blockers.append("config_missing")
 
-    frames_raw = _env_str("FRBOT_REAL_FRAMES_DIR", "")
-    frames_dir = Path(frames_raw) if frames_raw else (repo_root / "diagnostics" / "frames_full")
-    if not frames_dir.is_absolute():
-        frames_dir = (repo_root / frames_dir).resolve()
+    # Repo metadata.
+    git_dirty = False
+    git_branch = ""
+    git_commit = ""
+    git_status_out = ""
+    try:
+        r1 = run_cmd(["git", "status", "--porcelain"], cwd=repo_root)
+        git_status_out = r1.stdout
+        git_dirty = bool((r1.stdout or "").strip())
 
-    if not frames_dir.exists():
-        # Create only if it's within diagnostics/**
-        if _is_within_diagnostics(repo_root, frames_dir):
-            _ensure_dir(frames_dir)
+        r2 = run_cmd(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root)
+        git_branch = (r2.stdout or "").strip()
+
+        r3 = run_cmd(["git", "rev-parse", "HEAD"], cwd=repo_root)
+        git_commit = (r3.stdout or "").strip()
+    except Exception:
+        # Don't block readiness solely for git probing.
+        pass
+
+    # Pytest.
+    pytest_ok = False
+    pytest_rc: int | None = None
+    pytest_tail = ""
+    try:
+        pr = run_cmd(["poetry", "run", "pytest", "-q"], cwd=repo_root, timeout_s=0)
+        pytest_rc = int(pr.returncode)
+        pytest_ok = pr.returncode == 0
+        pytest_tail = _tail_lines(_normalize_output(pr.combined))
+    except Exception as exc:
+        pytest_ok = False
+        pytest_rc = None
+        pytest_tail = f"pytest_exception: {type(exc).__name__}: {exc}"
+
+    # audit_prod_full (only meaningful if REAL env is valid enough to expect a consistent audit).
+    prod_ok = False
+    prod_rc: int | None = None
+    prod_tail = ""
+    prod_final = ""
+    try:
+        env_for_prod = dict(env_snapshot)
+        if effective_hwnd is not None:
+            env_for_prod["FRBOT_WINDOW_HWND"] = str(int(effective_hwnd))
+        env_for_prod["FRBOT_REAL_FRAMES_DIR"] = str(frames_dir)
+        env_for_prod["FRBOT_CONFIG_PATH"] = str(config_path)
+
+        ar = run_cmd(["poetry", "run", "python", "tools/audit_prod_full.py"], cwd=repo_root, env=env_for_prod, timeout_s=0)
+        prod_rc = int(ar.returncode)
+        prod_tail = _tail_lines(ar.combined)
+        prod_final = _parse_final_decision(ar.combined)
+        prod_ok = prod_final == "OPERATIONAL_REAL" and ar.returncode == 0
+    except Exception as exc:
+        prod_ok = False
+        prod_rc = None
+        prod_tail = f"audit_prod_full_exception: {type(exc).__name__}: {exc}"
+        prod_final = ""
+
+    # Decide.
+    # Dedupe blockers while preserving order.
+    seen: set[str] = set()
+    deduped_blockers: list[str] = []
+    for b in root_blockers:
+        if b not in seen:
+            seen.add(b)
+            deduped_blockers.append(b)
+
+    final_decision = ""
+    exit_code = EXIT_NOT_OPERATIONAL
+    try:
+        final_decision = evaluate_go_no_go(
+            root_blockers=deduped_blockers,
+            prod_full_final_decision=prod_final,
+            repo_dirty=git_dirty,
+            pytest_ok=pytest_ok,
+        )
+        if final_decision == "READY":
+            exit_code = EXIT_READY
+        elif final_decision == "NOT_READY":
+            exit_code = EXIT_NOT_READY
         else:
-            pre_reasons.append("frames_dir_missing")
+            exit_code = EXIT_NOT_OPERATIONAL
+    except Exception:
+        deduped_blockers.append("internal_error")
+        final_decision = "NOT_OPERATIONAL_REAL"
+        exit_code = EXIT_NOT_OPERATIONAL
 
-    effective_frames_dir = _select_effective_frames_dir(frames_dir)
+    report: dict[str, Any] = {
+        "timestamp_utc": timestamp,
+        "final_decision": final_decision,
+        "exit_code": int(exit_code),
+        "root_blockers": deduped_blockers,
+        "env_snapshot": env_snapshot,
+        "paths": {
+            "status_repo_json": STATUS_REPO_JSON_REL,
+            "window_diagnostics_json": WINDOW_DIAGNOSTICS_JSON_REL,
+            "frames_dir": str(frames_dir),
+            "config_path": str(config_path),
+        },
+        "window": {
+            "effective_hwnd": (int(effective_hwnd) if effective_hwnd is not None else None),
+            "selection": selection,
+        },
+        "git": {
+            "dirty": bool(git_dirty),
+            "branch": git_branch,
+            "commit": git_commit,
+            "status_porcelain": _tail_lines(git_status_out, max_lines=30),
+        },
+        "pytest": {
+            "ok": bool(pytest_ok),
+            "returncode": pytest_rc,
+            "output_tail": pytest_tail,
+        },
+        "audit_prod_full": {
+            "ok": bool(prod_ok),
+            "returncode": prod_rc,
+            "final_decision": prod_final,
+            "output_tail": _tail_lines(prod_tail, max_lines=80),
+        },
+    }
 
-    # Require a manifest in the effective directory for audit_prod_full.
-    if not (effective_frames_dir / "evidence_manifest.json").exists():
-        pre_reasons.append("evidence_manifest_missing")
+    # Persist window diagnostics last (best-effort).
+    try:
+        write_json(window_diag_path, window_diag_payload)
+    except Exception:
+        pass
 
-    hwnd_raw = _env_str("FRBOT_WINDOW_HWND", "")
-    title_raw = _env_str("FRBOT_WINDOW_TITLE", "")
-    hwnd = _parse_hwnd(hwnd_raw)
-    title = title_raw.strip()
+    # Always write a fresh status JSON.
+    try:
+        write_json(status_path, report)
+    except Exception:
+        # If we can't write the report, reflect it in the process exit.
+        return EXIT_NOT_OPERATIONAL, report
 
-    if hwnd is None and not title:
-        pre_reasons.append("window_selector_missing")
-    if hwnd_raw and hwnd is None and not title:
-        # If user attempted HWND but it's invalid/placeholder.
-        pre_reasons.append("window_hwnd_invalid")
+    return int(exit_code), report
 
-    report["audit_prod_full"]["frames_dir"] = str(effective_frames_dir)
-    report["audit_prod_full"]["config_path"] = str(config_path)
 
-    # Parse gates if we have any evidence directory.
-    gates_out: list[dict[str, Any]] = []
-    if effective_frames_dir.exists() and effective_frames_dir.is_dir():
-        for gate in _REQUIRED_GATES:
-            gates_out.append(parse_gate_last_result(frames_dir=effective_frames_dir, gate=gate))
-    report["gates"] = gates_out
+def main(argv: list[str] | None = None) -> int:
+    _ = argv  # reserved for future flags; keep deterministic for now.
 
-    preconditions_ok = not pre_reasons
-    report["preconditions"]["ok"] = bool(preconditions_ok)
-    report["preconditions"]["reasons"] = list(pre_reasons)
-    if not preconditions_ok:
-        root_blockers.extend(pre_reasons)
+    repo_root = _repo_root()
+    # Ensure imports work when running from any CWD.
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
 
-    # 4) prod_full REAL audit (only if preconditions OK)
-    real_rc: int | None = None
-    real_out: str = ""
-    if preconditions_ok:
-        env_real = dict(env_base)
-        env_real["FRBOT_PROFILE"] = "prod_full"
-        env_real["FRBOT_REAL_FRAMES_DIR"] = str(effective_frames_dir)
-        env_real["FRBOT_CONFIG_PATH"] = str(config_path)
-
-        # Keep the contract explicit for strict OBS v5 source identity.
-        env_real["FRBOT_CAPTURE_SOURCE"] = "obs_source"
-        env_real["FRBOT_OBS_SOURCE_NAME"] = obs_name
-
-        # Preserve any provided selector variables as-is.
-        if hwnd_raw:
-            env_real["FRBOT_WINDOW_HWND"] = hwnd_raw
-        if title_raw:
-            env_real["FRBOT_WINDOW_TITLE"] = title_raw
-
-        real_res = _run_cmd(["poetry", "run", "python", str(repo_root / "tools" / "audit_prod_full.py")], cwd=repo_root, env=env_real)
-        real_rc = int(real_res.returncode)
-        real_out = _normalize_output(real_res.combined)
-
-        report["audit_prod_full"]["returncode"] = real_rc
-        report["audit_prod_full"]["output"] = real_out
-        report["audit_prod_full"]["audit_prod_full_ok"] = bool(real_rc == 0)
-
-        if real_rc != 0:
-            root_blockers.append("audit_prod_full_failed")
-    else:
-        report["audit_prod_full"]["returncode"] = None
-        report["audit_prod_full"]["output"] = ""
-        report["audit_prod_full"]["audit_prod_full_ok"] = False
-
-    # Persist report.
-    report["root_blockers"] = list(root_blockers)
-    diag = repo_root / "diagnostics"
-    _ensure_dir(diag)
-    (diag / "status_repo.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
-
-    operational = not root_blockers and bool(report["audit_prod_full"]["audit_prod_full_ok"]) and bool(report["tests"]["tests_ok"]) and bool(report["git_clean"])
-
-    if operational:
-        print("FINAL_DECISION: OPERATIONAL_REAL")
-        return 0
-
-    print(f"FINAL_DECISION: NOT_OPERATIONAL_REAL + ROOT_BLOCKERS: {root_blockers}")
-
-    # Exit code contract
-    if pre_reasons:
-        return 2
-    if not tests_ok:
-        return 4
-    return 3
+    exit_code, report = run_repo_status_audit(repo_root=repo_root, env=dict(os.environ))
+    # Single, consistent final line (Spanish).
+    print(f"DECISIÓN FINAL: {report.get('final_decision', '')}")
+    return int(exit_code)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))
