@@ -20,6 +20,7 @@ from runtime.healing_semantics import (
     read_text_percent,
 )
 from runtime.pacing import wait_until_ns
+from runtime.event_correlation import attach_snapshot, new_event, validate
 
 
 def _read_hp_mp(ctx: RuntimeContext, frame: Frame) -> tuple[float, float, str]:
@@ -120,6 +121,16 @@ def execute_heal_intent(
     except Exception:
         raise PreflightFailed('healing_window_binding_lost')
 
+    event = new_event(
+        gate=str(gate),
+        intent={
+            'type': 'healing_key',
+            'key': str(getattr(intent, 'key', '') or ''),
+        },
+    )
+
+    before_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='before', ts_ns=before_ts_ns, status=binding.snapshot())
     before = capture.grab()
     record_before(str(gate), before)
     before_hp, before_mp, src = _read_hp_mp(ctx, before)
@@ -130,6 +141,8 @@ def execute_heal_intent(
 
     try:
         binding.assert_bound()
+        input_ts_ns = int(time.monotonic_ns())
+        attach_snapshot(event, stage='input', ts_ns=input_ts_ns, status=binding.snapshot())
         input_.press_key(str(intent.key))
     except Exception as input_exc:
         raise PreflightFailed(f'input emit failed: {type(input_exc).__name__}: {input_exc}') from input_exc
@@ -143,8 +156,24 @@ def execute_heal_intent(
         wait_until_ns(int(time.monotonic_ns() + (int(post_heal_ms) * 1_000_000)))
 
     after = capture.grab()
+    after_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='after', ts_ns=after_ts_ns, status=binding.snapshot())
     record_after(str(gate), after)
     after_hp, after_mp, _ = _read_hp_mp(ctx, after)
+
+    corr_ok, corr_reason, corr_details = validate(event)
+    event['correlation_ok'] = bool(corr_ok)
+    event['correlation_reason'] = str(corr_reason)
+    if corr_details:
+        event['correlation_details'] = dict(corr_details)
+    ctx.telemetry.last_event_correlation = dict(event)
+    if not corr_ok:
+        exc = PreflightFailed('binding_correlation_failed')
+        try:
+            setattr(exc, 'details', {'event_correlation': event})
+        except Exception:
+            pass
+        raise exc
 
     hp_up = (after_hp - before_hp) >= float(intent.expected.hp_increase_min)
 

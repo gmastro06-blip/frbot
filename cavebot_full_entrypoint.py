@@ -92,6 +92,7 @@ def _write_last_result(
     before_ppm: str | None,
     after_ppm: str | None,
     evidence_reason: str,
+    event_correlation: dict | None = None,
 ) -> None:
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -104,6 +105,7 @@ def _write_last_result(
             'before_ppm': before_ppm,
             'after_ppm': after_ppm,
             'evidence_reason': str(evidence_reason),
+            'event_correlation': dict(event_correlation or {}),
         }
         (evidence_dir / f'{_GATE}_last_result.json').write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + '\n',
@@ -148,6 +150,7 @@ def run_cavebot_full_only() -> int:
 
     actions_sent = 0
 
+    ctx: RuntimeContext | None = None
     try:
         cfg = _load_cavebot_full_config_from_env()
 
@@ -162,6 +165,7 @@ def run_cavebot_full_only() -> int:
                 before_ppm=None,
                 after_ppm=None,
                 evidence_reason='unsupported_platform',
+                event_correlation={},
             )
             return 1
 
@@ -192,6 +196,7 @@ def run_cavebot_full_only() -> int:
                     before_ppm=before_ppm,
                     after_ppm=after_ppm,
                     evidence_reason='route_complete',
+                    event_correlation=dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}),
                 )
                 log_json(logger, event='success', gate=_GATE, status='SUCCESS', result='cavebot_route_complete', inputs_sent=int(ctx.cavebot.gate_inputs_sent))
                 return 0
@@ -245,6 +250,7 @@ def run_cavebot_full_only() -> int:
             before_ppm=before_ppm,
             after_ppm=after_ppm,
             evidence_reason=str(exc),
+            event_correlation=(dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}) if ctx is not None else {}),
         )
         write_fatal(str(exc), exc)
         return 1

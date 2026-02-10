@@ -18,6 +18,7 @@ from diagnostics.frame_dump import dump_enabled, dump_pair
 from runtime.cavebot_semantics import ProgressResult, compute_progress, detect_player_marker, is_progress_valid, select_player_marker
 from runtime.pacing import wait_until_ns
 from runtime.profile import is_prod_emergency
+from runtime.event_correlation import attach_snapshot, new_event, validate
 
 
 def _estimate_minimap_translation_px(
@@ -330,6 +331,17 @@ def execute_cavebot_tick(
     except Exception as exc:
         raise PreflightFailed('cavebot_window_binding_lost') from exc
 
+    event = new_event(
+        gate=str(gate),
+        intent={
+            'type': 'cavebot_tick',
+            'waypoint_id': str(getattr(waypoint, 'waypoint_id', '') or ''),
+            'tick_index': int(tick_index),
+        },
+    )
+
+    before_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='before', ts_ns=before_ts_ns, status=binding.snapshot())
     before = capture.grab()
     record_before(str(gate), before)
 
@@ -534,6 +546,9 @@ def execute_cavebot_tick(
     except Exception as exc:
         raise PreflightFailed('cavebot_window_binding_lost') from exc
 
+    input_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='input', ts_ns=input_ts_ns, status=binding.snapshot())
+
     input_.press_key(str(key))
     ctx.cavebot.gate_inputs_sent += 1
 
@@ -551,7 +566,23 @@ def execute_cavebot_tick(
         wait_until_ns(int(time.monotonic_ns() + (int(post_move_ms) * 1_000_000)))
 
     after = capture.grab()
+    after_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='after', ts_ns=after_ts_ns, status=binding.snapshot())
     record_after(str(gate), after)
+
+    corr_ok, corr_reason, corr_details = validate(event)
+    event['correlation_ok'] = bool(corr_ok)
+    event['correlation_reason'] = str(corr_reason)
+    if corr_details:
+        event['correlation_details'] = dict(corr_details)
+    ctx.telemetry.last_event_correlation = dict(event)
+    if not corr_ok:
+        exc = PreflightFailed('binding_correlation_failed')
+        try:
+            setattr(exc, 'details', {'event_correlation': event})
+        except Exception:
+            pass
+        raise exc
 
     progress, status = _progress_from_frames(ctx, before, after, waypoint)
 

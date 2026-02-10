@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -13,6 +14,7 @@ from contracts.runtime import InventorySnapshot, NpcIdentity, RuntimeContext, Tr
 from contracts.window import WindowBindingAdapter
 from diagnostics.last_frames import record_after, record_before
 from runtime.battle_list_semantics import crop_roi_rgb
+from runtime.event_correlation import attach_snapshot, new_event, validate
 from runtime.trade import select_trade_intent
 from runtime.trade_semantics import TradeDelta, compute_trade_delta, detect_npc_window, is_trade_success, read_trade_inventory
 
@@ -118,6 +120,17 @@ def execute_trade_tick(
 
     gate_name = (str(gate or 'trade') or 'trade').strip().lower()
 
+    event = new_event(
+        gate=str(gate_name),
+        intent={
+            'type': 'trade_action',
+            'action': str(getattr(ctx.config, 'trade_action', '') or ''),
+        },
+    )
+
+    before_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='before', ts_ns=before_ts_ns, status=binding.snapshot())
+
     profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
     pixel_fallback_ok = profile == 'prod_full'
 
@@ -167,6 +180,9 @@ def execute_trade_tick(
     try:
         binding.assert_bound()
 
+        input_ts_ns = int(time.monotonic_ns())
+        attach_snapshot(event, stage='input', ts_ns=input_ts_ns, status=binding.snapshot())
+
         click_cursor = (os.environ.get('FRBOT_TRADE_CLICK_CURSOR', '') or '').strip().lower() in {'1', 'true', 'yes', 'y'}
         if pixel_fallback_ok and click_cursor and hasattr(input_, 'click_cursor'):
             getattr(input_, 'click_cursor')()
@@ -174,6 +190,10 @@ def execute_trade_tick(
             # Emit exactly one input: click the configured action ROI.
             cx = int(action_roi.x) + (int(action_roi.width) // 2)
             cy = int(action_roi.y) + (int(action_roi.height) // 2)
+            try:
+                event['intent']['click'] = {'x': int(cx), 'y': int(cy)}
+            except Exception:
+                pass
             _try_dump_click_overlay(reason='trade_action_click', frame=before, x=int(cx), y=int(cy))
             input_.click(cx, cy)
     except Exception as exc:
@@ -182,7 +202,23 @@ def execute_trade_tick(
     ctx.trade.inputs_sent += 1
 
     after = capture.grab()
+    after_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='after', ts_ns=after_ts_ns, status=binding.snapshot())
     record_after(gate_name, after)
+
+    corr_ok, corr_reason, corr_details = validate(event)
+    event['correlation_ok'] = bool(corr_ok)
+    event['correlation_reason'] = str(corr_reason)
+    if corr_details:
+        event['correlation_details'] = dict(corr_details)
+    ctx.telemetry.last_event_correlation = dict(event)
+    if not corr_ok:
+        corr_exc = PreflightFailed('binding_correlation_failed')
+        try:
+            setattr(corr_exc, 'details', {'event_correlation': event})
+        except Exception:
+            pass
+        raise corr_exc
 
     if pixel_fallback_ok:
         confirm_rgb_after = b''

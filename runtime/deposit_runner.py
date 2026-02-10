@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -13,6 +14,7 @@ from diagnostics.last_frames import record_after, record_before
 from runtime.battle_list_semantics import crop_roi_rgb
 from runtime.deposit import DepositTickInput, tick
 from runtime.depot_semantics import DepotDelta, compute_depot_delta, read_depot_container
+from runtime.event_correlation import attach_snapshot, new_event, validate
 from runtime.inventory_semantics import InventoryDelta, compute_inventory_delta, is_deposit_success, read_inventory
 
 
@@ -32,7 +34,7 @@ def _changed_ratio(before_rgb: bytes, after_rgb: bytes, *, px_tol: int) -> float
     return float(changed) / float(npx)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class DepositTickEvidence:
     inventory_before: Optional[InventorySnapshot]
     inventory_after: Optional[InventorySnapshot]
@@ -43,7 +45,7 @@ class DepositTickEvidence:
     status: str
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class DepositTickOutcome:
     success: bool
     evidence: DepositTickEvidence
@@ -86,6 +88,17 @@ def execute_deposit_tick(
         )
 
     gate_name = (str(gate or 'deposit') or 'deposit').strip().lower()
+
+    event = new_event(
+        gate=str(gate_name),
+        intent={
+            'type': 'deposit_key',
+            'key': str(getattr(ctx.config, 'deposit_key', '') or ''),
+        },
+    )
+
+    before_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='before', ts_ns=before_ts_ns, status=binding.snapshot())
 
     profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
     pixel_fallback_ok = profile == 'prod_full'
@@ -157,6 +170,9 @@ def execute_deposit_tick(
     try:
         binding.assert_bound()
 
+        input_ts_ns = int(time.monotonic_ns())
+        attach_snapshot(event, stage='input', ts_ns=input_ts_ns, status=binding.snapshot())
+
         click_cursor = (os.environ.get('FRBOT_DEPOSIT_CLICK_CURSOR', '') or '').strip().lower() in {'1', 'true', 'yes', 'y'}
         if pixel_fallback_ok and click_cursor and hasattr(input_, 'click_cursor'):
             getattr(input_, 'click_cursor')()
@@ -169,7 +185,23 @@ def execute_deposit_tick(
     ctx.deposit.attempts_used += 1
 
     after = capture.grab()
+    after_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='after', ts_ns=after_ts_ns, status=binding.snapshot())
     record_after(gate_name, after)
+
+    corr_ok, corr_reason, corr_details = validate(event)
+    event['correlation_ok'] = bool(corr_ok)
+    event['correlation_reason'] = str(corr_reason)
+    if corr_details:
+        event['correlation_details'] = dict(corr_details)
+    ctx.telemetry.last_event_correlation = dict(event)
+    if not corr_ok:
+        corr_exc = PreflightFailed('binding_correlation_failed')
+        try:
+            setattr(corr_exc, 'details', {'event_correlation': event})
+        except Exception:
+            pass
+        raise corr_exc
 
     depot_rgb_after = b''
     if pixel_fallback_ok and depot_roi is not None:

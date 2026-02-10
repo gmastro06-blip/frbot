@@ -16,6 +16,7 @@ from contracts.runtime import InventorySnapshot, RuntimeContext
 from contracts.window import WindowBindingAdapter
 from diagnostics.last_frames import record_after, record_before
 from runtime.chat_loot_semantics import LootEvidence, detect_loot_from_chat
+from runtime.event_correlation import attach_snapshot, new_event, validate
 from runtime.inventory_semantics import (
     InventoryDelta,
     beef_candidate_u16,
@@ -91,6 +92,7 @@ def _try_write_looting_basic_last_result(
     used_chat_fallback: bool = False,
     before_ppm: str | None = None,
     after_ppm: str | None = None,
+    event_correlation: dict[str, Any] | None = None,
 ) -> None:
     """Write a small metadata file for tooling (audit/cert scripts).
 
@@ -169,6 +171,7 @@ def _try_write_looting_basic_last_result(
             'used_chat_fallback': bool(used_chat_fallback),
             'before_ppm': before_ppm,
             'after_ppm': after_ppm,
+            'event_correlation': dict(event_correlation or {}),
         }
 
         (out_dir / f'{g}_last_result.json').write_text(
@@ -266,6 +269,32 @@ def execute_looting_basic_once(
 
     gate_name = (gate or 'looting_basic').strip().lower() or 'looting_basic'
 
+    event = new_event(
+        gate=str(gate_name),
+        intent={
+            'type': 'looting_action',
+        },
+    )
+
+    def _finalize_event_corr() -> None:
+        after_ts_ns = int(time.monotonic_ns())
+        attach_snapshot(event, stage='after', ts_ns=after_ts_ns, status=binding.snapshot())
+        corr_ok, corr_reason, corr_details = validate(event)
+        event['correlation_ok'] = bool(corr_ok)
+        event['correlation_reason'] = str(corr_reason)
+        if corr_details:
+            event['correlation_details'] = dict(corr_details)
+        ctx.telemetry.last_event_correlation = dict(event)
+        if not corr_ok:
+            exc = PreflightFailed('binding_correlation_failed')
+            try:
+                setattr(exc, 'details', {'event_correlation': event})
+            except Exception:
+                pass
+            raise exc
+
+    before_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='before', ts_ns=before_ts_ns, status=binding.snapshot())
     before = capture.grab()
     record_before(gate_name, before)
     record_before('runtime', before)
@@ -596,6 +625,8 @@ def execute_looting_basic_once(
     # Emit exactly one input.
     try:
         binding.assert_bound()
+        input_ts_ns = int(time.monotonic_ns())
+        attach_snapshot(event, stage='input', ts_ns=input_ts_ns, status=binding.snapshot())
 
         mode = str(getattr(getattr(ctx, 'config', object()), 'mode', '') or '').strip().lower()
         if mode == 'real':
@@ -694,6 +725,12 @@ def execute_looting_basic_once(
         _try_dump_looting_pair(gate=gate_name, reason='looting_input_emit_failed', before=before, after=None)
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
 
+    try:
+        if loot_action is not None:
+            event['intent']['loot_action'] = dict(loot_action)
+    except Exception:
+        pass
+
     ctx.looting.attempts_used += 1
 
     is_real = str(getattr(getattr(ctx, 'config', object()), 'mode', '') or '').strip().lower() == 'real'
@@ -781,6 +818,8 @@ def execute_looting_basic_once(
                 # Optional diagnostics: when enabled, persist the before/after frames even on success.
                 before_name, after_name = _try_dump_looting_pair(gate=gate_name, reason='inventory_delta', before=before, after=after)
 
+                _finalize_event_corr()
+
                 _try_write_looting_basic_last_result(
                     gate=gate_name,
                     evidence_dir=_frames_dir_for_looting_evidence(),
@@ -797,6 +836,7 @@ def execute_looting_basic_once(
                     used_chat_fallback=False,
                     before_ppm=before_name,
                     after_ppm=after_name,
+                    event_correlation=ctx.telemetry.last_event_correlation,
                 )
 
                 # Enforce mandatory REAL evidence frames BEFORE returning PASS.
@@ -884,6 +924,8 @@ def execute_looting_basic_once(
                 and bool(allow_chat_fallback)
             ):
                 before_name, after_name = _try_dump_looting_pair(gate=gate_name, reason='chat_delta_inventory_unreadable', before=before, after=after)
+
+                _finalize_event_corr()
                 _try_write_looting_basic_last_result(
                     gate=gate_name,
                     evidence_dir=_frames_dir_for_looting_evidence(),
@@ -900,6 +942,7 @@ def execute_looting_basic_once(
                     used_chat_fallback=True,
                     before_ppm=before_name,
                     after_ppm=after_name,
+                    event_correlation=ctx.telemetry.last_event_correlation,
                 )
 
                 # Enforce mandatory REAL evidence frames BEFORE returning PASS.
@@ -951,6 +994,8 @@ def execute_looting_basic_once(
                 and bool(_chat_latency_ok(chat_evidence))
             ):
                 before_name, after_name = _try_dump_looting_pair(gate=gate_name, reason='chat_delta', before=before, after=after)
+
+                _finalize_event_corr()
                 _try_write_looting_basic_last_result(
                     gate=gate_name,
                     evidence_dir=_frames_dir_for_looting_evidence(),
@@ -967,6 +1012,7 @@ def execute_looting_basic_once(
                     used_chat_fallback=True,
                     before_ppm=before_name,
                     after_ppm=after_name,
+                    event_correlation=ctx.telemetry.last_event_correlation,
                 )
 
                 return LootingBasicOutcome(

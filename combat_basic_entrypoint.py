@@ -92,6 +92,7 @@ def _try_write_last_result(
     inputs_sent: int,
     before_ppm: str | None,
     after_ppm: str | None,
+    event_correlation: dict | None = None,
 ) -> None:
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -102,6 +103,7 @@ def _try_write_last_result(
             'inputs_sent': int(inputs_sent),
             'before_ppm': before_ppm,
             'after_ppm': after_ppm,
+            'event_correlation': dict(event_correlation or {}),
         }
         (evidence_dir / 'combat_basic_last_result.json').write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + '\n',
@@ -230,6 +232,7 @@ def run_combat_basic_only() -> int:
             inputs_sent=int(getattr(getattr(ctx, 'combat', object()), 'inputs_sent', 0) or 0),
             before_ppm=before_ppm,
             after_ppm=after_ppm,
+            event_correlation=dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}),
         )
         return 0
 
@@ -254,6 +257,7 @@ def run_combat_basic_only() -> int:
             inputs_sent=0,
             before_ppm=before_ppm,
             after_ppm=after_ppm,
+            event_correlation=dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}),
         )
         write_fatal(str(exc), exc)
         return 1

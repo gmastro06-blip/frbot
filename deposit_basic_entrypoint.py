@@ -95,6 +95,7 @@ def _try_write_last_result(
     inventory_after: InventorySnapshot | None,
     depot_before: DepotSnapshot | None,
     depot_after: DepotSnapshot | None,
+    event_correlation: dict | None = None,
 ) -> None:
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -127,6 +128,7 @@ def _try_write_last_result(
             'inventory_after': _serialize_inventory(inventory_after),
             'depot_before': _serialize_depot(depot_before),
             'depot_after': _serialize_depot(depot_after),
+            'event_correlation': dict(event_correlation or {}),
         }
 
         (evidence_dir / 'deposit_basic_last_result.json').write_text(
@@ -233,6 +235,7 @@ def run_deposit_basic_only() -> int:
             inventory_after=ev.inventory_after,
             depot_before=ev.depot_before,
             depot_after=ev.depot_after,
+            event_correlation=dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}),
         )
 
         return 0
@@ -267,6 +270,7 @@ def run_deposit_basic_only() -> int:
             inventory_after=inv_a,
             depot_before=dep_b,
             depot_after=dep_a,
+            event_correlation=(dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}) if ctx is not None else {}),
         )
 
         write_fatal(str(exc), exc)

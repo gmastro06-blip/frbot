@@ -106,6 +106,7 @@ def _try_write_last_result(
     npc: NpcIdentity | None,
     inventory_before: InventorySnapshot | None,
     inventory_after: InventorySnapshot | None,
+    event_correlation: dict | None = None,
 ) -> None:
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -138,6 +139,7 @@ def _try_write_last_result(
             'npc': _serialize_npc(npc),
             'inventory_before': _serialize_inventory(inventory_before),
             'inventory_after': _serialize_inventory(inventory_after),
+            'event_correlation': dict(event_correlation or {}),
         }
 
         (evidence_dir / 'trade_basic_last_result.json').write_text(
@@ -245,6 +247,7 @@ def run_trade_basic_only() -> int:
             npc=ev.npc,
             inventory_before=ev.inventory_before,
             inventory_after=ev.inventory_after,
+            event_correlation=dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}),
         )
 
         return 0
@@ -278,6 +281,7 @@ def run_trade_basic_only() -> int:
             npc=npc,
             inventory_before=inv_b,
             inventory_after=inv_a,
+            event_correlation=(dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}) if ctx is not None else {}),
         )
 
         write_fatal(str(exc), exc)

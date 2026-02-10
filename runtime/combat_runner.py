@@ -14,6 +14,7 @@ from runtime.battle_list_semantics import crop_roi_rgb, detect_battle_list
 from runtime.combat_semantics import detect_damage_feedback, read_target_hp_percent
 from runtime.healing_runner import _read_hp_mp
 from runtime.healing_semantics import detect_cooldown_marker, parse_rgb_triplet
+from runtime.event_correlation import attach_snapshot, new_event, validate
 from runtime.pacing import wait_until_ns
 
 
@@ -185,6 +186,16 @@ def execute_combat_intent(
     except Exception:
         raise PreflightFailed('combat_ambiguous_result')
 
+    event = new_event(
+        gate=str(gate),
+        intent={
+            'type': 'combat_key',
+            'key': str(getattr(intent, 'key', '') or ''),
+        },
+    )
+
+    before_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='before', ts_ns=before_ts_ns, status=binding.snapshot())
     before = capture.grab()
     record_before(str(gate), before)
 
@@ -213,6 +224,8 @@ def execute_combat_intent(
     # Execute exactly one input.
     try:
         binding.assert_bound()
+        input_ts_ns = int(time.monotonic_ns())
+        attach_snapshot(event, stage='input', ts_ns=input_ts_ns, status=binding.snapshot())
         input_.press_key(str(intent.key))
     except Exception as exc:
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
@@ -376,6 +389,21 @@ def execute_combat_intent(
 
     if last_after is not None:
         record_after(str(gate), last_after)
+        after_ts_ns = int(time.monotonic_ns())
+        attach_snapshot(event, stage='after', ts_ns=after_ts_ns, status=binding.snapshot())
+        corr_ok, corr_reason, corr_details = validate(event)
+        event['correlation_ok'] = bool(corr_ok)
+        event['correlation_reason'] = str(corr_reason)
+        if corr_details:
+            event['correlation_details'] = dict(corr_details)
+        ctx.telemetry.last_event_correlation = dict(event)
+        if not corr_ok:
+            exc = PreflightFailed('binding_correlation_failed')
+            try:
+                setattr(exc, 'details', {'event_correlation': event})
+            except Exception:
+                pass
+            raise exc
 
     if not saw_locked:
         raise PreflightFailed('combat_target_not_locked')

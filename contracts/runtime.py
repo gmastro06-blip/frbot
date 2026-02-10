@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from .errors import ContractViolation
 from .capture import CaptureStatus
@@ -373,6 +373,9 @@ class RuntimeTelemetry:
     last_capture_age_ms: int = 0
     last_tick_valid: bool = False
     last_intent: str = ''
+
+    # Additive: per-intent correlation snapshot used for audit-grade evidence.
+    last_event_correlation: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

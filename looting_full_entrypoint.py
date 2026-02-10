@@ -162,6 +162,7 @@ def _write_last_result(
     chat_ok: bool | None = None,
     chat_latency_ms: float | None = None,
     chat_max_latency_ms: float | None = None,
+    event_correlation: dict | None = None,
 ) -> None:
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -179,6 +180,7 @@ def _write_last_result(
             'chat_ok': None if chat_ok is None else bool(chat_ok),
             'chat_latency_ms': None if chat_latency_ms is None else float(chat_latency_ms),
             'chat_max_latency_ms': None if chat_max_latency_ms is None else float(chat_max_latency_ms),
+            'event_correlation': dict(event_correlation or {}),
         }
         (evidence_dir / 'looting_full_last_result.json').write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + '\n',
@@ -306,6 +308,7 @@ def run_looting_full_only() -> int:
             chat_ok=chat_ok,
             chat_latency_ms=chat_latency_ms,
             chat_max_latency_ms=chat_max_latency_ms,
+            event_correlation=(dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}) if ctx is not None else {}),
         )
 
         log_json(logger, event='success', gate='looting_full', status='SUCCESS', successes=int(outcome.successes))
@@ -350,6 +353,7 @@ def run_looting_full_only() -> int:
                 before_ppm=before_ppm,
                 after_ppm=after_ppm,
                 evidence_reason=str(evidence_reason),
+                event_correlation=(dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}) if ctx is not None else {}),
             )
         except Exception:
             pass
