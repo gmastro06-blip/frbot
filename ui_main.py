@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt, Signal
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, QPersistentModelIndex, Qt as _Qt, Signal
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -35,6 +35,13 @@ from PySide6.QtWidgets import (
 from logging_setup import setup_logger
 from models import Script, Waypoint, WaypointType, now_iso
 from storage import SchemaError, canonical_json, load_script, save_script
+
+
+# PySide6 exposes many Qt enums/flags dynamically. Some type-checker versions
+# (and certain bundled stubs) can report false-positive attribute errors.
+Qt = cast(Any, _Qt)
+_QAbstractItemView = cast(Any, QAbstractItemView)
+_QMessageBox = cast(Any, QMessageBox)
 
 
 _LOG = setup_logger()
@@ -173,36 +180,36 @@ class WaypointsTableModel(QAbstractTableModel):
         self._script = script
         self.endResetModel()
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:  # type: ignore[override]
         if parent.isValid():
             return 0
         return len(self._script.waypoints)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:  # type: ignore[override]
         if parent.isValid():
             return 0
         return len(self.COLS)
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
-        if role != Qt.DisplayRole:
+    def headerData(self, section: int, orientation: _Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if role != Qt.ItemDataRole.DisplayRole:
             return None
-        if orientation == Qt.Horizontal and 0 <= section < len(self.COLS):
+        if orientation == Qt.Orientation.Horizontal and 0 <= section < len(self.COLS):
             return self.COLS[section]
         return None
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Any:  # type: ignore[override]
         if not index.isValid():
-            return Qt.NoItemFlags
+            return Qt.ItemFlag.NoItemFlags
 
-        flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
         col = index.column()
         if col in (0, 1, 2, 3, 4):
-            flags |= Qt.ItemIsEditable
+            flags |= Qt.ItemFlag.ItemIsEditable
         if col == 5:
-            flags |= Qt.ItemIsUserCheckable | Qt.ItemIsEditable
+            flags |= Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEditable
         return flags
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:  # type: ignore[override]
         if not index.isValid():
             return None
         row = index.row()
@@ -212,10 +219,10 @@ class WaypointsTableModel(QAbstractTableModel):
 
         wp = self._script.waypoints[row]
 
-        if col == 5 and role == Qt.CheckStateRole:
-            return Qt.Checked if wp.enabled else Qt.Unchecked
+        if col == 5 and role == Qt.ItemDataRole.CheckStateRole:
+            return Qt.CheckState.Checked if wp.enabled else Qt.CheckState.Unchecked
 
-        if role in (Qt.DisplayRole, Qt.EditRole):
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             if col == 0:
                 return str(wp.type)
             if col == 1:
@@ -234,7 +241,12 @@ class WaypointsTableModel(QAbstractTableModel):
 
         return None
 
-    def setData(self, index: QModelIndex, value: Any, role: int = Qt.EditRole) -> bool:
+    def setData(
+        self,
+        index: QModelIndex | QPersistentModelIndex,
+        value: Any,
+        role: int = Qt.ItemDataRole.EditRole,
+    ) -> bool:  # type: ignore[override]
         if not index.isValid():
             return False
         row = index.row()
@@ -245,10 +257,14 @@ class WaypointsTableModel(QAbstractTableModel):
         wp = self._script.waypoints[row]
 
         try:
-            if col == 5 and role in (Qt.EditRole, Qt.CheckStateRole):
-                enabled = bool(value == Qt.Checked) if role == Qt.CheckStateRole else bool(value)
+            if col == 5 and role in (Qt.ItemDataRole.EditRole, Qt.ItemDataRole.CheckStateRole):
+                enabled = (
+                    bool(value == Qt.CheckState.Checked)
+                    if role == Qt.ItemDataRole.CheckStateRole
+                    else bool(value)
+                )
                 wp.enabled = enabled
-            elif role != Qt.EditRole:
+            elif role != Qt.ItemDataRole.EditRole:
                 return False
             elif col == 0:
                 t = str(value).strip()
@@ -273,7 +289,15 @@ class WaypointsTableModel(QAbstractTableModel):
             else:
                 return False
 
-            self.dataChanged.emit(index, index, [Qt.DisplayRole, Qt.EditRole, Qt.CheckStateRole])
+            self.dataChanged.emit(
+                index,
+                index,
+                [
+                    Qt.ItemDataRole.DisplayRole,
+                    Qt.ItemDataRole.EditRole,
+                    Qt.ItemDataRole.CheckStateRole,
+                ],
+            )
             return True
         except Exception:
             return False
@@ -315,7 +339,7 @@ class MainWindow(QMainWindow):
         root = QWidget()
         self.setCentralWidget(root)
 
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setChildrenCollapsible(False)
 
         # Left
@@ -359,9 +383,13 @@ class MainWindow(QMainWindow):
 
         self.table = QTableView()
         self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.table.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked | QAbstractItemView.EditKeyPressed)
+        self.table.setSelectionBehavior(_QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(_QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.table.setEditTriggers(
+            _QAbstractItemView.EditTrigger.DoubleClicked
+            | _QAbstractItemView.EditTrigger.SelectedClicked
+            | _QAbstractItemView.EditTrigger.EditKeyPressed
+        )
 
         self.model = WaypointsTableModel(self._script)
         self.table.setModel(self.model)
@@ -604,7 +632,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"Waypoint/Script Editor{where} ({name}){suffix}")
 
     def _show_error(self, title: str, message: str) -> None:
-        QMessageBox.critical(self, title, message)
+        _QMessageBox.critical(self, title, message)
 
     def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
         try:
@@ -615,10 +643,10 @@ class MainWindow(QMainWindow):
             box = QMessageBox(self)
             box.setWindowTitle("Unsaved changes")
             box.setText("You have unsaved changes. Save before closing?")
-            btn_save = box.addButton("Save", QMessageBox.AcceptRole)
-            btn_discard = box.addButton("Discard", QMessageBox.DestructiveRole)
-            btn_cancel = box.addButton("Cancel", QMessageBox.RejectRole)
-            box.setIcon(QMessageBox.Warning)
+            btn_save = box.addButton("Save", _QMessageBox.ButtonRole.AcceptRole)
+            btn_discard = box.addButton("Discard", _QMessageBox.ButtonRole.DestructiveRole)
+            btn_cancel = box.addButton("Cancel", _QMessageBox.ButtonRole.RejectRole)
+            box.setIcon(_QMessageBox.Icon.Warning)
             box.exec()
 
             clicked = box.clickedButton()
@@ -640,7 +668,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             _LOG.exception("closeEvent failed: %s", exc)
             try:
-                QMessageBox.critical(self, "Error", f"Unexpected error during close.\n\n{exc}")
+                _QMessageBox.critical(self, "Error", f"Unexpected error during close.\n\n{exc}")
             except Exception:
                 pass
             event.ignore()

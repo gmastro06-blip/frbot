@@ -46,6 +46,9 @@ diagnostics/**
 *_minimap.ppm
 logs/
 
+# UI runtime log (desktop editor)
+runtime_ui.log
+
 # Local real-client evidence (never commit captured game frames)
 tests/real_frames/
 
