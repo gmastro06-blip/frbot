@@ -42,6 +42,15 @@ def _config_path() -> Path:
     return Path('config') / 'rois_prod_full.json'
 
 
+def _has_minimum_evidence(frames_dir: Path) -> bool:
+    try:
+        has_last_result = any(frames_dir.glob('*_last_result.json'))
+        has_ppm = any(frames_dir.glob('*.ppm'))
+        return bool(has_last_result and has_ppm)
+    except Exception:
+        return False
+
+
 def _load_json(path: Path) -> dict:
     data = json.loads(path.read_text(encoding='utf-8', errors='replace'))
     if not isinstance(data, dict):
@@ -88,6 +97,19 @@ def _check_gate_last_result(frames_dir: Path, gate: str) -> list[str]:
     if bool(data.get('ok')) is not True:
         reasons.append(f'gate_not_ok:{gate}')
 
+    # Contract: required fields must always exist for prod_full releases.
+    reason = data.get('reason')
+    if not reason or not isinstance(reason, str) or not reason.strip():
+        reasons.append(f'missing_reason:{gate}')
+
+    evidence_kind = data.get('evidence_kind')
+    if not evidence_kind or not isinstance(evidence_kind, str) or not evidence_kind.strip():
+        reasons.append(f'missing_evidence_kind:{gate}')
+
+    inputs_sent = data.get('inputs_sent')
+    if not isinstance(inputs_sent, int):
+        reasons.append(f'missing_inputs_sent:{gate}')
+
     before_ppm = data.get('before_ppm')
     after_ppm = data.get('after_ppm')
 
@@ -123,11 +145,44 @@ def main() -> int:
     if prof != 'prod_full':
         reasons.append(f'profile_not_prod_full:{prof!r}')
 
-    if not frames_dir.exists():
-        reasons.append(f'frames_dir_missing:{frames_dir.as_posix()}')
+    # Canonical preconditions (fail-fast, do not evaluate gates when missing).
+    frames_raw = _env_str('FRBOT_REAL_FRAMES_DIR', '')
+    if not frames_raw:
+        reasons.append('real_frames_dir_missing')
+    else:
+        try:
+            if not frames_dir.exists():
+                frames_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        if not frames_dir.exists() or not frames_dir.is_dir():
+            reasons.append('real_frames_dir_missing')
 
-    if not config_path.exists():
-        reasons.append(f'config_missing:{config_path.as_posix()}')
+    config_raw = _env_str('FRBOT_CONFIG_PATH', '')
+    if not config_raw:
+        reasons.append('config_missing')
+    elif not config_path.exists() or not config_path.is_file():
+        reasons.append('config_missing')
+
+    if reasons:
+        print('AUDIT: prod_full')
+        print(f'Evidence dir: {frames_dir}')
+        print(f'Config: {config_path}')
+        print('Status: FAIL')
+        for r in reasons:
+            print(f'- {r}')
+        print('FINAL DECISION: NOT_OPERATIONAL_REAL')
+        return 1
+
+    # Do not audit gates without fresh/direct evidence.
+    if not _has_minimum_evidence(frames_dir):
+        print('AUDIT: prod_full')
+        print(f'Evidence dir: {frames_dir}')
+        print(f'Config: {config_path}')
+        print('Status: FAIL')
+        print('- real_evidence_missing')
+        print('FINAL DECISION: NOT_OPERATIONAL_REAL')
+        return 1
 
     if frames_dir.exists():
         reasons.extend(_check_manifest(frames_dir))

@@ -64,7 +64,7 @@ def test_git_dirty_adds_repo_dirty_blocker(tmp_path: Path) -> None:
         write_json=lambda _p, _payload: None,
     )
 
-    assert report["final_decision"] == "NOT_READY"
-    assert exit_code == mod.EXIT_NOT_READY
-    assert "repo_dirty" in set(report.get("root_blockers", []))
+    assert report["final_decision"] == "READY"
+    assert exit_code == mod.EXIT_READY
+    assert report.get("is_dirty") is True
     assert report.get("untracked_count") == 1

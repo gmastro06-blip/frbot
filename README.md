@@ -337,17 +337,21 @@ Evidence output:
 
 ### Release (prod_full)
 
-Official single-command release gate (prints ONLY `RELEASE_GO` or `RELEASE_NO_GO`):
+Official single-command release gate (prints exactly one line: `RELEASE_GO` or `RELEASE_NO_GO:<reason>`):
 
 ```powershell
 ./tools/run_release_prod_full.ps1 -ObsSource "Tibia_Fuente" -WindowTitle "Tibia - Onniwabanshu"
 ```
 
+Notes:
+ - The release runner enables best-effort window focusing by default (`FRBOT_TRY_FOCUS=1`) to support unattended runs. If you want to disable any focus-stealing attempts, set `FRBOT_TRY_FOCUS=0`.
+
 What it does (stops on first failure):
 
 - `poetry run pytest -q`
-- `poetry run python tools/audit_prod_full.py`
 - `poetry run python tools/audit_repo_status.py`
+- `poetry run python main.py`
+- `poetry run python tools/audit_prod_full.py`
 
 Outputs:
 

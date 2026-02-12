@@ -149,6 +149,8 @@ def run_targeting_full_only() -> int:
     evidence_dir = _frames_dir()
 
     actions_sent = 0
+    no_candidate_streak = 0
+    no_candidate_ticks = max(3, min(10, int(max_total_ticks)))
 
     ctx: RuntimeContext | None = None
     capture = None
@@ -208,6 +210,23 @@ def run_targeting_full_only() -> int:
 
             selected_name = res.intent.target_name if res.intent is not None else None
 
+            entries_count = int(len(obs.entries))
+            candidates_count = int(
+                sum(
+                    1
+                    for e in obs.entries
+                    if bool(getattr(e, 'name', None)) and e.is_attackable is True and e.hp_bar_visible is True
+                )
+            )
+
+            if not ctx.targeting.target.locked and res.intent is None:
+                no_candidate_streak += 1
+            else:
+                no_candidate_streak = 0
+
+            if no_candidate_streak >= int(no_candidate_ticks):
+                raise PreflightFailed('no_target_candidates')
+
             if res.intent is not None:
                 actions_sent += 1
                 execute_intent(ctx, capture=capture, input_=input_, binding=binding, intent=res.intent, gate=_GATE)
@@ -220,6 +239,9 @@ def run_targeting_full_only() -> int:
                 selected_target=str(selected_name),
                 attempts_used=int(ctx.targeting.attempt_count),
                 locked=bool(ctx.targeting.target.locked),
+                entries_count=int(entries_count),
+                candidates_count=int(candidates_count),
+                no_candidate_streak=int(no_candidate_streak),
             )
 
             ctx.telemetry.tick_count += 1

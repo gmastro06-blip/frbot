@@ -577,12 +577,12 @@ def execute_cavebot_tick(
         event['correlation_details'] = dict(corr_details)
     ctx.telemetry.last_event_correlation = dict(event)
     if not corr_ok:
-        exc = PreflightFailed('binding_correlation_failed')
+        corr_exc = PreflightFailed('binding_correlation_failed')
         try:
-            setattr(exc, 'details', {'event_correlation': event})
+            setattr(corr_exc, 'details', {'event_correlation': event})
         except Exception:
             pass
-        raise exc
+        raise corr_exc
 
     progress, status = _progress_from_frames(ctx, before, after, waypoint)
 

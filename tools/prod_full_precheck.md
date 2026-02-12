@@ -119,3 +119,25 @@ PARTIAL:
 - Making `config/rois_prod_full.json` the canonical default will require updating scripts and docs (and possibly keeping backward compatibility for `./rois_prod_full.json` to avoid sharp edges).
 - Tightening required ROIs for FULL gates can increase preflight failures until ROI calibration tooling is used (tools already exist: `tools/calibrate_obs_projector_rois.py`, `tools/convert_obs_projector_rois_to_runtime.py`).
 - Focus/binding flakiness: the code already asserts binding before inputs; the remaining risk is “foreground waiting without stealing focus” behavior in runners vs. strictness in prod_full.
+
+## Definition of Done (Release gate)
+
+Release is considered “DONE” when the single command below can be executed on Windows with **no human intervention**:
+
+```powershell
+./tools/run_release_prod_full.ps1 -ObsSource "Tibia_Fuente" -WindowTitle "Tibia - Onniwabanshu"
+```
+
+Contract:
+
+- Output: exactly one line: `RELEASE_GO` or `RELEASE_NO_GO:<reason>`
+- Exit codes:
+  - `0` = GO (audit says `FINAL DECISION: OPERATIONAL_REAL`)
+  - `1` = NO-GO (pipeline/audit ran but is NOT operational)
+  - `2` = NOT READY / infrastructure / missing env/config/window selector
+- Foreground/focus: the release orchestrator enables best-effort focus attempts by default (`FRBOT_TRY_FOCUS=1`) to support unattended runs. Opt out with `FRBOT_TRY_FOCUS=0`.
+- Steps (fail-fast): `pytest -q` → `tools/audit_repo_status.py` → `main.py` → `tools/audit_prod_full.py` → zip
+- Mandatory artifacts (zipped at `diagnostics/releases/<timestamp>.zip`):
+  - `diagnostics/status_repo.json`, `diagnostics/window_diagnostics.json`
+  - `diagnostics/runtime.log` (JSONL), `diagnostics/fatal.log` (JSON, when present)
+  - `diagnostics/frames_full/<timestamp>/*_last_result.json` + referenced `*.ppm`

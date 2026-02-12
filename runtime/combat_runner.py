@@ -398,12 +398,12 @@ def execute_combat_intent(
             event['correlation_details'] = dict(corr_details)
         ctx.telemetry.last_event_correlation = dict(event)
         if not corr_ok:
-            exc = PreflightFailed('binding_correlation_failed')
+            corr_exc = PreflightFailed('binding_correlation_failed')
             try:
-                setattr(exc, 'details', {'event_correlation': event})
+                setattr(corr_exc, 'details', {'event_correlation': event})
             except Exception:
                 pass
-            raise exc
+            raise corr_exc
 
     if not saw_locked:
         raise PreflightFailed('combat_target_not_locked')

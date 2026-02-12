@@ -1,10 +1,8 @@
 [CmdletBinding()]
 param(
-  # Nombre exacto del Source en OBS (requerido).
   [Parameter(Mandatory = $false)]
   [string]$ObsSource,
 
-  # Selector de ventana Tibia (requerido: WindowHwnd o WindowTitle).
   [Parameter(Mandatory = $false)]
   [string]$WindowTitle,
 
@@ -20,8 +18,8 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 $InformationPreference = "SilentlyContinue"
 
-$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-Push-Location $RepoRoot
+Set-Location -LiteralPath $PSScriptRoot
+
 try {
   try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch {}
 
@@ -30,29 +28,45 @@ try {
   if ($WindowHwnd) { $env:FRBOT_WINDOW_HWND = $WindowHwnd }
   if ($InputMethod) { $env:FRBOT_INPUT_METHOD = $InputMethod }
 
-  # Set required REAL/release flags.
-  $env:FRBOT_PROFILE = "prod_full"
-  $env:FRBOT_MODE = "prod_full"
-  $env:FRBOT_CAPTURE_SOURCE = "obs_source"
+  if (-not $env:FRBOT_PROFILE) { $env:FRBOT_PROFILE = "prod_full" }
+  if (-not $env:FRBOT_MODE) { $env:FRBOT_MODE = "prod_full" }
+  if (-not $env:FRBOT_CAPTURE_SOURCE) { $env:FRBOT_CAPTURE_SOURCE = "obs_source" }
   if (-not $env:FRBOT_INPUT_METHOD) { $env:FRBOT_INPUT_METHOD = "sendinput_vk" }
-  $env:FRBOT_DUMP_FRAMES = "1"
 
-  if (-not $env:FRBOT_CONFIG_PATH) {
-    $defaultCfg = (Join-Path $RepoRoot "config\rois_prod_full.json")
-    if (Test-Path $defaultCfg) { $env:FRBOT_CONFIG_PATH = $defaultCfg }
+  if (-not $env:FRBOT_REAL_FRAMES_DIR) {
+    $env:FRBOT_REAL_FRAMES_DIR = (Join-Path $PSScriptRoot "diagnostics\frames_full")
   }
 
-  # Set a per-release frames directory: diagnostics/frames_full/<timestamp>
-  $ts = (Get-Date).ToUniversalTime().ToString("yyyyMMdd_HHmmss")
-  $framesDir = (Join-Path $RepoRoot (Join-Path "diagnostics\frames_full" $ts))
-  New-Item -ItemType Directory -Force -Path $framesDir | Out-Null
-  $env:FRBOT_REAL_FRAMES_DIR = $framesDir
+  $cfgInvalid = $false
+  if (-not $env:FRBOT_CONFIG_PATH) {
+    $cfgInvalid = $true
+  } elseif (-not (Test-Path -LiteralPath $env:FRBOT_CONFIG_PATH)) {
+    $cfgInvalid = $true
+  }
+  if ($cfgInvalid) {
+    $env:FRBOT_CONFIG_PATH = (Join-Path $PSScriptRoot "rois_prod_full.json")
+  }
 
-  # Delegate orchestration to Python.
+  $hwndRaw = [string]($env:FRBOT_WINDOW_HWND)
+  $hwndRawTrim = $hwndRaw.Trim()
+  $hwndInvalid = $false
+  if ($hwndRawTrim -ne "") {
+    if ($hwndRawTrim -match "[Xx]") {
+      $hwndInvalid = $true
+    } elseif ($hwndRawTrim -notmatch "^(0x[0-9a-fA-F]+|[0-9]+)$") {
+      $hwndInvalid = $true
+    }
+  }
+  if ($hwndInvalid) {
+    Remove-Item Env:FRBOT_WINDOW_HWND -ErrorAction SilentlyContinue
+  }
+
+  New-Item -ItemType Directory -Force -Path $env:FRBOT_REAL_FRAMES_DIR | Out-Null
+
   $poetryArgs = @(
     "run",
     "python",
-    (Join-Path $RepoRoot "tools\release_prod_full.py"),
+    (Join-Path $PSScriptRoot "tools\release_prod_full.py"),
     "-ObsSource",
     [string]$env:FRBOT_OBS_SOURCE_NAME,
     "-WindowTitle",
@@ -64,10 +78,7 @@ try {
   $out = & poetry @poetryArgs 2>&1
   $code = [int]$LASTEXITCODE
 
-  # Normalize output to strings (avoid formatting non-string objects).
   $outLines = @($out | ForEach-Object { [string]$_ })
-
-  # Contract: print a single RELEASE_* line.
   $line = ($outLines | Where-Object { $_ -match "^(RELEASE_GO|RELEASE_NO_GO:)" } | Select-Object -Last 1)
   if (-not $line) {
     Write-Output "RELEASE_NO_GO:internal_error"
@@ -77,6 +88,8 @@ try {
   Write-Output ($line.Trim())
   if ($code -in 0, 1, 2) { exit $code }
   exit 2
-} finally {
-  Pop-Location
+}
+catch {
+  Write-Output "RELEASE_NO_GO:internal_error"
+  exit 2
 }

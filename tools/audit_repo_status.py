@@ -55,6 +55,14 @@ class VisibleWindow:
         return int(w * h)
 
 
+def _rects_overlap(a: VisibleWindow, b: VisibleWindow) -> bool:
+    left = max(int(a.rect_left), int(b.rect_left))
+    top = max(int(a.rect_top), int(b.rect_top))
+    right = min(int(a.rect_right), int(b.rect_right))
+    bottom = min(int(a.rect_bottom), int(b.rect_bottom))
+    return (right > left) and (bottom > top)
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
@@ -218,16 +226,16 @@ def _resolve_effective_hwnd(
         "requested_hwnd_raw": hwnd_raw,
         "requested_title": title_raw,
         "effective_hwnd": None,
+        "resolved_title": "",
         "match_kind": "",
         "reason": "",
     }
 
     hwnd_parsed = _parse_int_hwnd(hwnd_raw)
     if hwnd_parsed < 0:
-        # Invalid parse is a hard blocker unless title can self-heal.
+        # Invalid parse is treated as unset; title-based self-heal may still resolve.
         hwnd_parsed = 0
-        blockers.append("window_hwnd_invalid")
-        selection["reason"] = "FRBOT_WINDOW_HWND inválido"
+        selection["reason"] = "FRBOT_WINDOW_HWND inválido (se intentará resolver por título)"
 
     # Always require a visible + not-minimized hwnd.
     def _is_hwnd_ok(hwnd: int) -> bool:
@@ -256,13 +264,14 @@ def _resolve_effective_hwnd(
 
     # 2) If explicit HWND is set but not valid, attempt self-heal by title once.
     if int(hwnd_parsed) > 0 and not _is_hwnd_ok(int(hwnd_parsed)):
-        blockers.append("window_hwnd_invalid")
+        selection["reason"] = "FRBOT_WINDOW_HWND no visible/minimizado; se intentará resolver por título"
 
     if not title_raw:
         if int(hwnd_parsed) <= 0:
             blockers.append("window_selector_missing")
             selection["reason"] = selection.get("reason") or "Falta FRBOT_WINDOW_HWND o FRBOT_WINDOW_TITLE"
         else:
+            blockers.append("window_invalid_state")
             selection["reason"] = selection.get("reason") or "HWND no visible / minimizado"
         return None, selection, blockers
 
@@ -274,12 +283,13 @@ def _resolve_effective_hwnd(
         selection.update(
             {
                 "effective_hwnd": int(best.hwnd),
+                "resolved_title": str(best.title),
                 "match_kind": "title_exact",
                 "reason": "Auto-resolución por título exacto",
             }
         )
-        # Self-heal clears window blockers.
-        blockers = [b for b in blockers if b not in {"window_hwnd_invalid", "window_selector_missing"}]
+        # Self-heal clears selector blockers.
+        blockers = [b for b in blockers if b not in {"window_selector_missing", "window_invalid_state", "window_hwnd_invalid"}]
         return int(best.hwnd), selection, blockers
 
     # 4) Resolve by substring match.
@@ -290,15 +300,23 @@ def _resolve_effective_hwnd(
         selection.update(
             {
                 "effective_hwnd": int(best2.hwnd),
+                "resolved_title": str(best2.title),
                 "match_kind": "title_substring",
                 "reason": "Auto-resolución por título (substring)",
             }
         )
-        blockers = [b for b in blockers if b not in {"window_hwnd_invalid", "window_selector_missing"}]
+        blockers = [b for b in blockers if b not in {"window_selector_missing", "window_invalid_state", "window_hwnd_invalid"}]
         return int(best2.hwnd), selection, blockers
 
-    blockers.append("window_hwnd_invalid")
-    selection["reason"] = "No se encontró una ventana visible que coincida con FRBOT_WINDOW_TITLE"
+    # Distinguish between "title exists but window state invalid" and "no match".
+    exact_any = [w for w in windows if w.title == title_norm]
+    subs_any = [w for w in windows if (needle in w.title.lower())]
+    if any(bool(w.minimized) for w in (exact_any or subs_any)):
+        blockers.append("window_invalid_state")
+        selection["reason"] = "La ventana encontrada está minimizada"
+    else:
+        blockers.append("window_invalid_state")
+        selection["reason"] = "No se encontró una ventana visible que coincida con FRBOT_WINDOW_TITLE"
     return None, selection, blockers
 
 
@@ -311,14 +329,14 @@ def evaluate_go_no_go(
 ) -> str:
     """Reglas puras para el veredicto global.
 
-    - Si falta entorno/config => NOT_READY
-    - Si audit prod_full no es OPERATIONAL_REAL => NOT_OPERATIONAL_REAL
-    - Si repo sucio o tests fallan => NOT_READY
-    - Si todo OK => READY
+    Este auditor se limita a validar *readiness* del entorno REAL
+    (variables/selector/config/capture). No ejecuta gates ni tests.
+
+    Nota: se mantienen los parámetros `prod_full_final_decision/repo_dirty/pytest_ok`
+    por compatibilidad con versiones anteriores, pero no afectan la decisión.
     """
 
-    if "repo_dirty" in set(root_blockers) or bool(repo_dirty) or (not bool(pytest_ok)):
-        return "NOT_READY"
+    _ = (prod_full_final_decision, repo_dirty, pytest_ok)
 
     missing_or_invalid = {
         "unsupported_platform",
@@ -327,6 +345,8 @@ def evaluate_go_no_go(
         "obs_source_mismatch",
         "obs_source_name_missing",
         "window_selector_missing",
+        "window_invalid_state",
+        "window_not_foreground",
         "window_hwnd_invalid",
         "config_missing",
         "frames_dir_missing",
@@ -335,9 +355,6 @@ def evaluate_go_no_go(
 
     if any(b in missing_or_invalid for b in root_blockers):
         return "NOT_READY"
-
-    if str(prod_full_final_decision or "").strip() != "OPERATIONAL_REAL":
-        return "NOT_OPERATIONAL_REAL"
 
     return "READY"
 
@@ -363,6 +380,7 @@ def run_repo_status_audit(
 
     timestamp = now_iso()
     root_blockers: list[str] = []
+    warnings: list[str] = []
 
     env_snapshot = {
         k: str(env.get(k, "") or "")
@@ -388,7 +406,7 @@ def run_repo_status_audit(
     windows_meta_ok = bool(isinstance(windows_meta, dict) and windows_meta.get("ok") is True)
     if _is_windows() and (not windows_meta_ok):
         # Informational: window enumeration failed. Do not block by itself.
-        root_blockers.append("window_enumeration_failed")
+        warnings.append("window_enumeration_failed")
 
     effective_hwnd, selection, window_blockers = _resolve_effective_hwnd(
         env=env_snapshot,
@@ -396,6 +414,29 @@ def run_repo_status_audit(
         can_validate_hwnd=bool(windows_meta_ok and len(windows) > 0),
     )
     root_blockers.extend(window_blockers)
+
+    # Window state/foreground validation after selection resolution.
+    selected_window = None
+    if effective_hwnd is not None:
+        for w in windows:
+            if int(w.hwnd) == int(effective_hwnd):
+                selected_window = w
+                break
+    if effective_hwnd is not None and selected_window is None and bool(windows_meta_ok):
+        root_blockers.append("window_invalid_state")
+    if selected_window is not None and bool(selected_window.minimized):
+        root_blockers.append("window_invalid_state")
+    if selected_window is not None and bool(windows_meta_ok):
+        target_z = int(getattr(selected_window, "z_order", 1))
+        if target_z != 0:
+            overlapped_by_front_window = any(
+                (not bool(w.minimized))
+                and int(getattr(w, "z_order", 999999)) < target_z
+                and _rects_overlap(selected_window, w)
+                for w in windows
+            )
+            if overlapped_by_front_window:
+                root_blockers.append("window_not_foreground")
 
     # Window diagnostics payload (persist at the end so pytest/tools can't overwrite it).
     window_diag_payload: dict[str, Any] = {
@@ -446,8 +487,6 @@ def run_repo_status_audit(
         lines = (r1.stdout or "").splitlines()
         git_dirty = bool(any(l.strip() for l in lines))
         untracked_count = sum(1 for l in lines if l.startswith("??"))
-        if git_dirty:
-            root_blockers.append("repo_dirty")
 
         r2 = run_cmd(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root)
         git_branch = (r2.stdout or "").strip()
@@ -458,68 +497,16 @@ def run_repo_status_audit(
         # Don't block readiness solely for git probing.
         pass
 
-    # Determine if the REAL env is complete enough to run expensive checks.
-    required_env_ok = True
-    if "unsupported_platform" in set(root_blockers):
-        required_env_ok = False
-    if "profile_not_prod_full" in set(root_blockers):
-        required_env_ok = False
-    if "obs_source_missing" in set(root_blockers) or "obs_source_mismatch" in set(root_blockers):
-        required_env_ok = False
-    if "obs_source_name_missing" in set(root_blockers):
-        required_env_ok = False
-    if "window_selector_missing" in set(root_blockers) or "window_hwnd_invalid" in set(root_blockers):
-        required_env_ok = False
-    if "config_missing" in set(root_blockers) or "frames_dir_missing" in set(root_blockers):
-        required_env_ok = False
-
-    # Pytest.
+    # This tool is intentionally NOT running pytest nor prod_full auditors.
+    # Those are executed by the release wrapper (fail-fast, step-by-step).
     pytest_ok = False
     pytest_rc: int | None = None
-    pytest_tail = ""
-    if not required_env_ok:
-        pytest_ok = False
-        pytest_rc = None
-        pytest_tail = "skipped_missing_env"
-    else:
-        try:
-            pr = run_cmd(["poetry", "run", "pytest", "-q"], cwd=repo_root, timeout_s=0)
-            pytest_rc = int(pr.returncode)
-            pytest_ok = pr.returncode == 0
-            pytest_tail = _tail_lines(_normalize_output(pr.combined))
-        except Exception as exc:
-            pytest_ok = False
-            pytest_rc = None
-            pytest_tail = f"pytest_exception: {type(exc).__name__}: {exc}"
+    pytest_tail = "skipped_by_design"
 
-    # audit_prod_full (only meaningful if REAL env is valid enough to expect a consistent audit).
     prod_ok = False
     prod_rc: int | None = None
-    prod_tail = ""
+    prod_tail = "skipped_by_design"
     prod_final = ""
-    if not required_env_ok:
-        prod_ok = False
-        prod_rc = None
-        prod_tail = "skipped_missing_env"
-        prod_final = ""
-    else:
-        try:
-            env_for_prod = dict(env_snapshot)
-            if effective_hwnd is not None:
-                env_for_prod["FRBOT_WINDOW_HWND"] = str(int(effective_hwnd))
-            env_for_prod["FRBOT_REAL_FRAMES_DIR"] = str(frames_dir)
-            env_for_prod["FRBOT_CONFIG_PATH"] = str(config_path)
-
-            ar = run_cmd(["poetry", "run", "python", "tools/audit_prod_full.py"], cwd=repo_root, env=env_for_prod, timeout_s=0)
-            prod_rc = int(ar.returncode)
-            prod_tail = _tail_lines(ar.combined)
-            prod_final = _parse_final_decision(ar.combined)
-            prod_ok = prod_final == "OPERATIONAL_REAL" and ar.returncode == 0
-        except Exception as exc:
-            prod_ok = False
-            prod_rc = None
-            prod_tail = f"audit_prod_full_exception: {type(exc).__name__}: {exc}"
-            prod_final = ""
 
     # Decide.
     # Dedupe blockers while preserving order.
@@ -531,7 +518,7 @@ def run_repo_status_audit(
             deduped_blockers.append(b)
 
     final_decision = ""
-    exit_code = EXIT_NOT_OPERATIONAL
+    exit_code = EXIT_NOT_READY
     try:
         final_decision = evaluate_go_no_go(
             root_blockers=deduped_blockers,
@@ -541,20 +528,19 @@ def run_repo_status_audit(
         )
         if final_decision == "READY":
             exit_code = EXIT_READY
-        elif final_decision == "NOT_READY":
-            exit_code = EXIT_NOT_READY
         else:
-            exit_code = EXIT_NOT_OPERATIONAL
+            exit_code = EXIT_NOT_READY
     except Exception:
         deduped_blockers.append("internal_error")
-        final_decision = "NOT_OPERATIONAL_REAL"
-        exit_code = EXIT_NOT_OPERATIONAL
+        final_decision = "NOT_READY"
+        exit_code = EXIT_NOT_READY
 
     report: dict[str, Any] = {
         "timestamp_utc": timestamp,
         "final_decision": final_decision,
         "exit_code": int(exit_code),
         "root_blockers": deduped_blockers,
+        "warnings": warnings,
         "git_branch": git_branch,
         "git_commit": git_commit,
         "is_dirty": bool(git_dirty),
@@ -569,6 +555,21 @@ def run_repo_status_audit(
         "window": {
             "effective_hwnd": (int(effective_hwnd) if effective_hwnd is not None else None),
             "selection": selection,
+            "found_windows": [
+                {
+                    "hwnd": int(w.hwnd),
+                    "title": str(w.title),
+                    "minimized": bool(w.minimized),
+                    "z_order": int(w.z_order),
+                    "rect": {
+                        "left": int(w.rect_left),
+                        "top": int(w.rect_top),
+                        "right": int(w.rect_right),
+                        "bottom": int(w.rect_bottom),
+                    },
+                }
+                for w in windows
+            ],
         },
         "git": {
             "dirty": bool(git_dirty),

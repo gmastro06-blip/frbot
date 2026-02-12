@@ -57,6 +57,7 @@ def test_env_missing_is_not_operational_and_writes_json(tmp_path: Path) -> None:
     assert "obs_source_name_missing" in blockers
     assert "window_selector_missing" in blockers
     assert "profile_not_prod_full" in blockers
+    assert "config_missing" in blockers
 
 
 def test_self_heal_hwnd_by_title_exact(tmp_path: Path) -> None:
@@ -167,9 +168,9 @@ def test_repo_dirty_makes_not_ready(tmp_path: Path) -> None:
         write_json=writer,
     )
 
-    assert report["final_decision"] == "NOT_READY"
-    assert exit_code == mod.EXIT_NOT_READY
-    assert "repo_dirty" in set(report.get("root_blockers", []))
+    assert report["final_decision"] == "READY"
+    assert exit_code == mod.EXIT_READY
+    assert report.get("is_dirty") is True
 
 
 def test_status_json_is_written_each_run(tmp_path: Path) -> None:
@@ -283,3 +284,97 @@ def test_exit_code_constants_are_stable() -> None:
     assert mod.EXIT_READY == 0
     assert mod.EXIT_NOT_READY == 2
     assert mod.EXIT_NOT_OPERATIONAL == 3
+
+
+def test_placeholder_hwnd_uses_title_without_window_hwnd_invalid(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    mod = _load_module(repo_root)
+
+    env = {
+        "FRBOT_PROFILE": "prod_full",
+        "FRBOT_CAPTURE_SOURCE": "obs_source",
+        "FRBOT_OBS_SOURCE_NAME": "TIBIA_CAPTURE",
+        "FRBOT_WINDOW_HWND": "0xXXXXXXXX",
+        "FRBOT_WINDOW_TITLE": "Tibia",
+        "FRBOT_CONFIG_PATH": str(tmp_path / "config.json"),
+        "FRBOT_REAL_FRAMES_DIR": str(tmp_path / "frames_full"),
+    }
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
+
+    windows = [
+        mod.VisibleWindow(
+            hwnd=456,
+            title="Tibia",
+            minimized=False,
+            rect_left=0,
+            rect_top=0,
+            rect_right=100,
+            rect_bottom=100,
+            z_order=0,
+        )
+    ]
+
+    exit_code, report = mod.run_repo_status_audit(
+        repo_root=tmp_path,
+        env=env,
+        run_cmd=lambda argv, *, cwd, env=None, timeout_s=0: mod.CmdResult(argv=list(argv), returncode=0, stdout="", stderr=""),
+        list_windows=lambda: (windows, {"ok": True, "windows": [], "monitors": []}),
+        now_iso=lambda: "2026-01-01T00:00:00+00:00",
+        write_json=lambda _p, _payload: None,
+    )
+
+    assert report["window"]["effective_hwnd"] == 456
+    assert report["window"]["selection"]["match_kind"] == "title_exact"
+    assert "window_hwnd_invalid" not in set(report.get("root_blockers", []))
+    assert exit_code in {mod.EXIT_READY, mod.EXIT_NOT_READY}
+
+
+def test_higher_z_offscreen_window_does_not_trigger_not_foreground(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    mod = _load_module(repo_root)
+
+    env = {
+        "FRBOT_PROFILE": "prod_full",
+        "FRBOT_CAPTURE_SOURCE": "obs_source",
+        "FRBOT_OBS_SOURCE_NAME": "TIBIA_CAPTURE",
+        "FRBOT_WINDOW_TITLE": "Tibia - Character",
+        "FRBOT_CONFIG_PATH": str(tmp_path / "config.json"),
+        "FRBOT_REAL_FRAMES_DIR": str(tmp_path / "frames_full"),
+    }
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
+
+    windows = [
+        mod.VisibleWindow(
+            hwnd=999,
+            title="Runtime Broker",
+            minimized=False,
+            rect_left=-10000,
+            rect_top=-10000,
+            rect_right=-9000,
+            rect_bottom=-9000,
+            z_order=0,
+        ),
+        mod.VisibleWindow(
+            hwnd=123,
+            title="Tibia - Character",
+            minimized=False,
+            rect_left=0,
+            rect_top=0,
+            rect_right=1000,
+            rect_bottom=700,
+            z_order=1,
+        ),
+    ]
+
+    exit_code, report = mod.run_repo_status_audit(
+        repo_root=tmp_path,
+        env=env,
+        run_cmd=lambda argv, *, cwd, env=None, timeout_s=0: mod.CmdResult(argv=list(argv), returncode=0, stdout="", stderr=""),
+        list_windows=lambda: (windows, {"ok": True, "windows": [], "monitors": []}),
+        now_iso=lambda: "2026-01-01T00:00:00+00:00",
+        write_json=lambda _p, _payload: None,
+    )
+
+    assert report["window"]["effective_hwnd"] == 123
+    assert "window_not_foreground" not in set(report.get("root_blockers", []))
+    assert exit_code in {mod.EXIT_READY, mod.EXIT_NOT_READY}

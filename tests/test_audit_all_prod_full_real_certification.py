@@ -137,6 +137,8 @@ def _write_last_result_ok(
 	payload: dict = {
 		"gate": str(gate),
 		"ok": True,
+		"reason": "ok",
+		"evidence_kind": "unit_test",
 		"outcome_kind": "ok",
 		"inputs_sent": 1,
 		"before_ppm": str(before_ppm),

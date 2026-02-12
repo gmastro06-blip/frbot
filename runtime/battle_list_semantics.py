@@ -150,6 +150,38 @@ def _row_dark_fraction(
     return (float(dark) / float(total)) if total > 0 else 0.0
 
 
+def _row_bright_fraction(
+    rgb: bytes,
+    *,
+    width: int,
+    x0: int,
+    x1: int,
+    y0: int,
+    y1: int,
+    bright_luma: float,
+) -> float:
+    x0 = max(0, int(x0))
+    y0 = max(0, int(y0))
+    x1 = max(int(x0) + 1, int(x1))
+    y1 = max(int(y0) + 1, int(y1))
+
+    bright = 0
+    total = 0
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            idx = (y * width + x) * 3
+            if idx + 2 >= len(rgb):
+                continue
+            r = rgb[idx]
+            g = rgb[idx + 1]
+            b = rgb[idx + 2]
+            lum = (float(r) + float(g) + float(b)) / 3.0
+            if lum > float(bright_luma):
+                bright += 1
+            total += 1
+    return (float(bright) / float(total)) if total > 0 else 0.0
+
+
 def _infer_header_height(rgb: bytes, *, width: int, header_h: int, row_h: int, rows_fit: int) -> int:
     """Best-effort header detection for real Battle List ROIs.
 
@@ -401,16 +433,24 @@ def detect_battle_list(frame: Frame, roi: Roi, *, layout: Optional[MockBattleLis
         # Heuristic “row has content”: presence of dark text-like pixels in the name area.
         dark_luma = _env_float('FRBOT_BATTLE_LIST_TEXT_DARK_LUMA', 50.0)
         min_dark_frac = _env_float('FRBOT_BATTLE_LIST_TEXT_DARK_FRAC', 0.002)
+        bright_luma = _env_float('FRBOT_BATTLE_LIST_TEXT_BRIGHT_LUMA', 200.0)
+        min_bright_frac = _env_float('FRBOT_BATTLE_LIST_TEXT_BRIGHT_FRAC', 0.001)
         x0 = max(0, int(w * 0.10))
         x1 = max(x0 + 1, int(w * 0.70))
 
         entries2: list[BattleListEntry] = []
+        any_selectable = False
         for row_index in range(int(rows_fit2)):
             row_y = int(header_h2 + row_index * row_h)
             y0 = int(row_y)
             y1 = int(row_y + row_h)
             dark_frac = _row_dark_fraction(rgb, width=w, x0=x0, x1=x1, y0=y0, y1=y1, dark_luma=dark_luma)
-            has_text = bool(dark_frac >= float(min_dark_frac))
+            bright_frac = _row_bright_fraction(rgb, width=w, x0=x0, x1=x1, y0=y0, y1=y1, bright_luma=bright_luma)
+            has_text = bool((dark_frac >= float(min_dark_frac)) or (bright_frac >= float(min_bright_frac)))
+
+            selectable = bool(has_text)
+            if selectable:
+                any_selectable = True
 
             entry_bbox = Rect(x=int(roi.x), y=int(roi.y + row_y), width=int(roi.width), height=row_h)
             entries2.append(
@@ -419,12 +459,25 @@ def detect_battle_list(frame: Frame, roi: Roi, *, layout: Optional[MockBattleLis
                     # Selectability is controlled via is_attackable/hp_bar_visible.
                     name=f'row_{int(row_index)}',
                     # Without OCR/icons, we conservatively allow selecting only “populated” rows.
-                    hp_bar_visible=bool(has_text),
-                    is_attackable=bool(has_text),
+                    hp_bar_visible=bool(selectable),
+                    is_attackable=bool(selectable),
                     screen_bbox=entry_bbox,
                     row_index=int(row_index),
                     highlighted=(highlighted_idx is not None and int(row_index) == int(highlighted_idx)),
                 )
+            )
+
+        # If every row was classified as empty, still allow selecting the first row.
+        # This is a pragmatic REAL-mode fallback: the click is validated by target-frame evidence,
+        # and prevents a hard stop when UI rendering/scale makes the text heuristic unreliable.
+        if not any_selectable and entries2:
+            entries2[0] = BattleListEntry(
+                name=str(entries2[0].name),
+                hp_bar_visible=True,
+                is_attackable=True,
+                screen_bbox=entries2[0].screen_bbox,
+                row_index=int(entries2[0].row_index),
+                highlighted=bool(entries2[0].highlighted),
             )
 
         return BattleListObservation(
