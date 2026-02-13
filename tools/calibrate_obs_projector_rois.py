@@ -96,7 +96,7 @@ def _load_image(image_path: Path) -> "PILImage":
 
     try:
         im = Image.open(image_path)
-        im.load()  # force decode now (deterministic metadata)
+        im.load()  # type: ignore[no-untyped-call]  # force decode now (deterministic metadata)
         return im
     except Exception as exc:
         _hard_fail(f'image_open_failed: {type(exc).__name__}: {exc}')
@@ -266,7 +266,7 @@ def _interactive_calibrate(
     canvas.grid(row=0, column=0, rowspan=2, sticky='nsew')
 
     # Ensure no scaling: canvas exactly equals image size.
-    tk_im = ImageTk.PhotoImage(im)
+    tk_im = ImageTk.PhotoImage(im)  # type: ignore[no-untyped-call]
     canvas.create_image(0, 0, image=tk_im, anchor='nw')
 
     # Right: controls

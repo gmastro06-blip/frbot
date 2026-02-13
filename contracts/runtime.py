@@ -102,6 +102,7 @@ class CavebotTelemetry:
     angle_deg: float = 0.0
     attempts_used: int = 0
     inputs_sent: int = 0
+    wrong_direction_streak: int = 0
     last_n_distances: list[float] = field(default_factory=list)
 
 

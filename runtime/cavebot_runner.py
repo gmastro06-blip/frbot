@@ -11,7 +11,7 @@ from typing import Optional
 from contracts.capture import CaptureAdapter, Frame
 from contracts.errors import PreflightFailed
 from contracts.input import InputAdapter
-from contracts.runtime import RuntimeContext, Waypoint
+from contracts.runtime import MinimapMarker, RuntimeContext, Waypoint
 from contracts.window import WindowBindingAdapter
 from diagnostics.last_frames import record_after, record_before
 from diagnostics.frame_dump import dump_enabled, dump_pair
@@ -100,8 +100,8 @@ def _estimate_minimap_translation_px(
 
 @dataclass(frozen=True, slots=True)
 class CavebotTickEvidence:
-    marker_before: Optional[object]
-    marker_after: Optional[object]
+    marker_before: Optional[MinimapMarker]
+    marker_after: Optional[MinimapMarker]
     progress: Optional[ProgressResult]
     status: str
 
@@ -114,7 +114,22 @@ class CavebotTickOutcome:
     event: Optional[str] = None
 
 
-def _waypoint_distance_px(marker: Optional[object], waypoint: Waypoint) -> float:
+@dataclass(frozen=True, slots=True)
+class CavebotProgressEval:
+    progress: Optional[ProgressResult]
+    status: str
+    marker_after: Optional[MinimapMarker]
+    sel_after_confidence: float
+    sel_after_candidate_id: Optional[int]
+    sel_after_candidates: tuple[object, ...]
+    sel_after_details: dict[str, object]
+    inferred_dx: int
+    inferred_dy: int
+    inferred_sad_best: float
+    inferred_sad_0: float
+
+
+def _waypoint_distance_px(marker: Optional[MinimapMarker], waypoint: Waypoint) -> float:
     if marker is None:
         return 1e9
     mx = int(getattr(marker, 'x_px', -1))
@@ -122,6 +137,68 @@ def _waypoint_distance_px(marker: Optional[object], waypoint: Waypoint) -> float
     dx = float(mx - int(waypoint.x))
     dy = float(my - int(waypoint.y))
     return float((dx * dx + dy * dy) ** 0.5)
+
+
+def _wrong_direction_threshold_deg(*, real_mode: bool) -> float:
+    if not bool(real_mode):
+        return 90.0
+    raw = str(os.environ.get('FRBOT_CAVEBOT_WRONG_DIRECTION_ANGLE_DEG') or '').strip()
+    if not raw:
+        return 90.0
+    try:
+        val = float(raw)
+    except Exception:
+        return 90.0
+    if val < 90.0:
+        return 90.0
+    if val > 180.0:
+        return 180.0
+    return float(val)
+
+
+def _wrong_direction_abort_streak(*, real_mode: bool) -> int:
+    if not bool(real_mode):
+        return 1
+    raw = str(os.environ.get('FRBOT_CAVEBOT_WRONG_DIRECTION_ABORT_STREAK') or '').strip()
+    if not raw:
+        return 1
+    try:
+        val = int(raw)
+    except Exception:
+        return 1
+    return max(1, int(val))
+
+
+def _dead_reckon_on_static(*, real_mode: bool) -> bool:
+    if not bool(real_mode):
+        return False
+    raw = str(os.environ.get('FRBOT_CAVEBOT_DEAD_RECKON_ON_STATIC') or '').strip().lower()
+    return raw in {'1', 'true', 'yes', 'on'}
+
+
+def _dead_reckon_step_px(*, real_mode: bool) -> int:
+    if not bool(real_mode):
+        return 1
+    raw = str(os.environ.get('FRBOT_CAVEBOT_DEAD_RECKON_STEP_PX') or '').strip()
+    if not raw:
+        return 1
+    try:
+        val = int(raw)
+    except Exception:
+        return 1
+    return max(1, min(int(val), 4))
+
+
+def _stuck_window(*, real_mode: bool) -> int:
+    raw = str(os.environ.get('FRBOT_CAVEBOT_STUCK_WINDOW') or '').strip()
+    if not raw:
+        return 5
+    try:
+        val = int(raw)
+    except Exception:
+        return 5
+    max_w = 30 if bool(real_mode) else 15
+    return max(3, min(int(val), int(max_w)))
 
 
 def _select_key_toward_waypoint(marker_before: object, waypoint: Waypoint) -> str:
@@ -174,7 +251,7 @@ def _dump_marker_abort_pair(*, gate: str, before: Frame | None, after: Frame | N
         return
 
 
-def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, waypoint: Waypoint) -> tuple[Optional[ProgressResult], str]:
+def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, waypoint: Waypoint) -> CavebotProgressEval:
     cfg_rgb = _marker_rgb(ctx)
     sel_b = select_player_marker(
         before_f,
@@ -185,10 +262,34 @@ def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, 
         prev_marker=getattr(ctx.cavebot_gate.telemetry, 'marker_after', None),
     )
     if sel_b.abort_reason is not None:
-        return None, str(sel_b.abort_reason)
+        return CavebotProgressEval(
+            progress=None,
+            status=str(sel_b.abort_reason),
+            marker_after=None,
+            sel_after_confidence=0.0,
+            sel_after_candidate_id=None,
+            sel_after_candidates=(),
+            sel_after_details={},
+            inferred_dx=0,
+            inferred_dy=0,
+            inferred_sad_best=0.0,
+            inferred_sad_0=0.0,
+        )
     marker_before = sel_b.marker
     if marker_before is None:
-        return None, 'cavebot_marker_not_found'
+        return CavebotProgressEval(
+            progress=None,
+            status='cavebot_marker_not_found',
+            marker_after=None,
+            sel_after_confidence=0.0,
+            sel_after_candidate_id=None,
+            sel_after_candidates=(),
+            sel_after_details={},
+            inferred_dx=0,
+            inferred_dy=0,
+            inferred_sad_best=0.0,
+            inferred_sad_0=0.0,
+        )
 
     sel_a = select_player_marker(
         after_f,
@@ -199,10 +300,34 @@ def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, 
         prev_marker=marker_before,
     )
     if sel_a.abort_reason is not None:
-        return None, str(sel_a.abort_reason)
+        return CavebotProgressEval(
+            progress=None,
+            status=str(sel_a.abort_reason),
+            marker_after=sel_a.marker,
+            sel_after_confidence=float(sel_a.confidence),
+            sel_after_candidate_id=sel_a.selected_candidate_id,
+            sel_after_candidates=tuple(sel_a.candidates),
+            sel_after_details=dict(sel_a.details),
+            inferred_dx=0,
+            inferred_dy=0,
+            inferred_sad_best=0.0,
+            inferred_sad_0=0.0,
+        )
     marker_after = sel_a.marker
     if marker_after is None:
-        return None, 'cavebot_marker_not_found'
+        return CavebotProgressEval(
+            progress=None,
+            status='cavebot_marker_not_found',
+            marker_after=None,
+            sel_after_confidence=float(sel_a.confidence),
+            sel_after_candidate_id=sel_a.selected_candidate_id,
+            sel_after_candidates=tuple(sel_a.candidates),
+            sel_after_details=dict(sel_a.details),
+            inferred_dx=0,
+            inferred_dy=0,
+            inferred_sad_best=0.0,
+            inferred_sad_0=0.0,
+        )
 
     # Scroll-based inference is ONLY for REAL mode. Mock world already provides
     # deterministic moving markers and should not be influenced by translation heuristics.
@@ -233,6 +358,13 @@ def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, 
 
     virt_after = marker_after
 
+    wrong_dir_threshold_deg = _wrong_direction_threshold_deg(real_mode=bool(real_mode))
+
+    inferred_dx = 0
+    inferred_dy = 0
+    inferred_sad_best = 0.0
+    inferred_sad_0 = 0.0
+
     if not bool(real_mode):
         # In non-real mode, marker coordinates are authoritative.
         try:
@@ -242,11 +374,24 @@ def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, 
         except Exception:
             pass
         progress = compute_progress(marker_before, marker_after, waypoint)
-        if float(progress.angle_deg) > 90.0:
-            return progress, 'cavebot_wrong_direction'
-        if not is_progress_valid(progress, waypoint):
-            return progress, 'cavebot_no_progress'
-        return progress, 'ok'
+        status = 'ok'
+        if float(progress.angle_deg) > float(wrong_dir_threshold_deg):
+            status = 'cavebot_wrong_direction'
+        elif not is_progress_valid(progress, waypoint):
+            status = 'cavebot_no_progress'
+        return CavebotProgressEval(
+            progress=progress,
+            status=str(status),
+            marker_after=marker_after,
+            sel_after_confidence=float(sel_a.confidence),
+            sel_after_candidate_id=sel_a.selected_candidate_id,
+            sel_after_candidates=tuple(sel_a.candidates),
+            sel_after_details=dict(sel_a.details),
+            inferred_dx=int(inferred_dx),
+            inferred_dy=int(inferred_dy),
+            inferred_sad_best=float(inferred_sad_best),
+            inferred_sad_0=float(inferred_sad_0),
+        )
 
     # Primary: if the marker itself moves, trust it and keep telemetry in sync.
     if (abs(int(dx_m)) + abs(int(dy_m))) >= int(max(1, min_delta)):
@@ -260,6 +405,10 @@ def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, 
     else:
         # Fallback: infer minimap scroll and accumulate virtual position.
         dx_s, dy_s, sad_best, sad_0 = _estimate_minimap_translation_px(before_f, after_f)
+        inferred_dx = int(dx_s)
+        inferred_dy = int(dy_s)
+        inferred_sad_best = float(sad_best)
+        inferred_sad_0 = float(sad_0)
         improved = (float(sad_best) + 0.25) < float(sad_0)
         if improved and (abs(int(dx_s)) + abs(int(dy_s))) >= int(max(1, min_delta)):
             new_x = int(base_x) + int(dx_s)
@@ -281,11 +430,24 @@ def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, 
     progress = compute_progress(virt_before, virt_after, waypoint)
 
     # Aborts are decided in the runner (evidence-or-abort).
-    if float(progress.angle_deg) > 90.0:
-        return progress, 'cavebot_wrong_direction'
-    if not is_progress_valid(progress, waypoint):
-        return progress, 'cavebot_no_progress'
-    return progress, 'ok'
+    status = 'ok'
+    if float(progress.angle_deg) > float(wrong_dir_threshold_deg):
+        status = 'cavebot_wrong_direction'
+    elif not is_progress_valid(progress, waypoint):
+        status = 'cavebot_no_progress'
+    return CavebotProgressEval(
+        progress=progress,
+        status=str(status),
+        marker_after=marker_after,
+        sel_after_confidence=float(sel_a.confidence),
+        sel_after_candidate_id=sel_a.selected_candidate_id,
+        sel_after_candidates=tuple(sel_a.candidates),
+        sel_after_details=dict(sel_a.details),
+        inferred_dx=int(inferred_dx),
+        inferred_dy=int(inferred_dy),
+        inferred_sad_best=float(inferred_sad_best),
+        inferred_sad_0=float(inferred_sad_0),
+    )
 
 
 def _parse_rgb(raw: str) -> tuple[int, int, int]:
@@ -538,7 +700,21 @@ def execute_cavebot_tick(
 
     # Not yet reached: select exactly one input (intent) per tick.
     ctx.cavebot.gate_reach_streak = 0
-    key = _select_key_toward_waypoint(marker_before, waypoint)
+    key_marker = marker_before
+    try:
+        real_mode = str(getattr(ctx.config, 'mode', '')).strip().lower() == 'real'
+        tel = getattr(getattr(ctx, 'cavebot_gate', None), 'telemetry', None)
+        vx = getattr(tel, 'virtual_x_px', None) if tel is not None else None
+        vy = getattr(tel, 'virtual_y_px', None) if tel is not None else None
+        if bool(real_mode) and vx is not None and vy is not None:
+            key_marker = type(marker_before)(
+                x_px=int(vx),
+                y_px=int(vy),
+                pixel_count=int(getattr(marker_before, 'pixel_count', 0)),
+            )
+    except Exception:
+        key_marker = marker_before
+    key = _select_key_toward_waypoint(key_marker, waypoint)
 
     # Enforce strong binding immediately before input.
     try:
@@ -584,20 +760,17 @@ def execute_cavebot_tick(
             pass
         raise corr_exc
 
-    progress, status = _progress_from_frames(ctx, before, after, waypoint)
+    eval_ = _progress_from_frames(ctx, before, after, waypoint)
+    progress = eval_.progress
+    status = str(eval_.status)
 
-    # Best-effort: record inferred minimap scroll for audit/debug.
-    inferred_dx, inferred_dy, inferred_sad_best, inferred_sad_0 = _estimate_minimap_translation_px(before, after)
+    # Best-effort: inferred minimap scroll reused from progress evaluation.
+    inferred_dx = int(eval_.inferred_dx)
+    inferred_dy = int(eval_.inferred_dy)
+    inferred_sad_best = float(eval_.inferred_sad_best)
+    inferred_sad_0 = float(eval_.inferred_sad_0)
 
-    sel_after = select_player_marker(
-        after,
-        marker_rgb=cfg_rgb,
-        tol=int(ctx.config.player_marker_tol),
-        min_pixels=int(ctx.config.player_marker_min_pixels),
-        max_pixels=int(ctx.config.player_marker_max_pixels),
-        prev_marker=marker_before,
-    )
-    marker_after = sel_after.marker
+    marker_after = eval_.marker_after
 
     evidence = CavebotTickEvidence(
         marker_before=marker_before,
@@ -621,6 +794,32 @@ def execute_cavebot_tick(
     ctx.cavebot_gate.telemetry.last_n_distances.append(float(dist_a))
     if len(ctx.cavebot_gate.telemetry.last_n_distances) > 50:
         ctx.cavebot_gate.telemetry.last_n_distances = ctx.cavebot_gate.telemetry.last_n_distances[-50:]
+
+    real_mode = str(getattr(ctx.config, 'mode', '')).strip().lower() == 'real'
+
+    if (
+        str(status) == 'cavebot_no_progress'
+        and bool(real_mode)
+        and int(inferred_dx) == 0
+        and int(inferred_dy) == 0
+        and _dead_reckon_on_static(real_mode=bool(real_mode))
+    ):
+        step_px = _dead_reckon_step_px(real_mode=bool(real_mode))
+        try:
+            vx = int(getattr(ctx.cavebot_gate.telemetry, 'virtual_x_px', getattr(marker_before, 'x_px', 0)))
+            vy = int(getattr(ctx.cavebot_gate.telemetry, 'virtual_y_px', getattr(marker_before, 'y_px', 0)))
+            if str(key) == 'RIGHT':
+                vx += int(step_px)
+            elif str(key) == 'LEFT':
+                vx -= int(step_px)
+            elif str(key) == 'DOWN':
+                vy += int(step_px)
+            elif str(key) == 'UP':
+                vy -= int(step_px)
+            ctx.cavebot_gate.telemetry.virtual_x_px = int(vx)
+            ctx.cavebot_gate.telemetry.virtual_y_px = int(vy)
+        except Exception:
+            pass
 
     _append_trace(
         gate=str(gate),
@@ -664,10 +863,10 @@ def execute_cavebot_tick(
                 'event': 'abort',
                 'tick_index': int(tick_index),
                 'abort_reason': str(out.abort_reason),
-                'candidates_count': int(len(sel_after.candidates)),
-                'selected_marker_confidence': float(sel_after.confidence),
-                'selected_marker_id': sel_after.selected_candidate_id,
-                'marker_candidates': sel_after.details.get('marker_candidates', []),
+                'candidates_count': int(len(eval_.sel_after_candidates)),
+                'selected_marker_confidence': float(eval_.sel_after_confidence),
+                'selected_marker_id': eval_.sel_after_candidate_id,
+                'marker_candidates': eval_.sel_after_details.get('marker_candidates', []),
                 'waypoint': {
                     'waypoint_id': str(waypoint.waypoint_id),
                     'x': int(waypoint.x),
@@ -692,10 +891,10 @@ def execute_cavebot_tick(
                 'event': 'abort',
                 'tick_index': int(tick_index),
                 'abort_reason': str(out.abort_reason),
-                'candidates_count': int(len(sel_after.candidates)),
-                'selected_marker_confidence': float(sel_after.confidence),
-                'selected_marker_id': sel_after.selected_candidate_id,
-                'marker_candidates': sel_after.details.get('marker_candidates', []),
+                'candidates_count': int(len(eval_.sel_after_candidates)),
+                'selected_marker_confidence': float(eval_.sel_after_confidence),
+                'selected_marker_id': eval_.sel_after_candidate_id,
+                'marker_candidates': eval_.sel_after_details.get('marker_candidates', []),
                 'waypoint': {
                     'waypoint_id': str(waypoint.waypoint_id),
                     'x': int(waypoint.x),
@@ -709,6 +908,21 @@ def execute_cavebot_tick(
         return out
 
     if status == 'cavebot_wrong_direction':
+        real_mode = str(getattr(ctx.config, 'mode', '')).strip().lower() == 'real'
+        abort_streak_target = _wrong_direction_abort_streak(real_mode=bool(real_mode))
+        try:
+            current_streak = int(getattr(ctx.cavebot_gate.telemetry, 'wrong_direction_streak', 0)) + 1
+        except Exception:
+            current_streak = 1
+        try:
+            ctx.cavebot_gate.telemetry.wrong_direction_streak = int(current_streak)
+        except Exception:
+            pass
+        if int(current_streak) < int(abort_streak_target):
+            ctx.cavebot.gate_ticks_in_waypoint += 1
+            ctx.cavebot.gate_attempts_used += 1
+            return CavebotTickOutcome(reached_waypoint=False, evidence=evidence, abort_reason=None)
+
         out = CavebotTickOutcome(reached_waypoint=False, evidence=evidence, abort_reason='cavebot_wrong_direction')
         if dump_enabled():
             dump_pair(gate=str(gate), before=before, after=after, reason=str(out.abort_reason))
@@ -730,12 +944,18 @@ def execute_cavebot_tick(
         )
         return out
 
+    try:
+        ctx.cavebot_gate.telemetry.wrong_direction_streak = 0
+    except Exception:
+        pass
+
     if status == 'cavebot_no_progress':
         # No semantic progress: allow bounded retries, then deterministically abort stuck.
         # Stuck detection criteria over last N distances:
         # - no decreases at all (flat/increasing), OR
         # - oscillation (at least one decrease and at least one increase)
-        N = 5
+        real_mode = str(getattr(ctx.config, 'mode', '')).strip().lower() == 'real'
+        N = _stuck_window(real_mode=bool(real_mode))
         distances = list(ctx.cavebot_gate.telemetry.last_n_distances)
         last_n = distances[-N:] if len(distances) >= N else []
         if len(last_n) >= N:

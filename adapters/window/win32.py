@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 
 import time
 
@@ -84,10 +85,18 @@ class Win32WindowBinding(WindowBindingAdapter):
 
     def assert_bound(self) -> None:
         if self._bound is None:
-            raise RuntimeError('window_binding_lost')
+            try:
+                self._bound = self._resolve()
+            except Exception as exc:
+                raise RuntimeError('window_binding_lost') from exc
 
         title_sub = self._title_substring.strip()
-        deadline_ns = time.monotonic_ns() + 1_000_000_000
+        try:
+            retry_ms = int(os.environ.get('FRBOT_WINDOW_BINDING_RETRY_MS', '3000') or '3000')
+        except Exception:
+            retry_ms = 3000
+        retry_ms = max(500, min(int(retry_ms), 10000))
+        deadline_ns = time.monotonic_ns() + (int(retry_ms) * 1_000_000)
         last_exc: Exception | None = None
 
         while True:
