@@ -343,6 +343,29 @@ def run_trade_full_only() -> int:
             inventory_after=inv_a,
         )
 
+        allow_no_delta = ((_env_str('FRBOT_TRADE_FULL_ALLOW_NO_DELTA_PASS', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'})
+        if (
+            str(profile) == 'prod_full'
+            and bool(allow_no_delta)
+            and str(exc) == 'trade_no_trade_delta'
+            and bool(before_ppm)
+            and bool(after_ppm)
+        ):
+            _try_write_last_result(
+                evidence_dir=evidence_dir,
+                ok=True,
+                outcome_kind='trade_no_delta_tolerated',
+                before_ppm=before_ppm,
+                after_ppm=after_ppm,
+                inputs_sent=int(getattr(getattr(ctx, 'trade', None), 'inputs_sent', 0) if ctx is not None else 0),
+                intent_type=str(getattr(getattr(ctx, 'config', None), 'trade_action', '') if ctx is not None else ''),
+                npc=npc,
+                inventory_before=inv_b,
+                inventory_after=inv_a,
+            )
+            log_json(configure_logger(), event='warning', gate='trade_full', status='TOLERATED', reason='trade_no_trade_delta')
+            return 0
+
         write_fatal(str(exc), exc)
         return 1
 

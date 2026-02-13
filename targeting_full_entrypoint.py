@@ -103,11 +103,14 @@ def _write_last_result(
             'gate': _GATE,
             'ok': bool(ok),
             'outcome_kind': str(outcome_kind),
+            'reason': str(outcome_kind),
             'actions_sent': int(actions_sent),
+            'inputs_sent': int(actions_sent),
             'successes': int(successes),
             'before_ppm': before_ppm,
             'after_ppm': after_ppm,
             'evidence_reason': str(evidence_reason),
+            'evidence_kind': str(evidence_reason),
             'event_correlation': dict(event_correlation or {}),
         }
         (evidence_dir / f'{_GATE}_last_result.json').write_text(

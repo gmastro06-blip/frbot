@@ -34,12 +34,12 @@ try {
   $env:FRBOT_PROFILE = "prod_full"
   $env:FRBOT_MODE = "prod_full"
   $env:FRBOT_CAPTURE_SOURCE = "obs_source"
-  if (-not $env:FRBOT_INPUT_METHOD) { $env:FRBOT_INPUT_METHOD = "sendinput_vk" }
+  if (-not $env:FRBOT_INPUT_METHOD) { $env:FRBOT_INPUT_METHOD = "postmessage" }
   $env:FRBOT_DUMP_FRAMES = "1"
 
-  if (-not $env:FRBOT_CONFIG_PATH) {
-    $defaultCfg = (Join-Path $RepoRoot "config\rois_prod_full.json")
-    if (Test-Path $defaultCfg) { $env:FRBOT_CONFIG_PATH = $defaultCfg }
+  $defaultCfg = (Join-Path $RepoRoot "config\rois_prod_full.json")
+  if (Test-Path -LiteralPath $defaultCfg) {
+    $env:FRBOT_CONFIG_PATH = $defaultCfg
   }
 
   # Set a per-release frames directory: diagnostics/frames_full/<timestamp>

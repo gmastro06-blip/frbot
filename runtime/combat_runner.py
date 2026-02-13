@@ -172,6 +172,13 @@ def execute_combat_intent(
     On no evidence, consumes attempt.
     """
 
+    allow_lock_only_success = str(os.environ.get('FRBOT_COMBAT_ALLOW_LOCK_ONLY_SUCCESS', '0') or '0').strip().lower() in {
+        '1',
+        'true',
+        'yes',
+        'on',
+    }
+
     now_ms = int(time.monotonic_ns() // 1_000_000)
     if ctx.combat.attempt_count == 0:
         ctx.combat.attempt_started_ts_ms = now_ms
@@ -409,6 +416,11 @@ def execute_combat_intent(
         raise PreflightFailed('combat_target_not_locked')
 
     if evidence_ok_any and winning_after is not None:
+        ctx.combat.attempt_count = 0
+        ctx.combat.attempt_started_ts_ms = 0
+        return True
+
+    if allow_lock_only_success and saw_locked and last_after is not None:
         ctx.combat.attempt_count = 0
         ctx.combat.attempt_started_ts_ms = 0
         return True

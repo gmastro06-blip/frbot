@@ -31,20 +31,15 @@ try {
   if (-not $env:FRBOT_PROFILE) { $env:FRBOT_PROFILE = "prod_full" }
   if (-not $env:FRBOT_MODE) { $env:FRBOT_MODE = "prod_full" }
   if (-not $env:FRBOT_CAPTURE_SOURCE) { $env:FRBOT_CAPTURE_SOURCE = "obs_source" }
-  if (-not $env:FRBOT_INPUT_METHOD) { $env:FRBOT_INPUT_METHOD = "sendinput_vk" }
+  if (-not $env:FRBOT_INPUT_METHOD) { $env:FRBOT_INPUT_METHOD = "postmessage" }
 
   if (-not $env:FRBOT_REAL_FRAMES_DIR) {
     $env:FRBOT_REAL_FRAMES_DIR = (Join-Path $PSScriptRoot "diagnostics\frames_full")
   }
 
-  $cfgInvalid = $false
-  if (-not $env:FRBOT_CONFIG_PATH) {
-    $cfgInvalid = $true
-  } elseif (-not (Test-Path -LiteralPath $env:FRBOT_CONFIG_PATH)) {
-    $cfgInvalid = $true
-  }
-  if ($cfgInvalid) {
-    $env:FRBOT_CONFIG_PATH = (Join-Path $PSScriptRoot "rois_prod_full.json")
+  $prodFullCfg = (Join-Path $PSScriptRoot "rois_prod_full.json")
+  if (Test-Path -LiteralPath $prodFullCfg) {
+    $env:FRBOT_CONFIG_PATH = $prodFullCfg
   }
 
   $hwndRaw = [string]($env:FRBOT_WINDOW_HWND)

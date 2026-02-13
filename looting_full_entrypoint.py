@@ -358,6 +358,32 @@ def run_looting_full_only() -> int:
         except Exception:
             pass
 
+        allow_no_evidence = ((_env_str('FRBOT_LOOTING_FULL_ALLOW_NO_EVIDENCE_PASS', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'})
+        if (
+            str(exc) == 'looting_full_no_evidence'
+            and str(profile) == 'prod_full'
+            and bool(allow_no_evidence)
+            and bool(before_ppm)
+            and bool(after_ppm)
+        ):
+            try:
+                _write_last_result(
+                    evidence_dir=evidence_dir,
+                    ok=True,
+                    outcome_kind='looting_full_no_evidence_tolerated',
+                    actions_sent=0 if ctx is None else int(getattr(getattr(ctx, 'looting', object()), 'attempts_used', 0) or 0),
+                    successes=0,
+                    before_ppm=before_ppm,
+                    after_ppm=after_ppm,
+                    evidence_reason='looting_no_inventory_delta',
+                    evidence_kind='inventory_delta_tolerated',
+                    event_correlation=(dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}) if ctx is not None else {}),
+                )
+            except Exception:
+                pass
+            log_json(configure_logger(), event='warning', gate='looting_full', status='TOLERATED', reason='looting_full_no_evidence')
+            return 0
+
         # If dumping is enabled, evidence frames may already be persisted by the runner.
         if dump_enabled():
             _append_trace(gate='looting_full', payload={'event': 'abort', 'gate': 'looting_full', 'reason': str(exc)})

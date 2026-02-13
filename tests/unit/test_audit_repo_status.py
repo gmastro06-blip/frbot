@@ -378,3 +378,55 @@ def test_higher_z_offscreen_window_does_not_trigger_not_foreground(tmp_path: Pat
     assert report["window"]["effective_hwnd"] == 123
     assert "window_not_foreground" not in set(report.get("root_blockers", []))
     assert exit_code in {mod.EXIT_READY, mod.EXIT_NOT_READY}
+
+
+def test_postmessage_mode_ignores_foreground_blocker(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    mod = _load_module(repo_root)
+
+    env = {
+        "FRBOT_PROFILE": "prod_full",
+        "FRBOT_CAPTURE_SOURCE": "obs_source",
+        "FRBOT_OBS_SOURCE_NAME": "TIBIA_CAPTURE",
+        "FRBOT_INPUT_METHOD": "postmessage",
+        "FRBOT_WINDOW_TITLE": "Tibia - Character",
+        "FRBOT_CONFIG_PATH": str(tmp_path / "config.json"),
+        "FRBOT_REAL_FRAMES_DIR": str(tmp_path / "frames_full"),
+    }
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
+
+    windows = [
+        mod.VisibleWindow(
+            hwnd=999,
+            title="Overlay",
+            minimized=False,
+            rect_left=0,
+            rect_top=0,
+            rect_right=1000,
+            rect_bottom=700,
+            z_order=0,
+        ),
+        mod.VisibleWindow(
+            hwnd=123,
+            title="Tibia - Character",
+            minimized=False,
+            rect_left=0,
+            rect_top=0,
+            rect_right=1000,
+            rect_bottom=700,
+            z_order=1,
+        ),
+    ]
+
+    exit_code, report = mod.run_repo_status_audit(
+        repo_root=tmp_path,
+        env=env,
+        run_cmd=lambda argv, *, cwd, env=None, timeout_s=0: mod.CmdResult(argv=list(argv), returncode=0, stdout="", stderr=""),
+        list_windows=lambda: (windows, {"ok": True, "windows": [], "monitors": []}),
+        now_iso=lambda: "2026-01-01T00:00:00+00:00",
+        write_json=lambda _p, _payload: None,
+    )
+
+    assert report["window"]["effective_hwnd"] == 123
+    assert "window_not_foreground" not in set(report.get("root_blockers", []))
+    assert exit_code in {mod.EXIT_READY, mod.EXIT_NOT_READY}

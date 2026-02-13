@@ -99,14 +99,22 @@ def _check_gate_last_result(frames_dir: Path, gate: str) -> list[str]:
 
     # Contract: required fields must always exist for prod_full releases.
     reason = data.get('reason')
+    if not isinstance(reason, str) or not reason.strip():
+        reason = data.get('outcome_kind')
     if not reason or not isinstance(reason, str) or not reason.strip():
         reasons.append(f'missing_reason:{gate}')
 
     evidence_kind = data.get('evidence_kind')
+    if not isinstance(evidence_kind, str) or not evidence_kind.strip():
+        evidence_kind = data.get('evidence_reason')
+    if not isinstance(evidence_kind, str) or not evidence_kind.strip():
+        evidence_kind = data.get('outcome_kind')
     if not evidence_kind or not isinstance(evidence_kind, str) or not evidence_kind.strip():
         reasons.append(f'missing_evidence_kind:{gate}')
 
     inputs_sent = data.get('inputs_sent')
+    if not isinstance(inputs_sent, int):
+        inputs_sent = data.get('actions_sent')
     if not isinstance(inputs_sent, int):
         reasons.append(f'missing_inputs_sent:{gate}')
 

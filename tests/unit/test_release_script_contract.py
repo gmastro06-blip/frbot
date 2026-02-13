@@ -29,7 +29,7 @@ def test_root_run_release_wrapper_has_required_self_heal_defaults() -> None:
     assert "Set-Location -LiteralPath $PSScriptRoot" in ps1
     assert "FRBOT_PROFILE" in ps1 and "prod_full" in ps1
     assert "FRBOT_CAPTURE_SOURCE" in ps1 and "obs_source" in ps1
-    assert "FRBOT_INPUT_METHOD" in ps1 and "sendinput_vk" in ps1
+    assert "FRBOT_INPUT_METHOD" in ps1 and "postmessage" in ps1
     assert "rois_prod_full.json" in ps1
     assert "Remove-Item Env:FRBOT_WINDOW_HWND" in ps1
     assert "tools\\release_prod_full.py" in ps1 or "tools/release_prod_full.py" in ps1

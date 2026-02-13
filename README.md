@@ -345,6 +345,7 @@ Official single-command release gate (prints exactly one line: `RELEASE_GO` or `
 
 Notes:
  - The release runner enables best-effort window focusing by default (`FRBOT_TRY_FOCUS=1`) to support unattended runs. If you want to disable any focus-stealing attempts, set `FRBOT_TRY_FOCUS=0`.
+ - Runtime-only tuning currently applied by the release orchestrator is documented in `docs/prod_full_runtime_tuning_runbook.md`.
 
 What it does (stops on first failure):
 
@@ -370,6 +371,34 @@ ROI config requirements (REAL, `FRBOT_PROFILE=prod_full`):
 - Required base: `minimap`, `battle_list`, `target_frame`, `hp_mp`
 - Allowlisted extras used by the pipeline: `inventory_text`, `depot_container`, `trade_inventory`, `trade_npc`, `trade_action`
 - Combat evidence requires at least one of: `combat_feedback` or `target_hp_bar`
+
+### Hunger Guard (auto-eat)
+
+Standalone mode to detect hunger state from a ROI and press an eat hotkey repeatedly with cooldown:
+
+```powershell
+poetry run python hunger_entrypoint.py
+```
+
+Main env vars:
+
+- `FRBOT_HUNGER_ROI` (default: `hunger_status`)
+- `FRBOT_HUNGER_RGB` (default: `255,170,0`)
+- `FRBOT_HUNGER_RGB_TOL` (default: `28`)
+- `FRBOT_HUNGER_MATCH_RATIO_MIN` (default: `0.08`)
+- `FRBOT_EAT_KEY` (default: `F9`)
+- `FRBOT_EAT_INTERVAL_MS` (default: `1200`)
+- `FRBOT_HUNGER_MAX_TICKS` (default: `1200`)
+
+Example:
+
+```powershell
+$env:FRBOT_HUNGER_BACKEND='real'
+$env:FRBOT_CONFIG_PATH='config/rois_prod_full.json'
+$env:FRBOT_HUNGER_ROI='hunger_status'
+$env:FRBOT_EAT_KEY='F9'
+poetry run python hunger_entrypoint.py
+```
 
 ### Real calibration (Tibia 15.x) — strict foreground-safe
 

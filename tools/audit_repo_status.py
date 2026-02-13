@@ -388,6 +388,7 @@ def run_repo_status_audit(
             "FRBOT_PROFILE",
             "FRBOT_CAPTURE_SOURCE",
             "FRBOT_OBS_SOURCE_NAME",
+            "FRBOT_INPUT_METHOD",
             "FRBOT_WINDOW_HWND",
             "FRBOT_WINDOW_TITLE",
             "FRBOT_CONFIG_PATH",
@@ -428,6 +429,8 @@ def run_repo_status_audit(
         root_blockers.append("window_invalid_state")
     if selected_window is not None and bool(windows_meta_ok):
         target_z = int(getattr(selected_window, "z_order", 1))
+        input_method = str(env_snapshot.get("FRBOT_INPUT_METHOD", "") or "").strip().lower()
+        requires_foreground = input_method in {"", "sendinput", "sendinput_vk"}
         if target_z != 0:
             overlapped_by_front_window = any(
                 (not bool(w.minimized))
@@ -435,7 +438,7 @@ def run_repo_status_audit(
                 and _rects_overlap(selected_window, w)
                 for w in windows
             )
-            if overlapped_by_front_window:
+            if requires_foreground and overlapped_by_front_window:
                 root_blockers.append("window_not_foreground")
 
     # Window diagnostics payload (persist at the end so pytest/tools can't overwrite it).

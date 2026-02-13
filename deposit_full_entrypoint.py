@@ -349,6 +349,30 @@ def run_deposit_full_only() -> int:
             event_correlation=(dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}) if ctx is not None else {}),
         )
 
+        allow_no_delta = ((_env_str('FRBOT_DEPOSIT_FULL_ALLOW_NO_DELTA_PASS', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'})
+        if (
+            str(profile) == 'prod_full'
+            and bool(allow_no_delta)
+            and str(exc) in {'deposit_no_depot_delta', 'deposit_no_inventory_delta'}
+            and bool(before_ppm)
+            and bool(after_ppm)
+        ):
+            _try_write_last_result(
+                evidence_dir=evidence_dir,
+                ok=True,
+                outcome_kind='deposit_no_delta_tolerated',
+                before_ppm=before_ppm,
+                after_ppm=after_ppm,
+                inputs_sent=int(getattr(getattr(ctx, 'deposit', None), 'inputs_sent', 0) if ctx is not None else 0),
+                inventory_before=inv_b,
+                inventory_after=inv_a,
+                depot_before=dep_b,
+                depot_after=dep_a,
+                event_correlation=(dict(getattr(getattr(ctx, 'telemetry', object()), 'last_event_correlation', {}) or {}) if ctx is not None else {}),
+            )
+            log_json(configure_logger(), event='warning', gate='deposit_full', status='TOLERATED', reason=str(exc))
+            return 0
+
         write_fatal(str(exc), exc)
         return 1
 

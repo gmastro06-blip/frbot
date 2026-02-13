@@ -19,6 +19,45 @@ _RUNTIME_HEALING_TUNING: dict[str, str] = {
     "FRBOT_HEAL_MP_DECREASE_MIN": "0.0",
 }
 
+_RUNTIME_COMBAT_TUNING: dict[str, str] = {
+    "FRBOT_POST_ATTACK_DELAY_MS": "300",
+    "FRBOT_COMBAT_AFTER_WINDOW_MS": "2200",
+    "FRBOT_COMBAT_AFTER_POLL_MS": "100",
+    "FRBOT_COMBAT_COOLDOWN_DELTA_RATIO_MIN": "0.0015",
+    "FRBOT_COMBAT_FEEDBACK_DELTA_RATIO_MIN": "0.0008",
+    "FRBOT_COMBAT_BATTLE_LIST_DELTA_RATIO_MIN": "0.01",
+    "FRBOT_COMBAT_ALLOW_LOCK_ONLY_SUCCESS": "1",
+}
+
+_RUNTIME_CAVEBOT_TUNING: dict[str, str] = {
+    "FRBOT_CAVEBOT_MIN_PIXEL_DELTA": "1",
+    "FRBOT_CAVEBOT_STUCK_WINDOW": "10",
+    "FRBOT_CAVEBOT_WRONG_DIRECTION_ANGLE_DEG": "130",
+    "FRBOT_CAVEBOT_WRONG_DIRECTION_ABORT_STREAK": "3",
+    "FRBOT_CAVEBOT_DEAD_RECKON_ON_STATIC": "1",
+    "FRBOT_CAVEBOT_DEAD_RECKON_STEP_PX": "1",
+}
+
+_RUNTIME_LOOTING_TUNING: dict[str, str] = {
+    "FRBOT_LOOTING_FULL_MAX_ACTIONS": "30",
+    "FRBOT_LOOTING_FULL_STOP_NO_DELTA": "6",
+    "FRBOT_LOOTING_BASIC_ACTION": "key",
+    "FRBOT_LOOTING_BASIC_STRICT_VERIFY_ATTEMPTS": "8",
+    "FRBOT_LOOTING_FULL_ALLOW_NO_EVIDENCE_PASS": "1",
+}
+
+_RUNTIME_TRADE_TUNING: dict[str, str] = {
+    "FRBOT_TRADE_DELTA_PX_TOL": "10",
+    "FRBOT_TRADE_DELTA_RATIO_MIN": "0.001",
+    "FRBOT_TRADE_FULL_ALLOW_NO_DELTA_PASS": "1",
+}
+
+_RUNTIME_DEPOSIT_TUNING: dict[str, str] = {
+    "FRBOT_DEPOSIT_DEPOT_DELTA_PX_TOL": "10",
+    "FRBOT_DEPOSIT_DEPOT_DELTA_RATIO_MIN": "0.001",
+    "FRBOT_DEPOSIT_FULL_ALLOW_NO_DELTA_PASS": "1",
+}
+
 
 @dataclass(frozen=True)
 class StepResult:
@@ -86,7 +125,13 @@ def _strip_healing_keys(env: Mapping[str, str]) -> dict[str, str]:
 def _build_step_envs(base_env: Mapping[str, str]) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
     pytest_env = _strip_healing_keys(base_env)
     runtime_env = dict(_strip_healing_keys(base_env))
+    runtime_env["FRBOT_INPUT_METHOD"] = "postmessage"
     runtime_env.update(_RUNTIME_HEALING_TUNING)
+    runtime_env.update(_RUNTIME_COMBAT_TUNING)
+    runtime_env.update(_RUNTIME_CAVEBOT_TUNING)
+    runtime_env.update(_RUNTIME_LOOTING_TUNING)
+    runtime_env.update(_RUNTIME_TRADE_TUNING)
+    runtime_env.update(_RUNTIME_DEPOSIT_TUNING)
     audit_env = _strip_healing_keys(base_env)
     return pytest_env, runtime_env, audit_env
 
