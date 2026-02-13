@@ -1,9 +1,8 @@
-import cv2
 import time
 import hashlib
 import numpy as np
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 from runtime.pacing import sleep_ms
 
@@ -40,12 +39,24 @@ class HdmiCaptureReal:
     def __init__(self, device_index: int = 0, expected_min_fps: int = 5):
         self.device_index = device_index
         self.expected_min_fps = expected_min_fps
-        self.cap: Optional[cv2.VideoCapture] = None
+        # NOTE: cv2 is imported lazily to keep this module import-safe in CI/Linux.
+        self.cap: Optional[Any] = None
         self._last_frame_ts: Optional[int] = None
+
+    def _cv2(self) -> Any:
+        try:
+            import cv2  # type: ignore
+
+            return cv2
+        except Exception as exc:
+            # Common in headless Linux CI: opencv wheel can exist but fail to import
+            # due to missing libGL/libgtk dependencies.
+            raise RuntimeError(f"opencv_unavailable: {type(exc).__name__}: {exc}") from exc
 
     # ---------- Verification ----------
 
     def verify(self) -> VerificationResult:
+        cv2 = self._cv2()
         cap = cv2.VideoCapture(self.device_index, cv2.CAP_ANY)
 
         if not cap.isOpened():
@@ -108,6 +119,7 @@ class HdmiCaptureReal:
     # ---------- Runtime ----------
 
     def open(self) -> None:
+        cv2 = self._cv2()
         self.cap = cv2.VideoCapture(self.device_index, cv2.CAP_ANY)
         if not self.cap.isOpened():
             raise RuntimeError("Failed to open HDMI capture device")

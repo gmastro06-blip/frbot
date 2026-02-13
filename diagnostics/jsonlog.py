@@ -5,6 +5,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from diagnostics.schema import base_context_fields
+
 
 def _ts() -> str:
 	return datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')
@@ -21,6 +23,7 @@ def log(logger: logging.Logger, *, event: str, gate: str, **fields: Any) -> None
 	"""
 	payload: dict[str, Any] = {
 		'ts': _ts(),
+		**base_context_fields(),
 		'event': str(event),
 		'gate': str(gate),
 	}

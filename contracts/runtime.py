@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from .errors import ContractViolation
 from .capture import CaptureStatus
@@ -88,6 +88,13 @@ class Waypoint:
 @dataclass(slots=True)
 class CavebotTelemetry:
     waypoint_id: str = ''
+    # Marker RGB used for semantic minimap tracking. When None, runner falls back
+    # to RuntimeConfig.player_marker_rgb.
+    marker_rgb: tuple[int, int, int] | None = None
+    # Virtual marker position used when the real minimap keeps the marker centered
+    # and movement must be inferred from minimap scroll.
+    virtual_x_px: int | None = None
+    virtual_y_px: int | None = None
     marker_before: Optional[MinimapMarker] = None
     marker_after: Optional[MinimapMarker] = None
     distance_before_px: float = 0.0
@@ -95,6 +102,7 @@ class CavebotTelemetry:
     angle_deg: float = 0.0
     attempts_used: int = 0
     inputs_sent: int = 0
+    wrong_direction_streak: int = 0
     last_n_distances: list[float] = field(default_factory=list)
 
 
@@ -367,6 +375,9 @@ class RuntimeTelemetry:
     last_tick_valid: bool = False
     last_intent: str = ''
 
+    # Additive: per-intent correlation snapshot used for audit-grade evidence.
+    last_event_correlation: dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass(slots=True)
 class RuntimeStatus:
@@ -412,6 +423,11 @@ class RuntimeContext:
     # Loaded ROI map (must include minimap in operational modes).
     rois: dict[str, Roi] = field(default_factory=dict)
 
+    # Optional: configured capture frame dimensions (used to map ROI/frame coordinates
+    # to window client coordinates for input when capture is OBS source identity).
+    frame_width: Optional[int] = None
+    frame_height: Optional[int] = None
+
 
 @dataclass(slots=True)
 class HealState:
@@ -435,6 +451,9 @@ class CombatState:
     intents_emitted: int = 0
     inputs_sent: int = 0
     last_target_hp: Optional[float] = None
+    last_click_xy: Optional[tuple[int, int]] = None
+    last_action_type: str = ''
+    last_action_value: str = ''
 
 
 @dataclass(frozen=True, slots=True)

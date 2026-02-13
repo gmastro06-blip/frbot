@@ -32,12 +32,20 @@ def dump_frame_ppm(frame: Frame, path: Path) -> bool:
         if int(frame.width) <= 0 or int(frame.height) <= 0:
             return False
         expected = int(frame.width) * int(frame.height) * 3
-        if len(frame.rgb) != expected:
+
+        # Be tolerant to adapters providing byte-like buffers (e.g. memoryview,
+        # bytearray) or array-backed objects (e.g. numpy ndarray). Convert first,
+        # then validate length.
+        try:
+            rgb_bytes = bytes(frame.rgb)
+        except Exception:
+            return False
+        if len(rgb_bytes) != expected:
             return False
 
         path.parent.mkdir(parents=True, exist_ok=True)
         header = f"P6\n{int(frame.width)} {int(frame.height)}\n255\n".encode('ascii')
-        path.write_bytes(header + bytes(frame.rgb))
+        path.write_bytes(header + rgb_bytes)
         return True
     except Exception:
         return False
@@ -50,7 +58,7 @@ def dump_pair(
     after: Frame | None,
     reason: str,
     out_dir: str | Path = 'diagnostics/frames',
-) -> None:
+) -> tuple[str | None, str | None]:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -58,8 +66,12 @@ def dump_pair(
     stamp = _ts()
     r = _safe_reason(reason)
 
+    before_name: str | None = None
+    after_name: str | None = None
+
     if before is not None:
-        dump_frame_ppm(before, out / f'{g}_{stamp}_{r}_before.ppm')
+        before_name = f'{g}_{stamp}_{r}_before.ppm'
+        dump_frame_ppm(before, out / str(before_name))
         minimap_rgb = getattr(before, 'minimap_rgb', None)
         if bool(getattr(before, 'minimap_detected', False)) and isinstance(minimap_rgb, (bytes, bytearray, memoryview)) and len(minimap_rgb):
             mm = Frame(
@@ -72,7 +84,8 @@ def dump_pair(
             dump_frame_ppm(mm, out / f'{g}_{stamp}_{r}_before_minimap.ppm')
 
     if after is not None:
-        dump_frame_ppm(after, out / f'{g}_{stamp}_{r}_after.ppm')
+        after_name = f'{g}_{stamp}_{r}_after.ppm'
+        dump_frame_ppm(after, out / str(after_name))
         minimap_rgb = getattr(after, 'minimap_rgb', None)
         if bool(getattr(after, 'minimap_detected', False)) and isinstance(minimap_rgb, (bytes, bytearray, memoryview)) and len(minimap_rgb):
             mm = Frame(
@@ -83,3 +96,5 @@ def dump_pair(
                 rgb=bytes(minimap_rgb),
             )
             dump_frame_ppm(mm, out / f'{g}_{stamp}_{r}_after_minimap.ppm')
+
+    return before_name, after_name

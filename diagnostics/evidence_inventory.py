@@ -120,11 +120,24 @@ def _verify_cavebot_trace(frames_dir: Path) -> Optional[str]:
 
 
 _FILENAME_RE = re.compile(
-    r'^(?P<gate>[a-z0-9-]+)_(?P<stamp>\d{8}-\d{6})_(?P<reason>.+)_(?P<side>before|after)(?P<mini>_minimap)?\.ppm$',
+    r'^(?P<gate>[a-z0-9_-]+)_(?P<stamp>\d{8}-\d{6})_(?P<reason>.+)_(?P<side>before|after)(?P<mini>_minimap)?\.ppm$',
     re.IGNORECASE,
 )
 
-_GATES = ('targeting', 'healing', 'combat', 'cavebot', 'looting', 'deposit', 'trade')
+_GATES = (
+    'targeting',
+    'healing',
+    'combat_basic',
+    'cavebot',
+    'looting_basic',
+    'looting_full',
+    'combat',
+    'looting',
+    'deposit',
+    'trade',
+    'deposit_full',
+    'trade_full',
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,7 +184,7 @@ def _env_str(name: str, default: str) -> str:
 def _roi_names_for_gate(gate: str) -> tuple[str, ...]:
     # ROI-name requirements per gate, aligned to runtime env defaults.
     profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
-    if profile == 'prod_emergency':
+    if profile in {'prod_emergency', 'prod_full'}:
         if gate == 'targeting':
             # Targeting evidence requires both battle list and target frame.
             return (
@@ -183,6 +196,25 @@ def _roi_names_for_gate(gate: str) -> tuple[str, ...]:
             return (_env_str('FRBOT_HP_MP_ROI', 'hp_mp'),)
         if gate == 'cavebot':
             return (_env_str('FRBOT_MINIMAP_ROI', 'minimap'),)
+        if gate == 'combat_basic':
+            # Minimal combat_basic: requires target frame and either target_hp_bar OR combat_feedback.
+            # The OR portion is validated specially in collect_evidence_inventory().
+            return (_env_str('FRBOT_TARGET_FRAME_ROI', 'target_frame'),)
+        if gate == 'looting_basic':
+            return (_env_str('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text'),)
+        if gate == 'looting_full':
+            return (_env_str('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text'),)
+        if gate == 'deposit_full':
+            return (
+                _env_str('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text'),
+                _env_str('FRBOT_DEPOT_CONTAINER_ROI', 'depot_container'),
+            )
+        if gate == 'trade_full':
+            return (
+                _env_str('FRBOT_TRADE_INVENTORY_ROI', 'trade_inventory'),
+                _env_str('FRBOT_TRADE_NPC_ROI', 'trade_npc'),
+                _env_str('FRBOT_TRADE_ACTION_ROI', 'trade_action'),
+            )
 
     if gate == 'targeting':
         return (
@@ -211,6 +243,10 @@ def _roi_names_for_gate(gate: str) -> tuple[str, ...]:
         )
     if gate == 'cavebot':
         return (_env_str('FRBOT_MINIMAP_ROI', 'minimap'),)
+    if gate == 'combat_basic':
+        return (_env_str('FRBOT_TARGET_FRAME_ROI', 'target_frame'),)
+    if gate == 'looting_basic':
+        return (_env_str('FRBOT_INVENTORY_TEXT_ROI', 'inventory_text'),)
     if gate == 'looting':
         # Strict: require the maximum set to avoid hidden assumptions.
         return (
@@ -231,6 +267,49 @@ def _roi_names_for_gate(gate: str) -> tuple[str, ...]:
             _env_str('FRBOT_TRADE_ACTION_ROI', 'trade_action'),
         )
     return ()
+
+
+def _combat_basic_locked_after_ok(*, frames_dir: Path) -> bool:
+    """Return True if runtime.log contains combat_basic tick with locked_after=true."""
+
+    # Common layout: diagnostics/runtime.log next to diagnostics/frames.
+    candidates = [
+        frames_dir.parent / 'runtime.log',
+        frames_dir / 'runtime.log',
+    ]
+    rp = None
+    for c in candidates:
+        if c.exists():
+            rp = c
+            break
+    if rp is None:
+        return False
+
+    try:
+        lines = rp.read_text(encoding='utf-8', errors='replace').splitlines()
+    except Exception:
+        return False
+
+    for line in lines:
+        s = (line or '').strip()
+        if not s:
+            continue
+        try:
+            obj = json.loads(s)
+        except Exception:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        if str(obj.get('gate', '')).strip().lower() != 'combat_basic':
+            continue
+        if str(obj.get('event', '')).strip().lower() != 'tick':
+            continue
+        if str(obj.get('abort_reason', 'none') or 'none') != 'none':
+            continue
+        if bool(obj.get('locked_after', False)) is True:
+            return True
+
+    return False
 
 
 def _load_rois_from_config(config_path: Path) -> tuple[Optional[dict], Optional[str]]:
@@ -366,11 +445,81 @@ def collect_evidence_inventory(frames_dir: Path, config_path: Path | None) -> Ev
             status = 'UNVERIFIED'
         elif required and rois_node is not None:
             miss = [name for name in required if name not in rois_node]
+            # Special OR contract for combat_basic.
+            if g == 'combat_basic':
+                hp = _env_str('FRBOT_TARGET_HP_BAR_ROI', 'target_hp_bar')
+                fb = _env_str('FRBOT_COMBAT_FEEDBACK_ROI', 'combat_feedback')
+                if (hp not in rois_node) and (fb not in rois_node):
+                    miss.append(f'{hp}|{fb}')
             if miss:
                 missing_rois[g] = miss
                 status = 'UNVERIFIED'
 
         per_gate_status[g] = status
+
+    # PROD-EMERGENCY special rule: combat_basic must be proven via runtime.log locked_after=true.
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile in {'prod_emergency', 'prod_full'}:
+        st = per_gate_status.get('combat_basic')
+        if st == 'PASS':
+            if not _combat_basic_locked_after_ok(frames_dir=frames_dir):
+                per_gate_status['combat_basic'] = 'UNVERIFIED'
+                missing.append('combat_basic_locked_after_missing')
+
+    def _require_last_result_ok(*, gate: str) -> None:
+        st = per_gate_status.get(gate)
+        if st not in {'PASS'}:
+            return
+        lp = frames_dir / f'{gate}_last_result.json'
+        if not lp.exists():
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_last_result_missing')
+            return
+        try:
+            data = json.loads(lp.read_text(encoding='utf-8', errors='replace'))
+        except Exception as exc:
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_last_result_unreadable:{type(exc).__name__}')
+            return
+        if not isinstance(data, dict):
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_last_result_invalid_shape')
+            return
+        if bool(data.get('ok', False)) is not True:
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_semantic_fail')
+            return
+
+        # Ensure the meta points to concrete evidence artifacts.
+        bp = str(data.get('before_ppm', '') or '').strip()
+        ap = str(data.get('after_ppm', '') or '').strip()
+        if not bp or not ap:
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_last_result_missing_ppm_ptrs')
+            return
+        if not (frames_dir / bp).exists() or not (frames_dir / ap).exists():
+            per_gate_status[gate] = 'UNVERIFIED'
+            missing.append(f'{gate}_last_result_ppm_ptrs_missing')
+            return
+
+        # Gate-specific semantic expectations.
+        if gate == 'looting_full':
+            try:
+                successes = int(data.get('successes', 0) or 0)
+            except Exception:
+                successes = 0
+            if successes <= 0:
+                per_gate_status[gate] = 'UNVERIFIED'
+                missing.append('looting_full_no_semantic_success')
+
+    if profile == 'prod_full':
+        # In prod_full REAL, operational evidence requires a manifest and per-gate meta.
+        mp = frames_dir / 'evidence_manifest.json'
+        if not mp.exists():
+            missing.append('evidence_manifest_missing')
+
+        for g in ('combat_basic', 'looting_full', 'deposit_full', 'trade_full'):
+            _require_last_result_ok(gate=str(g))
 
     # Cavebot certification: require semantic trace (series + reached event).
     cavebot_status = per_gate_status.get('cavebot')
@@ -385,6 +534,7 @@ def collect_evidence_inventory(frames_dir: Path, config_path: Path | None) -> Ev
         'config_path': (str(config_path) if config_path is not None else ''),
         'unparsed_ppm': int(unparsed),
         'missing_rois': missing_rois,
+        'missing_preconditions': list(missing),
         'per_gate': {
             g: {
                 'before_full': int(details[g].before_full),

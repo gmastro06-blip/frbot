@@ -13,8 +13,8 @@ from diagnostics.fatal import write_fatal
 from runtime.env import parse_window_hwnd_env
 
 
-_PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE: bool = False
-_PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED: bool = False
+_PROD_PROFILE_REAL_GUARDS_PASSED_ONCE: bool = False
+_PROD_PROFILE_REAL_HWND_SELF_HEAL_USED: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +33,23 @@ def _env_str(name: str) -> str:
     return str(os.environ.get(name) or '').strip()
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() not in {'', '0', 'false', 'no', 'off'}
+
+
+def _env_int_opt(name: str) -> int | None:
+    raw = os.environ.get(name)
+    if raw is None:
+        return None
+    try:
+        return int(str(raw).strip())
+    except Exception:
+        return None
+
+
 def _profile() -> str:
     return (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
 
@@ -43,6 +60,8 @@ def _mode() -> str:
 
 def _capture_source() -> str:
     v = (os.environ.get('FRBOT_CAPTURE_SOURCE', '') or '').strip().lower()
+    if not v:
+        return 'obs_source'
     if v == 'obs_source':
         return 'obs_source'
     return 'obs' if v == 'obs' else 'client'
@@ -100,11 +119,11 @@ def _write_window_diagnostics_json(*, expected_title: str, resolved_hwnd: int, r
 
 
 def _ensure_trace_initialized() -> None:
-    # PROD-EMERGENCY REAL requires trace to exist even if we hard-stop in startup guards.
+    # PROD profiles REAL requires trace to exist even if we hard-stop in startup guards.
     try:
-        if _profile() != 'prod_emergency' or _mode() != 'real':
+        if _profile() not in {'prod_emergency', 'prod_full'} or _mode() != 'real':
             return
-        frames_dir = Path('diagnostics') / 'frames_emergency'
+        frames_dir = Path('diagnostics') / ('frames_emergency' if _profile() == 'prod_emergency' else 'frames_full')
         frames_dir.mkdir(parents=True, exist_ok=True)
         p = frames_dir / 'cavebot_trace.jsonl'
         if not p.exists():
@@ -123,6 +142,7 @@ def _resolve_hwnd_by_title(title: str) -> tuple[int, str]:
             return int(exact.hwnd), str(exact.title)
     except Exception:
         pass
+
     try:
         sub = w32.find_window_by_title_substring(t)
         if sub is not None:
@@ -167,12 +187,12 @@ def _collect_details(*, hwnd: int, title_substring: str) -> StartupGuardDetails:
 
 
 def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> None:
-    """Enforce non-negotiable startup guards for PROD-EMERGENCY REAL.
+    """Enforce non-negotiable startup guards for PROD profiles REAL.
 
     Requirements:
     - Windows-only
     - FRBOT_PROFILE=prod_emergency (enforced by caller)
-    - FRBOT_MODE must be 'real'
+    - FRBOT_MODE must be 'real' or 'combat_basic' (real-mode gates)
         - Capture source selector:
             - FRBOT_CAPTURE_SOURCE=client (default): must provide FRBOT_WINDOW_HWND or FRBOT_WINDOW_TITLE
             - FRBOT_CAPTURE_SOURCE=obs: must provide FRBOT_OBS_PROJECTOR_TITLE
@@ -180,17 +200,17 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
     - No focus stealing: we never attempt to activate/focus a window
     """
 
-    global _PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE
-    global _PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED
+    global _PROD_PROFILE_REAL_GUARDS_PASSED_ONCE
+    global _PROD_PROFILE_REAL_HWND_SELF_HEAL_USED
 
     _ensure_trace_initialized()
 
-    if _profile() != 'prod_emergency':
+    if _profile() not in {'prod_emergency', 'prod_full'}:
         return
 
     # Contract: foreground is verified at startup only (never during runtime).
     # Multiple preflight entrypoints may call this; make it idempotent per-process.
-    if bool(_PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE):
+    if bool(_PROD_PROFILE_REAL_GUARDS_PASSED_ONCE):
         return
 
     if sys.platform != 'win32':
@@ -199,9 +219,47 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
             write_fatal('unsupported_platform', exc, details={'platform': str(sys.platform)})
         raise exc
 
-    if _mode() != 'real':
+    # Allow running independent gates via main.py routing.
+    if _mode() not in {
+        'real',
+        'prod_full',
+        'combat_basic',
+        'looting_basic',
+        'looting_full',
+        'deposit_basic',
+        'trade_basic',
+        'deposit_full',
+        'trade_full',
+        'targeting',
+        'healing',
+        'cavebot',
+        'targeting_full',
+        'healing_full',
+        'combat_full',
+        'cavebot_full',
+    }:
         exc = PreflightFailed('invalid_mode')
-        details: dict[str, object] = {'mode': _mode(), 'required': 'real'}
+        details: dict[str, object] = {
+            'mode': _mode(),
+            'required': [
+                'real',
+                'prod_full',
+                'combat_basic',
+                'looting_basic',
+                'looting_full',
+                'deposit_basic',
+                'trade_basic',
+                'deposit_full',
+                'trade_full',
+                'targeting',
+                'healing',
+                'cavebot',
+                'targeting_full',
+                'healing_full',
+                'combat_full',
+                'cavebot_full',
+            ],
+        }
         setattr(exc, 'details', details)
         if write_fatal_on_fail:
             write_fatal('invalid_mode', exc, details=details)
@@ -246,8 +304,8 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         hwnd, resolved_title = _resolve_hwnd_by_title(str(title_substring))
 
     # One-time self-heal: if invalid, re-enumerate and retry resolve once.
-    if (hwnd <= 0) and title_substring and (not _PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED):
-        _PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED = True
+    if (hwnd <= 0) and title_substring and (not _PROD_PROFILE_REAL_HWND_SELF_HEAL_USED):
+        _PROD_PROFILE_REAL_HWND_SELF_HEAL_USED = True
         hwnd2, resolved_title2 = _resolve_hwnd_by_title(str(title_substring))
         if int(hwnd2) > 0:
             hwnd = int(hwnd2)
@@ -305,17 +363,41 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         raise pf
 
     if int(info.foreground_hwnd) != int(hwnd):
-        # Optional best-effort focus (kept opt-in to avoid side-effects in tests).
-        raw_try_focus = os.environ.get('FRBOT_STARTUP_TRY_FOCUS', '')
-        try_focus = raw_try_focus is not None and raw_try_focus.strip().lower() not in {'', '0', 'false', 'no', 'off'}
-        if try_focus:
+        # Optional operator-wait for foreground (still no focus stealing).
+        retries_opt = _env_int_opt('FRBOT_FOREGROUND_RETRIES')
+        retries = int(retries_opt) if retries_opt is not None else 0
+        delay_ms = int(
+            _env_int_opt('FRBOT_FOREGROUND_DELAY_MS')
+            or _env_int_opt('FRBOT_FOREGROUND_RETRY_DELAY_MS')
+            or 150
+        )
+
+        try_focus = _env_bool('FRBOT_TRY_FOCUS', False)
+
+        last_fg = int(info.foreground_hwnd)
+        last_title = str(w32.get_window_text(int(last_fg)) or '') if int(last_fg) > 0 else ''
+
+        # Import locally to keep startup dependencies minimal.
+        from runtime.pacing import sleep_ms
+
+        for attempt in range(max(0, int(retries)) + 1):
+            if try_focus:
+                try:
+                    w32.try_focus_window(int(hwnd), timeout_s=0.15)
+                except Exception:
+                    pass
             try:
-                w32.try_focus_window(int(hwnd), timeout_s=0.8)
+                fg_now = int(w32.get_foreground_window())
             except Exception:
-                pass
-            info2 = _collect_details(hwnd=int(hwnd), title_substring=str(title_substring))
-            if int(getattr(info2, 'foreground_hwnd', 0)) == int(hwnd):
-                info = info2
+                fg_now = 0
+            last_fg = int(fg_now)
+            last_title = str(w32.get_window_text(int(last_fg)) or '') if int(last_fg) > 0 else ''
+            if int(fg_now) == int(hwnd):
+                # Refresh info for downstream consumers.
+                info = _collect_details(hwnd=int(hwnd), title_substring=str(title_substring))
+                break
+            if attempt < int(retries):
+                sleep_ms(max(0.0, float(delay_ms)))
 
         if int(info.foreground_hwnd) != int(hwnd):
             pf = PreflightFailed('window_not_foreground')
@@ -323,10 +405,12 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
                 'reason': 'window_not_foreground',
                 'expected_foreground': 'TIBIA',
                 'window_hwnd': hex(int(hwnd)),
-                'foreground_hwnd': hex(int(info.foreground_hwnd)),
-                'foreground_title': str(w32.get_window_text(int(info.foreground_hwnd)) or '') if int(info.foreground_hwnd) > 0 else '',
+                'foreground_hwnd': hex(int(last_fg)),
+                'foreground_title': str(last_title),
                 'hint': 'Focus Tibia window and rerun',
                 'try_focus': bool(try_focus),
+                'retries': int(retries),
+                'delay_ms': int(delay_ms),
             }
             setattr(pf, 'details', details_fg)
             if write_fatal_on_fail:
@@ -343,21 +427,18 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
             if write_fatal_on_fail:
                 write_fatal('obs_source_not_found', pf, details=details)
             raise pf
-        _PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE = True
+        _PROD_PROFILE_REAL_GUARDS_PASSED_ONCE = True
         return
 
-    # PROD-EMERGENCY: legacy projector mode is disabled (capture must be OBS source identity).
-    if _capture_source() == 'obs':
-        pf = PreflightFailed('capture_source_invalid')
-        details = {
-            'reason': 'capture_source_invalid',
-            'capture_source': 'obs',
-            'required': 'obs_source',
-            'hint': 'Set FRBOT_CAPTURE_SOURCE=obs_source and provide FRBOT_OBS_SOURCE_NAME',
-        }
-        setattr(pf, 'details', details)
-        if write_fatal_on_fail:
-            write_fatal('capture_source_invalid', pf, details=details)
-        raise pf
-
-    return
+    # PROD profiles: capture must be OBS source identity only.
+    pf = PreflightFailed('capture_source_invalid')
+    details = {
+        'reason': 'capture_source_invalid',
+        'capture_source': _capture_source(),
+        'required': 'obs_source',
+        'hint': 'Set FRBOT_CAPTURE_SOURCE=obs_source and provide FRBOT_OBS_SOURCE_NAME',
+    }
+    setattr(pf, 'details', details)
+    if write_fatal_on_fail:
+        write_fatal('capture_source_invalid', pf, details=details)
+    raise pf

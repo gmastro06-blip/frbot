@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from _pytest.monkeypatch import MonkeyPatch
@@ -28,4 +29,8 @@ def test_real_mode_never_runs_unbound(monkeypatch: MonkeyPatch) -> None:
     code = run()
     assert code == 1
     assert fatal.exists()
-    assert 'window_binding_lost' in fatal.read_text(encoding='utf-8', errors='replace').lower()
+    msg = fatal.read_text(encoding='utf-8', errors='replace').lower()
+    if sys.platform == 'win32':
+        assert 'window_binding_lost' in msg
+    else:
+        assert 'unsupported_platform' in msg

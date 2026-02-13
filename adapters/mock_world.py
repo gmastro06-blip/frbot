@@ -114,10 +114,12 @@ class MockWorld:
 
 	# Deterministic looting test controls.
 	# - inventory_delta: looting produces a semantic inventory delta (gold or capacity_used increases)
+	# - inventory_delta_count: if >0, allow exactly N loot deltas before stopping
 	# - container_opens: clicking the corpse opens the container
 	# - inventory_read_fail: inventory ROI is not readable (bad magic)
 	# - premium: quick-loot key is accepted
 	mock_loot_inventory_delta: bool = False
+	mock_loot_inventory_delta_count: int = 0
 	mock_loot_container_opens: bool = False
 	mock_loot_inventory_read_fail: bool = False
 	mock_loot_premium: bool = True
@@ -185,6 +187,7 @@ class MockWorld:
 		mock_deposit_partial: bool = False,
 		mock_deposit_inventory_unreadable: bool = False,
 		mock_loot_inventory_delta: bool = False,
+		mock_loot_inventory_delta_count: int = 0,
 		mock_loot_container_opens: bool = False,
 		mock_loot_inventory_read_fail: bool = False,
 		mock_loot_premium: bool = True,
@@ -252,6 +255,7 @@ class MockWorld:
 			mock_deposit_partial=bool(mock_deposit_partial),
 			mock_deposit_inventory_unreadable=bool(mock_deposit_inventory_unreadable),
 			mock_loot_inventory_delta=bool(mock_loot_inventory_delta),
+			mock_loot_inventory_delta_count=max(0, int(mock_loot_inventory_delta_count)),
 			mock_loot_container_opens=bool(mock_loot_container_opens),
 			mock_loot_inventory_read_fail=bool(mock_loot_inventory_read_fail),
 			mock_loot_premium=bool(mock_loot_premium),
@@ -627,10 +631,17 @@ class MockWorld:
 		if take_roi is not None and _roi_bounds_ok(self.width, self.height, take_roi):
 			if x >= take_roi.x and y >= take_roi.y and x < (take_roi.x + take_roi.width) and y < (take_roi.y + take_roi.height):
 				# Only succeed if container is open.
-				if bool(self.loot_container_open) and bool(self.mock_loot_inventory_delta):
-					self.inventory_gold_count += 1
-					self.inventory_capacity_used += 1
-					self._draw_looting_ui()
+				if bool(self.loot_container_open):
+					allow_delta = False
+					if int(self.mock_loot_inventory_delta_count) > 0:
+						allow_delta = True
+						self.mock_loot_inventory_delta_count = max(0, int(self.mock_loot_inventory_delta_count) - 1)
+					else:
+						allow_delta = bool(self.mock_loot_inventory_delta)
+					if bool(allow_delta):
+						self.inventory_gold_count += 1
+						self.inventory_capacity_used += 1
+						self._draw_looting_ui()
 				return
 
 		roi = self.rois.get('battle_list')
@@ -933,7 +944,13 @@ class MockWorld:
 			# Premium quick-loot key.
 			if not bool(self.mock_loot_premium):
 				return
-			if bool(self.mock_loot_inventory_delta):
+			allow_delta = False
+			if int(self.mock_loot_inventory_delta_count) > 0:
+				allow_delta = True
+				self.mock_loot_inventory_delta_count = max(0, int(self.mock_loot_inventory_delta_count) - 1)
+			else:
+				allow_delta = bool(self.mock_loot_inventory_delta)
+			if bool(allow_delta):
 				self.inventory_gold_count += 1
 				self.inventory_capacity_used += 1
 			self._draw_looting_ui()

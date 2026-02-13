@@ -8,7 +8,24 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-_ALL_GATES: tuple[str, ...] = ('targeting', 'healing', 'combat', 'cavebot', 'looting', 'deposit', 'trade')
+_ALL_GATES: tuple[str, ...] = (
+    'targeting',
+    'healing',
+    'targeting_full',
+    'healing_full',
+    'combat_full',
+    'cavebot_full',
+    'combat_basic',
+    'cavebot',
+    'looting_basic',
+    'looting_full',
+    'combat',
+    'looting',
+    'deposit',
+    'trade',
+    'deposit_full',
+    'trade_full',
+)
 
 
 def _profile() -> str:
@@ -19,10 +36,15 @@ def _gates_for_profile() -> tuple[tuple[str, ...], list[str], list[str]]:
     """Return (required_gates, enabled_features, disabled_features)."""
 
     if _profile() == 'prod_emergency':
-        enabled = ['capture_real', 'targeting_basic', 'cavebot_basic', 'healing_basic']
+        enabled = ['capture_real', 'targeting_basic', 'cavebot_basic', 'healing_basic', 'combat_basic', 'looting_basic']
         disabled = ['combat', 'looting', 'deposit', 'trade']
         # Only require evidence for the allowed gates.
-        return ('targeting', 'cavebot', 'healing'), enabled, disabled
+        return ('targeting', 'cavebot', 'healing', 'combat_basic', 'looting_basic'), enabled, disabled
+
+    if _profile() == 'prod_full':
+        enabled = ['capture_real', 'targeting_full', 'healing_full', 'combat_full', 'cavebot_full', 'looting_full', 'deposit_full', 'trade_full']
+        disabled = ['combat', 'looting', 'deposit', 'trade']
+        return ('targeting_full', 'healing_full', 'combat_full', 'cavebot_full', 'looting_full', 'deposit_full', 'trade_full'), enabled, disabled
 
     return _ALL_GATES, [], []
 
@@ -86,7 +108,9 @@ def _check_obs_manifest(frames_dir: Path) -> tuple[bool, str, list[str]]:
         return False, 'obs_evidence_source_mismatch', [f"Manifest capture_source mismatch (expected obs, got {src!r})"]
 
     man_title = str(data.get('obs_projector_title', '') or '')
-    if expected_title and man_title and expected_title != man_title:
+    if not man_title:
+        return False, 'obs_evidence_source_mismatch', ['Manifest obs_projector_title missing']
+    if expected_title and expected_title != man_title:
         return False, 'obs_evidence_source_mismatch', ['Manifest obs_projector_title mismatch']
 
     return True, '', []
@@ -117,7 +141,9 @@ def _check_obs_source_manifest(frames_dir: Path) -> tuple[bool, str, list[str]]:
         return False, 'obs_evidence_source_mismatch', [f"Manifest capture_source mismatch (expected obs_source, got {src!r})"]
 
     man_name = str(data.get('obs_source_name', '') or '')
-    if expected and man_name and expected != man_name:
+    if not man_name:
+        return False, 'obs_evidence_source_mismatch', ['Manifest obs_source_name missing']
+    if expected and expected != man_name:
         return False, 'obs_evidence_source_mismatch', ['Manifest obs_source_name mismatch']
 
     return True, '', []

@@ -131,7 +131,7 @@ def _load_image_size(image_path: Path) -> tuple[int, int, str, str]:
 
     try:
         im = Image.open(image_path)
-        im.load()
+        im.load()  # type: ignore[no-untyped-call]
         w, h = int(im.size[0]), int(im.size[1])
         return w, h, str(im.mode), str(im.format or '')
     except Exception as exc:

@@ -1,5 +1,16 @@
 # ROI Calibration (Real Mode)
 
+## PROD_EMERGENCY note (semantic evidence)
+
+In `prod_emergency`, gates are **evidence-or-abort** and rely on **semantic reads**, not ROI digests/hashes.
+
+- `combat_basic`: validates via target HP semantics and/or combat feedback/cooldown markers.
+- `looting_basic`: validates via `inventory_text` semantics.
+
+### `inventory_text` ROI
+
+Some gates require a tiny ROI that encodes inventory counters (see `runtime/inventory_semantics.py`). The semantic read succeeds only when the ROI contains the expected magic + counters, so this ROI must be calibrated to the exact overlay/source region that provides those bytes.
+
 Real mode requires a JSON config file that defines **ROIs (regions of interest)** used for:
 
 - extracting a minimal `Observation` (hp/mana/booleans)

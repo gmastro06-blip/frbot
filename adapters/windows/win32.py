@@ -3,14 +3,18 @@ from __future__ import annotations
 import ctypes
 import os
 import time
-from ctypes import wintypes
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from contracts.window import WindowRect
 
 
 _IS_WINDOWS = os.name == 'nt'
+
+if _IS_WINDOWS:
+    from ctypes import wintypes
+else:  # pragma: no cover
+    wintypes = None  # type: ignore[assignment]
 user32 = ctypes.WinDLL('user32', use_last_error=True) if _IS_WINDOWS else None
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True) if _IS_WINDOWS else None
 
@@ -154,12 +158,17 @@ class WindowDiagnosticInfo:
     z_order: int
 
 
-EnumWindowsProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+# Keep EnumWindowsProc callable for typing even on non-Windows.
+# On Windows it's a ctypes callback factory; elsewhere it's a no-op wrapper.
+EnumWindowsProc: Any
+if _IS_WINDOWS and user32 is not None and wintypes is not None and hasattr(ctypes, 'WINFUNCTYPE'):
+    EnumWindowsProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
-if user32 is not None:
     # Ensure EnumWindows signature is known to ctypes.
     user32.EnumWindows.argtypes = [EnumWindowsProc, wintypes.LPARAM]
     user32.EnumWindows.restype = wintypes.BOOL
+else:  # pragma: no cover
+    EnumWindowsProc = lambda cb: cb
 
 
 def _require_windows() -> ctypes.WinDLL:
@@ -364,15 +373,29 @@ def find_window_by_title_substring(substr: str) -> Optional[HwndMatch]:
         return None
 
     best: Optional[HwndMatch] = None
+    best_rank: tuple[int, int] | None = None
 
     def on_enum(hwnd: int) -> bool:
-        nonlocal best
+        nonlocal best, best_rank
         title = get_window_text(hwnd)
         if not title:
             return True
         if needle in title.lower():
-            best = HwndMatch(hwnd=int(hwnd), title=title)
-            return False
+            try:
+                visible = bool(is_window_visible(int(hwnd)))
+            except Exception:
+                visible = False
+            try:
+                minimized = bool(is_window_minimized(int(hwnd)))
+            except Exception:
+                minimized = False
+
+            # Prefer visible, non-minimized windows. Keep first match for ties.
+            rank = (0 if visible else 1, 0 if (not minimized) else 1)
+            if best is None or (best_rank is not None and rank < best_rank) or best_rank is None:
+                best = HwndMatch(hwnd=int(hwnd), title=title)
+                best_rank = rank
+            return True
         return True
 
     def _cb(hwnd: wintypes.HWND, lparam: wintypes.LPARAM) -> bool:

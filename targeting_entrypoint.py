@@ -90,12 +90,15 @@ def run_targeting_only() -> int:
 
     max_total_ticks = cap_ticks(_env_int('FRBOT_TARGETING_MAX_TICKS', 30))
 
+    capture = None
     try:
-        if sys.platform != 'win32':
+        cfg = _load_targeting_config_from_env()
+
+        # Mock backend is used in CI on Linux; only REAL runs are Windows-only.
+        if cfg.mode.strip().lower() == 'real' and sys.platform != 'win32':
             write_fatal('unsupported_platform', details={'platform': str(sys.platform)})
             return 1
 
-        cfg = _load_targeting_config_from_env()
         ctx = RuntimeContext(
             config=cfg,
             status=RuntimeStatus(state=RuntimeState.INIT),
@@ -170,6 +173,13 @@ def run_targeting_only() -> int:
     except PreflightFailed as exc:
         if dump_enabled():
             before, after = snapshot('targeting')
+            # If no intent was executed, snapshot may be empty; fall back to direct capture.
+            try:
+                if (before is None or after is None) and capture is not None:
+                    before = before or capture.grab()
+                    after = after or capture.grab()
+            except Exception:
+                pass
             if before is not None or after is not None:
                 dump_pair(gate='targeting', before=before, after=after, reason=str(exc))
             else:

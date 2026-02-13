@@ -45,7 +45,7 @@ class RealModeAuditResult:
 
 
 _FILENAME_RE = re.compile(
-    r'^(?P<gate>[a-z0-9-]+)_(?P<stamp>\d{8}-\d{6})_(?P<reason>.+)_(?P<side>before|after)(?P<mini>_minimap)?\.ppm$',
+    r'^(?P<gate>[a-z0-9_-]+)_(?P<stamp>\d{8}-\d{6})_(?P<reason>.+)_(?P<side>before|after)(?P<mini>_minimap)?\.ppm$',
     re.IGNORECASE,
 )
 
@@ -294,6 +294,17 @@ def run_real_mode_audit(*, frames_dir: Path, config_path: Path | None, max_pairs
             'battle_list': rois.get('battle_list'),
             'target_frame': rois.get('target_frame'),
             'hp_mp': rois.get('hp_mp'),
+        }
+    elif profile == 'prod_full':
+        critical_rois = {
+            'minimap': rois.get('minimap'),
+            'battle_list': rois.get('battle_list'),
+            'target_frame': rois.get('target_frame'),
+            'hp_mp': rois.get('hp_mp'),
+            'inventory_text': rois.get('inventory_text'),
+            'depot_container': rois.get('depot_container'),
+            'trade_npc': rois.get('trade_npc'),
+            'trade_inventory': rois.get('trade_inventory'),
         }
     else:
         critical_rois = {

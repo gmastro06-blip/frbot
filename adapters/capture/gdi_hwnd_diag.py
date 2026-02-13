@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import ctypes
-from ctypes import wintypes
+import sys
+
+if sys.platform == 'win32':
+    from ctypes import wintypes
+else:  # pragma: no cover
+    wintypes = None  # type: ignore[assignment]
 from dataclasses import dataclass
 
 from contracts.window import WindowRect
@@ -28,6 +33,9 @@ def capture_client_bgra(hwnd: int, rect: WindowRect) -> GdiCaptureResult:
     - PrintWindow can fail (returns 0) for some clients (e.g., protected surfaces).
     - Caller must ensure hwnd is foreground/visible if that's an invariant.
     """
+
+    if sys.platform != 'win32':
+        return GdiCaptureResult(ok=False, reason='gdi_non_windows')
 
     width = int(rect.width)
     height = int(rect.height)

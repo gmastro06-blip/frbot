@@ -15,10 +15,9 @@ class MockWindowBinding(WindowBindingAdapter):
 
     def verify(self) -> VerificationResult:
         ok = os.environ.get('FRBOT_MOCK_WINDOW_OK', '1') == '1'
-        foreground = os.environ.get('FRBOT_MOCK_WINDOW_FOREGROUND', '1') == '1'
         rect_ok = os.environ.get('FRBOT_MOCK_WINDOW_RECT_OK', '1') == '1'
 
-        if not ok or not foreground or not rect_ok:
+        if not ok or not rect_ok:
             return VerificationResult(ok=False, reason='window_binding_lost')
         return VerificationResult(ok=True)
 
@@ -27,8 +26,6 @@ class MockWindowBinding(WindowBindingAdapter):
 
     def assert_bound(self) -> None:
         if os.environ.get('FRBOT_MOCK_WINDOW_OK', '1') != '1':
-            raise RuntimeError('window_binding_lost')
-        if os.environ.get('FRBOT_MOCK_WINDOW_FOREGROUND', '1') != '1':
             raise RuntimeError('window_binding_lost')
         if os.environ.get('FRBOT_MOCK_WINDOW_RECT_OK', '1') != '1':
             raise RuntimeError('window_binding_lost')

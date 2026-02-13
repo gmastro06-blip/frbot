@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
+import time
+from pathlib import Path
 from typing import TypeAlias
 
 from adapters.capture.mock_world_any import MockWorldAnyCapture
@@ -12,11 +15,13 @@ from adapters.input.win32_hwnd import Win32HwndKeyboard
 from adapters.mock_world import MockBattleListRow, MockWorld
 from adapters.window.mock import MockWindowBinding
 from adapters.window.win32 import Win32WindowBinding
-from contracts.capture import CaptureStatus
+from contracts.capture import CaptureStatus, Frame
+from contracts.evidence import Roi
 from contracts.errors import PreflightFailed
 from contracts.input import InputStatus
 from contracts.runtime import RuntimeContext, RuntimeState
-from runtime.battle_list_semantics import detect_battle_list
+from diagnostics.frame_dump import dump_frame_ppm, dump_pair
+from runtime.battle_list_semantics import crop_roi_rgb, detect_battle_list
 from runtime.config_loader import load_rois
 from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
 from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_obs_projector_hwnd
@@ -26,6 +31,67 @@ from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
 CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MeldBoundWindowRealCapture | ObsSourceRealCapture | MockWorldAnyCapture
 InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
+
+
+def _evidence_dir_default() -> Path:
+    raw = (os.environ.get('FRBOT_REAL_FRAMES_DIR', '') or '').strip()
+    if raw:
+        return Path(str(raw))
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    if profile == 'prod_emergency':
+        return Path('diagnostics') / 'frames_emergency'
+    if profile == 'prod_full':
+        return Path('diagnostics') / 'frames_full'
+    return Path('diagnostics') / 'frames'
+
+
+def _dump_battle_list_debug(*, gate: str, frame: Frame, roi: Roi, reason: str) -> None:
+    try:
+        out_dir = _evidence_dir_default()
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # Full-frame evidence (preflight can fail before last_frames snapshot exists).
+        dump_pair(gate=str(gate), before=frame, after=None, reason=str(reason), out_dir=out_dir)
+
+        rgb = crop_roi_rgb(frame, roi)
+        if rgb and int(roi.width) > 0 and int(roi.height) > 0:
+            crop = Frame(width=int(roi.width), height=int(roi.height), monotonic_ts_ns=0, digest_hex='', rgb=bytes(rgb))
+            stamp = int(time.time())
+            dump_frame_ppm(crop, out_dir / f'{str(gate).strip().lower()}_{stamp}_battle_list_roi.ppm')
+
+        # Probe the exact pixels used by the mock OCR in row 0.
+        samples: list[dict[str, int]] = []
+        w = int(roi.width)
+        for i in range(12):
+            x = 2 + i
+            y = 4
+            r, g, b = (0, 0, 0)
+            if rgb and w > 0 and x >= 0 and y >= 0 and x < w:
+                idx = (y * w + x) * 3
+                if 0 <= idx and (idx + 2) < len(rgb):
+                    r = int(rgb[idx])
+                    g = int(rgb[idx + 1])
+                    b = int(rgb[idx + 2])
+            samples.append({'x': int(x), 'y': int(y), 'r': int(r), 'g': int(g), 'b': int(b)})
+
+        (out_dir / f'{str(gate).strip().lower()}_battle_list_debug.json').write_text(
+            json.dumps(
+                {
+                    'reason': str(reason),
+                    'frame_resolution': [int(getattr(frame, 'width', 0)), int(getattr(frame, 'height', 0))],
+                    'roi': {'x': int(roi.x), 'y': int(roi.y), 'width': int(roi.width), 'height': int(roi.height)},
+                    'mock_ocr_probe_samples': samples,
+                    'note': 'If g/b are not 0 and r are not ASCII bytes, the mock OCR encoding is not present in this ROI.',
+                },
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            + '\n',
+            encoding='utf-8',
+        )
+    except Exception:
+        return
 
 
 def _parse_mock_rows(raw: str) -> tuple[MockBattleListRow, ...]:
@@ -161,6 +227,7 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
 
         obs = detect_battle_list(before, battle_roi)
         if obs is None:
+            _dump_battle_list_debug(gate='targeting_full_preflight', frame=before, roi=battle_roi, reason='battle_list_not_detected')
             raise PreflightFailed('battle_list_not_detected')
 
         ctx.status.state = RuntimeState.READY

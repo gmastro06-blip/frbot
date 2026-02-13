@@ -290,7 +290,7 @@ def test_cavebot_window_binding_lost(tmp_path: Path, monkeypatch: MonkeyPatch) -
     )
 
     # Preflight passes, but tick binding fails.
-    monkeypatch.setenv('FRBOT_MOCK_WINDOW_FOREGROUND', '0')
+    monkeypatch.setenv('FRBOT_MOCK_WINDOW_OK', '0')
 
     assert run_cavebot_only() == 1
 

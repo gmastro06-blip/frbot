@@ -19,7 +19,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install pytest pytest-mock
-          python -m pip install numpy pillow opencv-python mss
+          python -m pip install numpy pillow opencv-python-headless mss
 
       - name: Guardrails (fast fail)
         env:
@@ -52,7 +52,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install pytest pytest-mock
-          python -m pip install numpy pillow opencv-python mss
+          python -m pip install numpy pillow opencv-python-headless mss
 
       - name: Guardrails (fast fail)
         env:
@@ -63,8 +63,20 @@ jobs:
       - name: Pytest
         env:
           FRBOT_MODE: mock
+        shell: bash
         run: |
-          python -m pytest -q
+          set -euo pipefail
+          python -m pytest -q 2>&1 | tee pytest.log
+
+      - name: Pytest failure (annotate)
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f pytest.log ]; then
+            tail -n 200 pytest.log | python -c 'import sys; text=sys.stdin.read(); text=text.replace("%","%25").replace("\r","%0D").replace("\n","%0A"); print(f"::error::pytest failed (tail -n 200).%0A{text}")'
+          else
+            echo "::error::pytest failed and pytest.log was missing"
+          fi
 
   audit-mock:
     runs-on: ubuntu-latest
@@ -81,7 +93,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install pytest pytest-mock
-          python -m pip install numpy pillow opencv-python mss
+          python -m pip install numpy pillow opencv-python-headless mss
 
       - name: Run auditor (mock)
         env:

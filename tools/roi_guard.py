@@ -68,8 +68,14 @@ def _load_rois_only_config(config_path: Path) -> tuple[dict[str, Any] | None, _C
         invalid.append(f"invalid_config:{err}")
         return None, _CheckResult(missing=missing, invalid=invalid)
 
-    if not isinstance(data, dict) or set(data.keys()) != {"rois"}:
-        invalid.append("invalid_config_schema:top_level_must_be_only_rois")
+    if not isinstance(data, dict):
+        invalid.append("invalid_config_schema:top_level_must_be_object")
+        return None, _CheckResult(missing=missing, invalid=invalid)
+
+    keys = set(data.keys())
+    allowed = ({"rois"}, {"rois", "frame"}, {"rois", "certified_manifest"}, {"rois", "frame", "certified_manifest"})
+    if keys not in allowed:
+        invalid.append("invalid_config_schema:top_level_keys")
         return None, _CheckResult(missing=missing, invalid=invalid)
 
     rois_node = data.get("rois")

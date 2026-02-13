@@ -28,6 +28,7 @@ var/
 .vscode/
 venv
 .venv/
+.ci_venv/
 
 # Test / tooling caches
 .pytest_cache/
@@ -44,6 +45,9 @@ diagnostics/**
 *_full.ppm
 *_minimap.ppm
 logs/
+
+# UI runtime log (desktop editor)
+runtime_ui.log
 
 # Local real-client evidence (never commit captured game frames)
 tests/real_frames/

@@ -1,0 +1,39 @@
+{
+  "enabled": true,
+  "metadata": {},
+  "name": "script1",
+  "run_to_target": false,
+  "waypoints": [
+    {
+      "created_at": "2026-02-10T00:00:00+00:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 100,
+      "y": 200,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-10T00:00:01+00:00",
+      "enabled": true,
+      "options": {
+        "ignore": true
+      },
+      "type": "walk_ignore",
+      "x": 110,
+      "y": 200,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-10T00:00:02+00:00",
+      "enabled": true,
+      "options": {
+        "direction": "north"
+      },
+      "type": "single_move",
+      "x": 110,
+      "y": 190,
+      "z": 7
+    }
+  ]
+}

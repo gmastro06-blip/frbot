@@ -19,6 +19,7 @@ from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, Runti
 from diagnostics.fatal import write_fatal
 from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
+from diagnostics.schema import base_context_fields
 from diagnostics.frame_dump import dump_enabled, dump_pair
 from diagnostics.last_frames import record_after, record_before, snapshot
 from core.engine import tick as engine_tick
@@ -67,6 +68,7 @@ def _write_evidence_manifest(*, frames_dir: Path, capture: object) -> None:
             'capture_source': ('obs_source' if src == 'obs_source' else ('obs' if src == 'obs' else 'client')),
             'obs_source_name': str(getattr(capture, 'obs_source_name', '') or ''),
             'obs_projector_title': str(_env_str('FRBOT_OBS_PROJECTOR_TITLE', '') or ''),
+            **base_context_fields(),
             'ts': int(time.time()),
         }
         frames_dir.mkdir(parents=True, exist_ok=True)
@@ -99,17 +101,6 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if raw is None:
         return bool(default)
     return str(raw).strip().lower() not in {'', '0', 'false', 'no', 'off'}
-
-
-def _binding_ok_or_none(binding: object) -> bool:
-    try:
-        fn = getattr(binding, 'assert_bound', None)
-        if fn is None:
-            return True
-        fn()
-        return True
-    except Exception:
-        return False
 
 
 def _trace_required() -> bool:
@@ -357,6 +348,10 @@ def _load_config_from_env() -> RuntimeConfig:
         raw = os.environ.get(name)
         return default if raw is None else raw
 
+    def env_key(name: str, default: str) -> str:
+        v = str(env_str(name, default) or default).strip()
+        return str(v) if v else str(default)
+
     return RuntimeConfig(
         mode=mode,
         tick_hz=float(tick_hz_raw),
@@ -364,6 +359,10 @@ def _load_config_from_env() -> RuntimeConfig:
         bot_config_path=bot_config_path,
         enable_cavebot=env_bool('FRBOT_ENABLE_CAVEBOT', True),
         minimap_roi=env_str('FRBOT_MINIMAP_ROI', 'minimap'),
+
+        # Looting (premium): allow overriding the quick-loot hotkey.
+        # Accepts key aliases like 'avPag' / 'pgdn' / 'pagedown'.
+        quick_loot_key=env_key('FRBOT_TIBIA_QUICK_LOOT_KEY', env_str('FRBOT_QUICK_LOOT_KEY', 'R')),
 
         window_hwnd=parse_window_hwnd_env('FRBOT_WINDOW_HWND'),
         window_title_substring=env_str('FRBOT_WINDOW_TITLE', ''),
@@ -383,7 +382,10 @@ def _load_config_from_env() -> RuntimeConfig:
 
 def run() -> int:
     try:
-        if sys.platform != 'win32':
+        cfg = _load_config_from_env()
+
+        # Mock mode is used in CI on Linux; only REAL runs are Windows-only.
+        if cfg.mode.strip().lower() == 'real' and sys.platform != 'win32':
             write_fatal('unsupported_platform', details={'platform': str(sys.platform)})
             return 1
 
@@ -391,7 +393,6 @@ def run() -> int:
         frames_dir = _frames_dir_for_run()
         os.environ.setdefault('FRBOT_REAL_FRAMES_DIR', str(frames_dir))
 
-        cfg = _load_config_from_env()
         ctx = RuntimeContext(
             config=cfg,
             status=RuntimeStatus(state=RuntimeState.INIT),
@@ -526,53 +527,7 @@ def run() -> int:
 
         next_tick_ns = start_ns
         while True:
-            # PROD-EMERGENCY REAL: tolerate temporary foreground loss.
-            # Block inputs while unbound; hard-stop only if binding doesn't recover.
-            binding_block_timeout_ms = _env_ms('FRBOT_BINDING_BLOCK_MAX_MS', 8000)
-            binding_try_focus = _env_bool('FRBOT_BINDING_TRY_FOCUS_ON_BLOCK', False)
-
-            if 'binding_blocked_since_ns' not in locals():
-                binding_blocked_since_ns: int | None = None
-                binding_blocked_tries: int = 0
-
             now_ns = time.monotonic_ns()
-            bound_now = _binding_ok_or_none(binding)
-            if (not bound_now) and binding_try_focus:
-                try:
-                    from adapters.windows import win32 as w32
-
-                    snap = binding.snapshot()
-                    w32.try_focus_window(int(getattr(snap, 'hwnd', 0) or 0), timeout_s=0.25)
-                except Exception:
-                    pass
-                bound_now = _binding_ok_or_none(binding)
-
-            if not bound_now:
-                if binding_blocked_since_ns is None:
-                    binding_blocked_since_ns = int(now_ns)
-                    binding_blocked_tries = 0
-                binding_blocked_tries += 1
-                blocked_ms = int((now_ns - int(binding_blocked_since_ns)) // 1_000_000)
-                if blocked_ms >= int(max(0, int(binding_block_timeout_ms))):
-                    exc = PreflightFailed('window_binding_lost')
-                    try:
-                        setattr(
-                            exc,
-                            'details',
-                            {
-                                'reason': 'window_binding_lost',
-                                'blocked_ms': int(blocked_ms),
-                                'tries': int(binding_blocked_tries),
-                                'try_focus': bool(binding_try_focus),
-                            },
-                        )
-                    except Exception:
-                        pass
-                    raise exc
-            else:
-                binding_blocked_since_ns = None
-                binding_blocked_tries = 0
-
             frame = capture.grab()  # verified by preflight
             record_before('runtime', frame)
             if not frame.minimap_detected:
@@ -705,22 +660,14 @@ def run() -> int:
                     raise PreflightFailed(f'unknown intent type: {type(intent).__name__}')
                 ctx.telemetry.last_intent = type(intent).__name__
 
-                # Block inputs while binding is invalid; allow resume when valid.
-                if not bound_now:
-                    # Skip input emission this tick; continue to capture/track.
-                    next_tick_ns += int(tick_period_ns)
-                    wait_until_ns(int(next_tick_ns))
-                    continue
-
-                # Enforce: inputs must be bound to the Tibia HWND (not OBS).
+                # Window binding is checked ONLY immediately before emitting input.
+                # Losing foreground/focus must not abort a capture-only tick.
                 try:
+                    binding.assert_bound()
                     snap = binding.snapshot()
                     input_.assert_bound(int(getattr(snap, 'hwnd', 0)))
-                except Exception:
-                    # Treat as binding lost; skip input and let the top-of-loop timeout handle hard-stop.
-                    next_tick_ns += int(tick_period_ns)
-                    wait_until_ns(int(next_tick_ns))
-                    continue
+                except Exception as exc:
+                    raise PreflightFailed('window_binding_lost') from exc
 
                 before_tile = ctx.position.tile()
                 waypoint = ctx.cavebot.current_waypoint()

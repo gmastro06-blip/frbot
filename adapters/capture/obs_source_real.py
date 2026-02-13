@@ -7,7 +7,7 @@ import os
 import time
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, cast
 
 from contracts.capture import Frame
 from contracts.errors import PreflightFailed
@@ -45,9 +45,9 @@ def _to_rgb_bytes_from_png(png_bytes: bytes) -> tuple[bytes, int, int]:
 
     try:
         img = Image.open(BytesIO(png_bytes))
-        img = img.convert('RGB')
-        w, h = img.size
-        return bytes(img.tobytes()), int(w), int(h)
+        rgb_img = img.convert('RGB')
+        w, h = rgb_img.size
+        return bytes(rgb_img.tobytes()), int(w), int(h)
     except Exception as exc:
         raise PreflightFailed('obs_capture_invalid_content') from exc
 
@@ -138,20 +138,20 @@ class _ObsWsV5Client:
 
         try:
             import websocket  # type: ignore
-        except Exception as exc:  # pragma: no cover
-            raise PreflightFailed('missing_dependency') from exc
+        except Exception as import_exc:  # pragma: no cover
+            raise PreflightFailed('missing_dependency') from import_exc
 
         url = f"ws://{self._host}:{int(self._port)}"
-        ws = websocket.WebSocket()
+        ws = cast(Any, websocket.WebSocket())
         ws.settimeout(self._timeout_s)
         ws.connect(url)
 
         hello_raw = ws.recv()
         hello = json.loads(str(hello_raw))
         if int(hello.get('op', -1)) != 0:
-            exc = PreflightFailed('obs_ws_protocol_error')
-            setattr(exc, 'details', {'reason': 'obs_ws_protocol_error', 'expected_op': 0, 'got': hello.get('op')})
-            raise exc
+            protocol_exc = PreflightFailed('obs_ws_protocol_error')
+            setattr(protocol_exc, 'details', {'reason': 'obs_ws_protocol_error', 'expected_op': 0, 'got': hello.get('op')})
+            raise protocol_exc
 
         auth = None
         auth_info = (hello.get('d') or {}).get('authentication')
@@ -164,22 +164,23 @@ class _ObsWsV5Client:
                 secret = base64.b64encode(hashlib.sha256((self._password + salt).encode('utf-8')).digest()).decode('utf-8')
                 auth = base64.b64encode(hashlib.sha256((secret + challenge).encode('utf-8')).digest()).decode('utf-8')
 
-        identify = {
+        identify_d: dict[str, Any] = {
+            'rpcVersion': 1,
+        }
+        identify: dict[str, Any] = {
             'op': 1,
-            'd': {
-                'rpcVersion': 1,
-            },
+            'd': identify_d,
         }
         if auth is not None:
-            identify['d']['authentication'] = auth
+            identify_d['authentication'] = auth
 
         ws.send(json.dumps(identify))
         identified_raw = ws.recv()
         identified = json.loads(str(identified_raw))
         if int(identified.get('op', -1)) != 2:
-            exc = PreflightFailed('obs_ws_auth_failed')
-            setattr(exc, 'details', {'reason': 'obs_ws_auth_failed', 'expected_op': 2, 'got': identified.get('op')})
-            raise exc
+            auth_exc = PreflightFailed('obs_ws_auth_failed')
+            setattr(auth_exc, 'details', {'reason': 'obs_ws_auth_failed', 'expected_op': 2, 'got': identified.get('op')})
+            raise auth_exc
 
         self._ws = ws
         self._identified = True

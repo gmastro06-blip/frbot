@@ -38,8 +38,8 @@ def test_obs_source_ignores_projector_foreground(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(startup_guards.w32, 'get_client_rect_in_screen', lambda hwnd: (_ for _ in ()).throw(AssertionError('should not be called')), raising=True)
 
     # Each test should behave like a fresh process.
-    startup_guards._PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE = False
-    startup_guards._PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED = False
+    startup_guards._PROD_PROFILE_REAL_GUARDS_PASSED_ONCE = False
+    startup_guards._PROD_PROFILE_REAL_HWND_SELF_HEAL_USED = False
     startup_guards.enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=False)
 
 
@@ -64,8 +64,8 @@ def test_input_still_requires_hwnd_foreground(tmp_path: Path, monkeypatch: pytes
     monkeypatch.setattr(startup_guards.w32, 'get_dpi_awareness_status', lambda: {}, raising=True)
 
     # Each test should behave like a fresh process.
-    startup_guards._PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE = False
-    startup_guards._PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED = False
+    startup_guards._PROD_PROFILE_REAL_GUARDS_PASSED_ONCE = False
+    startup_guards._PROD_PROFILE_REAL_HWND_SELF_HEAL_USED = False
 
     with pytest.raises(PreflightFailed) as ei:
         startup_guards.enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=True)
@@ -102,8 +102,8 @@ def test_obs_source_not_found_writes_required_fatal_details(tmp_path: Path, monk
     monkeypatch.setattr(startup_guards.w32, 'get_dpi_awareness_status', lambda: {}, raising=True)
 
     # Each test should behave like a fresh process.
-    startup_guards._PROD_EMERGENCY_REAL_GUARDS_PASSED_ONCE = False
-    startup_guards._PROD_EMERGENCY_REAL_HWND_SELF_HEAL_USED = False
+    startup_guards._PROD_PROFILE_REAL_GUARDS_PASSED_ONCE = False
+    startup_guards._PROD_PROFILE_REAL_HWND_SELF_HEAL_USED = False
 
     with pytest.raises(PreflightFailed) as ei:
         startup_guards.enforce_prod_emergency_real_startup_guards(write_fatal_on_fail=True)

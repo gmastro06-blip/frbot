@@ -1,0 +1,140 @@
+{
+  "certified_manifest": {
+    "certified_by": "gmast",
+    "certified_ts": 1770919174,
+    "roi_config_sha": "6c5556e58e3b2e7add809c852e2015e5e22d811bc5824b54ef2e77a835e38556",
+    "schema_version": "1.0"
+  },
+  "frame": {
+    "height": 1080,
+    "width": 1920
+  },
+  "rois": {
+    "battle_list": {
+      "height": 210,
+      "width": 155,
+      "x": 1574,
+      "y": 458
+    },
+    "chat_loot_area": {
+      "height": 185,
+      "width": 340,
+      "x": 0,
+      "y": 895
+    },
+    "combat_cooldown": {
+      "height": 40,
+      "width": 110,
+      "x": 1748,
+      "y": 282
+    },
+    "combat_feedback": {
+      "height": 20,
+      "width": 780,
+      "x": 6,
+      "y": 1
+    },
+    "depot_container": {
+      "height": 140,
+      "width": 200,
+      "x": 800,
+      "y": 80
+    },
+    "heal_cooldown": {
+      "height": 20,
+      "width": 780,
+      "x": 6,
+      "y": 1
+    },
+    "hp_bar": {
+      "height": 20,
+      "width": 776,
+      "x": 8,
+      "y": 1
+    },
+    "hp_mp": {
+      "height": 20,
+      "width": 1550,
+      "x": 8,
+      "y": 1
+    },
+    "hp_text": {
+      "height": 20,
+      "width": 250,
+      "x": 8,
+      "y": 1
+    },
+    "inventory_text": {
+      "height": 22,
+      "width": 32,
+      "x": 1763,
+      "y": 158
+    },
+    "loot_container_open": {
+      "height": 80,
+      "width": 110,
+      "x": 1751,
+      "y": 196
+    },
+    "loot_corpse": {
+      "height": 80,
+      "width": 110,
+      "x": 1751,
+      "y": 276
+    },
+    "loot_take": {
+      "height": 80,
+      "width": 110,
+      "x": 1751,
+      "y": 356
+    },
+    "minimap": {
+      "height": 115,
+      "width": 108,
+      "x": 1751,
+      "y": 25
+    },
+    "mp_bar": {
+      "height": 17,
+      "width": 772,
+      "x": 785,
+      "y": 4
+    },
+    "mp_text": {
+      "height": 17,
+      "width": 250,
+      "x": 785,
+      "y": 4
+    },
+    "target_frame": {
+      "height": 50,
+      "width": 220,
+      "x": 836,
+      "y": 40
+    },
+    "target_hp_bar": {
+      "height": 10,
+      "width": 180,
+      "x": 838,
+      "y": 66
+    },
+    "trade_action": {
+      "height": 70,
+      "width": 90,
+      "x": 80,
+      "y": 980
+    },
+    "trade_inventory": {
+      "height": 420,
+      "width": 600,
+      "x": 1100,
+      "y": 300
+    },
+    "trade_npc": {
+      "height": 62,
+      "width": 686,
+      "x": 0,
+      "y": 943
+    }
+  }
+}

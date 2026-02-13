@@ -1,0 +1,56 @@
+{
+  "frame": {
+    "height": 1080,
+    "width": 1920
+  },
+  "rois": {
+    "battle_list": {
+      "height": 210,
+      "width": 155,
+      "x": 1574,
+      "y": 458
+    },
+    "combat_feedback": {
+      "height": 136,
+      "width": 502,
+      "x": 4,
+      "y": 924
+    },
+    "chat_loot_area": {
+      "height": 222,
+      "width": 1920,
+      "x": 0,
+      "y": 858
+    },
+    "hp_mp": {
+      "height": 45,
+      "width": 250,
+      "x": 790,
+      "y": 15
+    },
+    "inventory_text": {
+      "height": 1,
+      "width": 2,
+      "x": 212,
+      "y": 857
+    },
+    "loot_corpse": {
+      "height": 120,
+      "width": 120,
+      "x": 900,
+      "y": 480
+    },
+    "minimap": {
+      "height": 115,
+      "width": 108,
+      "x": 1751,
+      "y": 25
+    },
+    "target_frame": {
+      "height": 50,
+      "width": 220,
+      "x": 836,
+      "y": 40
+    }
+  }
+}

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -9,12 +11,30 @@ from contracts.input import InputAdapter
 from contracts.runtime import DepotSnapshot, InventorySnapshot, RuntimeContext
 from contracts.window import WindowBindingAdapter
 from diagnostics.last_frames import record_after, record_before
+from runtime.battle_list_semantics import crop_roi_rgb
 from runtime.deposit import DepositTickInput, tick
 from runtime.depot_semantics import DepotDelta, compute_depot_delta, read_depot_container
+from runtime.event_correlation import attach_snapshot, new_event, validate
 from runtime.inventory_semantics import InventoryDelta, compute_inventory_delta, is_deposit_success, read_inventory
 
 
-@dataclass(frozen=True, slots=True)
+def _changed_ratio(before_rgb: bytes, after_rgb: bytes, *, px_tol: int) -> float:
+    if not before_rgb or not after_rgb or len(before_rgb) != len(after_rgb):
+        return 0.0
+    t = int(px_tol)
+    changed = 0
+    npx = max(1, len(before_rgb) // 3)
+    for i in range(0, len(before_rgb), 3):
+        if (
+            abs(int(before_rgb[i + 0]) - int(after_rgb[i + 0])) > t
+            or abs(int(before_rgb[i + 1]) - int(after_rgb[i + 1])) > t
+            or abs(int(before_rgb[i + 2]) - int(after_rgb[i + 2])) > t
+        ):
+            changed += 1
+    return float(changed) / float(npx)
+
+
+@dataclass(frozen=True)
 class DepositTickEvidence:
     inventory_before: Optional[InventorySnapshot]
     inventory_after: Optional[InventorySnapshot]
@@ -25,7 +45,7 @@ class DepositTickEvidence:
     status: str
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class DepositTickOutcome:
     success: bool
     evidence: DepositTickEvidence
@@ -39,6 +59,7 @@ def execute_deposit_tick(
     input_: InputAdapter,
     binding: WindowBindingAdapter,
     tick_index: int,
+    gate: str = 'deposit',
 ) -> DepositTickOutcome:
     """Execute exactly one deposit tick.
 
@@ -66,11 +87,37 @@ def execute_deposit_tick(
             abort_reason='deposit_unreadable_state',
         )
 
+    gate_name = (str(gate or 'deposit') or 'deposit').strip().lower()
+
+    event = new_event(
+        gate=str(gate_name),
+        intent={
+            'type': 'deposit_key',
+            'key': str(getattr(ctx.config, 'deposit_key', '') or ''),
+        },
+    )
+
+    before_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='before', ts_ns=before_ts_ns, status=binding.snapshot())
+
+    profile = (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
+    pixel_fallback_ok = profile == 'prod_full'
+
     before = capture.grab()
-    record_before('deposit', before)
+    record_before(gate_name, before)
+
+    depot_rgb_before = b''
+    if pixel_fallback_ok and depot_roi is not None:
+        depot_rgb_before = crop_roi_rgb(before, depot_roi)
+        if not depot_rgb_before:
+            return DepositTickOutcome(
+                success=False,
+                evidence=DepositTickEvidence(None, None, None, None, None, None, 'deposit_unreadable_state'),
+                abort_reason='deposit_unreadable_state',
+            )
 
     inv_before = read_inventory(before, inv_roi)
-    if inv_before is None:
+    if inv_before is None and not pixel_fallback_ok:
         return DepositTickOutcome(
             success=False,
             evidence=DepositTickEvidence(None, None, None, None, None, None, 'deposit_inventory_unreadable'),
@@ -78,14 +125,14 @@ def execute_deposit_tick(
         )
 
     depot_before = read_depot_container(before, depot_roi)
-    if depot_before is None:
+    if depot_before is None and not pixel_fallback_ok:
         return DepositTickOutcome(
             success=False,
             evidence=DepositTickEvidence(inv_before, None, None, None, None, None, 'deposit_unreadable_state'),
             abort_reason='deposit_unreadable_state',
         )
 
-    if not bool(depot_before.open):
+    if depot_before is not None and (not bool(depot_before.open)) and not pixel_fallback_ok:
         return DepositTickOutcome(
             success=False,
             evidence=DepositTickEvidence(inv_before, None, depot_before, None, None, None, 'deposit_depot_not_open'),
@@ -122,7 +169,15 @@ def execute_deposit_tick(
     # Emit exactly one input.
     try:
         binding.assert_bound()
-        input_.press_key(str(intent.key))
+
+        input_ts_ns = int(time.monotonic_ns())
+        attach_snapshot(event, stage='input', ts_ns=input_ts_ns, status=binding.snapshot())
+
+        click_cursor = (os.environ.get('FRBOT_DEPOSIT_CLICK_CURSOR', '') or '').strip().lower() in {'1', 'true', 'yes', 'y'}
+        if pixel_fallback_ok and click_cursor and hasattr(input_, 'click_cursor'):
+            getattr(input_, 'click_cursor')()
+        else:
+            input_.press_key(str(intent.key))
     except Exception as exc:
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
 
@@ -130,10 +185,30 @@ def execute_deposit_tick(
     ctx.deposit.attempts_used += 1
 
     after = capture.grab()
-    record_after('deposit', after)
+    after_ts_ns = int(time.monotonic_ns())
+    attach_snapshot(event, stage='after', ts_ns=after_ts_ns, status=binding.snapshot())
+    record_after(gate_name, after)
+
+    corr_ok, corr_reason, corr_details = validate(event)
+    event['correlation_ok'] = bool(corr_ok)
+    event['correlation_reason'] = str(corr_reason)
+    if corr_details:
+        event['correlation_details'] = dict(corr_details)
+    ctx.telemetry.last_event_correlation = dict(event)
+    if not corr_ok:
+        corr_exc = PreflightFailed('binding_correlation_failed')
+        try:
+            setattr(corr_exc, 'details', {'event_correlation': event})
+        except Exception:
+            pass
+        raise corr_exc
+
+    depot_rgb_after = b''
+    if pixel_fallback_ok and depot_roi is not None:
+        depot_rgb_after = crop_roi_rgb(after, depot_roi)
 
     inv_after = read_inventory(after, inv_roi)
-    if inv_after is None:
+    if inv_after is None and not pixel_fallback_ok:
         return DepositTickOutcome(
             success=False,
             evidence=DepositTickEvidence(inv_before, None, depot_before, None, None, None, 'deposit_inventory_unreadable'),
@@ -141,18 +216,49 @@ def execute_deposit_tick(
         )
 
     depot_after = read_depot_container(after, depot_roi)
-    if depot_after is None:
+    if depot_after is None and not pixel_fallback_ok:
         return DepositTickOutcome(
             success=False,
             evidence=DepositTickEvidence(inv_before, inv_after, depot_before, None, None, None, 'deposit_unreadable_state'),
             abort_reason='deposit_unreadable_state',
         )
 
-    inv_delta = compute_inventory_delta(inv_before, inv_after)
-    depot_delta = compute_depot_delta(depot_before, depot_after)
+    inv_delta: InventoryDelta | None = None
+    depot_delta: DepotDelta | None = None
+    if inv_before is not None and inv_after is not None:
+        inv_delta = compute_inventory_delta(inv_before, inv_after)
+    if depot_before is not None and depot_after is not None:
+        depot_delta = compute_depot_delta(depot_before, depot_after)
 
     ctx.deposit.last_inventory_after = inv_after
     ctx.deposit.last_depot_after = depot_after
+
+    if inv_delta is None or depot_delta is None:
+        if pixel_fallback_ok and depot_rgb_before and depot_rgb_after:
+            try:
+                px_tol = int(os.environ.get('FRBOT_DEPOSIT_DEPOT_DELTA_PX_TOL', '15') or '15')
+                ratio_thr = float(os.environ.get('FRBOT_DEPOSIT_DEPOT_DELTA_RATIO_MIN', '0.01') or '0.01')
+            except Exception:
+                px_tol = 15
+                ratio_thr = 0.01
+            ratio = _changed_ratio(depot_rgb_before, depot_rgb_after, px_tol=int(px_tol))
+            if float(ratio) >= float(ratio_thr):
+                return DepositTickOutcome(
+                    success=True,
+                    evidence=DepositTickEvidence(inv_before, inv_after, depot_before, depot_after, inv_delta, depot_delta, 'ok_deposit_confirmed_depot_delta'),
+                    abort_reason=None,
+                )
+            return DepositTickOutcome(
+                success=False,
+                evidence=DepositTickEvidence(inv_before, inv_after, depot_before, depot_after, inv_delta, depot_delta, 'deposit_no_depot_delta'),
+                abort_reason='deposit_no_depot_delta',
+            )
+
+        return DepositTickOutcome(
+            success=False,
+            evidence=DepositTickEvidence(inv_before, inv_after, depot_before, depot_after, inv_delta, depot_delta, 'deposit_ambiguous_result'),
+            abort_reason='deposit_ambiguous_result',
+        )
 
     inv_success = bool(is_deposit_success(inv_delta))
     depot_success = int(depot_delta.item_count_delta) > 0
