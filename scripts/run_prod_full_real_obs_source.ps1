@@ -105,7 +105,7 @@ try {
   if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:FRBOT_CONFIG_PATH)) {
       $ConfigPath = $env:FRBOT_CONFIG_PATH
-      # Some terminals/README snippets use placeholders like "C:\...\file.json".
+      # Some terminals/README snippets use placeholders like "C:\...\Waypoints\file.json".
       # If env points to a non-existent path, fall back to the repo default.
       if (-not (Test-Path $ConfigPath)) {
         $ConfigPath = ""

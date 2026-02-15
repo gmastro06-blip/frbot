@@ -244,6 +244,49 @@ class _ObsWsV5Client:
             return dict(resp) if isinstance(resp, dict) else {}
 
 
+def list_obs_input_names() -> list[str]:
+    host = _env_str('FRBOT_OBS_WS_HOST', '127.0.0.1')
+    port = _env_int('FRBOT_OBS_WS_PORT', 4455)
+    password = _env_str('FRBOT_OBS_WS_PASSWORD', '')
+    timeout_s = _env_float('FRBOT_OBS_WS_TIMEOUT_S', 2.0)
+    try:
+        client = _ObsWsV5Client(host=host, port=port, password=password, timeout_s=timeout_s)
+        resp = client.request('GetInputList', {})
+    except Exception:
+        return []
+
+    out: list[str] = []
+    seen: set[str] = set()
+    inputs = resp.get('inputs')
+    if not isinstance(inputs, list):
+        return out
+
+    audio_kind_tokens = {
+        'wasapi',
+        'coreaudio',
+        'pulse',
+        'alsa',
+        'audio',
+        'jack',
+    }
+
+    for raw in inputs:
+        if not isinstance(raw, dict):
+            continue
+        kind = str(raw.get('inputKind') or raw.get('unversionedInputKind') or '').strip().lower()
+        if kind and any(tok in kind for tok in audio_kind_tokens):
+            continue
+        name = str(raw.get('inputName') or raw.get('sourceName') or '').strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(name)
+    return out
+
+
 ObsScreenshotProvider = Callable[[str, int, int], tuple[bytes, int, int]]
 
 

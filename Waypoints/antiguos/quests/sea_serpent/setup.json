@@ -1,0 +1,49 @@
+{
+"general": 
+{
+	"loot_type":"auto",
+	"walk_type":"mouse"
+},
+"script_options": {
+	"comment":"Make sure you have 5 of each type of fish in backpack"
+},
+"containers": 
+{
+	"gold_bp":"Golden Backpack",
+	"loot_bp":"Red Backpack"
+},
+"tools":
+{
+},
+"items":
+{
+	"strong mana potion": {"hotkey":"e", "use":"self"},
+	"ultimate health potion": {"hotkey":"F", "id":7643, "use":"self"},
+	"brown mushroom": {"hotkey":"f11", "id":3725, "use":"use"},
+	"bait": {"hotkey":"5", "id":939, "use":"crosshair"}
+},
+"spells":
+{
+	"exori":"1",
+	"exori ico":"q",
+	"exura ico":"r"
+},
+"healing":
+[
+	{"type":"hp", "below_percent":70, "use_item":"ultimate health potion",  "priority":4},
+	{"type":"hp", "below_percent":85, "use_spell":"exura ico", "min_mana_percent":20, "priority":3},
+	{"type":"mp", "below_percent":80, "use_item":"strong mana potion", "priority":2}
+],
+"hunt_config": {
+},
+"persistent_actions": [
+	{"action":"eat_food", "interval":60}
+],
+"target_monsters": 
+[
+],
+"target_spells":
+[ 
+],
+"loot": []
+}

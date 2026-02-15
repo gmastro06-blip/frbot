@@ -1,0 +1,61 @@
+label start
+load scripts/general/refill_port_hope.in
+label go_hunt
+stand (32627,32771,7)
+action travel_east
+node (32690,32778,7)
+call conditional_jump_script_options("var_name":"task" , "label_skip":"skip_task")
+call check_kill_count("monster_name":"tarantula", "kill_amount":300,  "label_jump":"go_task", "label_skip":"skip_task")
+label go_task
+stand (32694,32773,7)
+stand (32694,32772,7)
+stand (32694,32768,6)
+call talk_npc("list_words":["tasks", "tarantula", "yes"])
+label repeat_task
+call talk_npc("list_words":["promotion", "yes"])
+call talk_npc("list_words":["tasks", "tarantula", "yes"])
+stand (32694,32772,6)
+stand (32694,32772,6)
+label skip_task
+node (32699,32789,7)
+node (32728,32812,7)
+node (32752,32832,7)
+node (32784,32852,7)
+node (32811,32866,7)
+node (32844,32875,7)
+stand (32851,32870,7)
+label hunt
+node (32880,32866,8)
+node (32853,32873,8)
+node (32867,32889,8)
+node (32884,32883,8)
+node (32880,32903,8)
+node (32862,32911,8)
+node (32852,32905,8)
+node (32836,32924,8)
+node (32816,32912,8)
+node (32815,32891,8)
+node (32839,32891,8)
+node (32825,32878,8)
+node (32808,32875,8)
+node (32831,32872,8)
+node (32850,32874,8)
+action check
+label leave
+node (32847,32873,8)
+stand (32851,32870,8)
+node (32812,32856,7)
+node (32776,32835,7)
+node (32733,32817,7)
+node (32707,32809,7)
+node (32686,32796,7)
+node (32686,32792,7)
+stand (32679,32776,7)
+action travel_center
+node (32630,32759,7)
+node (32623,32747,7)
+action check_time
+label train
+load scripts/general/dp_to_train_port_hope.in
+label start_trainer
+load scripts/general/train_to_dp_port_hope.in

@@ -477,7 +477,8 @@ class MeldBoundWindowRealCapture(CaptureAdapter):
             snap = self._binding.snapshot()
             hwnd = int(getattr(snap, 'hwnd', 0) or 0)
             fg = int(w32.get_foreground_window())
-            if hwnd <= 0 or fg != hwnd:
+            require_fg = not _env_bool('FRBOT_ALLOW_BACKGROUND_INPUT', False)
+            if hwnd <= 0 or (require_fg and fg != hwnd):
                 return VerificationResult(ok=False, reason='window_not_foreground')
 
             rect_client = w32.get_client_rect_in_screen(hwnd)
@@ -749,7 +750,8 @@ class MeldBoundMinimapRealCapture(CaptureAdapter):
             snap = self._binding.snapshot()
             hwnd = int(getattr(snap, 'hwnd', 0) or 0)
             fg = int(w32.get_foreground_window())
-            if hwnd <= 0 or fg != hwnd:
+            require_fg = not _env_bool('FRBOT_ALLOW_BACKGROUND_INPUT', False)
+            if hwnd <= 0 or (require_fg and fg != hwnd):
                 return VerificationResult(ok=False, reason='window_not_foreground')
 
             rect_client = w32.get_client_rect_in_screen(hwnd)

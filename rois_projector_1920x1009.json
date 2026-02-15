@@ -1,0 +1,130 @@
+{
+  "rois": {
+    "battle_list": {
+      "x": 1574,
+      "y": 428,
+      "width": 155,
+      "height": 196
+    },
+    "chat_loot_area": {
+      "x": 0,
+      "y": 836,
+      "width": 340,
+      "height": 173
+    },
+    "combat_cooldown": {
+      "x": 1748,
+      "y": 263,
+      "width": 110,
+      "height": 37
+    },
+    "combat_feedback": {
+      "x": 6,
+      "y": 1,
+      "width": 780,
+      "height": 19
+    },
+    "depot_container": {
+      "x": 800,
+      "y": 75,
+      "width": 200,
+      "height": 131
+    },
+    "heal_cooldown": {
+      "x": 6,
+      "y": 1,
+      "width": 780,
+      "height": 19
+    },
+    "hp_bar": {
+      "x": 8,
+      "y": 1,
+      "width": 776,
+      "height": 19
+    },
+    "hp_mp": {
+      "x": 8,
+      "y": 1,
+      "width": 1550,
+      "height": 19
+    },
+    "hp_text": {
+      "x": 8,
+      "y": 1,
+      "width": 250,
+      "height": 19
+    },
+    "inventory_text": {
+      "x": 1763,
+      "y": 148,
+      "width": 32,
+      "height": 21
+    },
+    "loot_container_open": {
+      "x": 1751,
+      "y": 183,
+      "width": 110,
+      "height": 75
+    },
+    "loot_corpse": {
+      "x": 1751,
+      "y": 258,
+      "width": 110,
+      "height": 75
+    },
+    "loot_take": {
+      "x": 1751,
+      "y": 333,
+      "width": 110,
+      "height": 75
+    },
+    "minimap": {
+      "x": 1751,
+      "y": 23,
+      "width": 108,
+      "height": 107
+    },
+    "mp_bar": {
+      "x": 785,
+      "y": 4,
+      "width": 772,
+      "height": 16
+    },
+    "mp_text": {
+      "x": 785,
+      "y": 4,
+      "width": 250,
+      "height": 16
+    },
+    "target_frame": {
+      "x": 836,
+      "y": 37,
+      "width": 220,
+      "height": 47
+    },
+    "target_hp_bar": {
+      "x": 838,
+      "y": 62,
+      "width": 180,
+      "height": 9
+    },
+    "trade_action": {
+      "x": 80,
+      "y": 916,
+      "width": 90,
+      "height": 65
+    },
+    "trade_inventory": {
+      "x": 1100,
+      "y": 280,
+      "width": 600,
+      "height": 392
+    },
+    "trade_npc": {
+      "x": 0,
+      "y": 881,
+      "width": 686,
+      "height": 58
+    }
+  }
+}

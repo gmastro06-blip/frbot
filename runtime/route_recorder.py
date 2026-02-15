@@ -93,17 +93,29 @@ class RouteRecordingSession:
 
         x, y, z = self._last_tile
         a = str(action).strip().lower()
-        if a == 'ladder':
-            return self._add_waypoint(waypoint_type=WaypointType.USE_LADDER.value, x=x, y=y, z=z)
+        if a in {'ladder', 'stairs_up', 'stairs_down'}:
+            return self._add_waypoint(
+                waypoint_type=WaypointType.USE_LADDER.value,
+                x=x,
+                y=y,
+                z=z,
+                options={'action_kind': a},
+            )
         if a == 'rope':
-            return self._add_waypoint(waypoint_type=WaypointType.ROPE.value, x=x, y=y, z=z)
-        if a == 'open_hole':
+            return self._add_waypoint(
+                waypoint_type=WaypointType.ROPE.value,
+                x=x,
+                y=y,
+                z=z,
+                options={'action_kind': a},
+            )
+        if a in {'open_hole', 'shovel', 'pick'}:
             return self._add_waypoint(
                 waypoint_type=WaypointType.USE_RIGHT_CLICK.value,
                 x=x,
                 y=y,
                 z=z,
-                options={'interaction': 'open_hole'},
+                options={'interaction': 'open_hole', 'action_kind': a},
             )
         raise ValueError(f'route_recorder_unknown_action:{a}')
 

@@ -15,9 +15,13 @@ from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from diagnostics.schema import base_context_fields
+from runtime.env_bootstrap import load_repo_env
 
 from runtime.combat_basic_preflight import run as combat_basic_preflight_run
 from runtime.combat_basic_runner import execute_combat_basic_once
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:

@@ -9,10 +9,14 @@ from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, Runti
 from diagnostics.fatal import write_fatal
 from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
+from runtime.env_bootstrap import load_repo_env
 from runtime.hunger_guard import HungerSettings, is_hungry, parse_rgb, should_press_eat
 from runtime.pacing import wait_until_ns
 from runtime.preflight import preflight
 from runtime.profile import cap_ticks
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:

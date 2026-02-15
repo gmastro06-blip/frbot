@@ -13,9 +13,13 @@ from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from diagnostics.logger import configure_logger
+from runtime.env_bootstrap import load_repo_env
 
 from runtime.looting_basic_preflight import run as looting_basic_preflight_run
 from runtime.looting_basic_runner import execute_looting_basic_once
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:
@@ -45,6 +49,42 @@ def _env_float(name: str, default: float) -> float:
         return float(raw) if raw is not None else float(default)
     except Exception:
         return float(default)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() not in {'0', 'false', 'no', 'off'}
+
+
+def _should_try_shift_rmb_fallback(exc: PreflightFailed) -> bool:
+    reason = str(exc or '').strip().lower()
+    profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
+    if reason not in {'quick_loot_not_effective', 'looting_basic_not_confirmed'}:
+        return False
+    if profile != 'prod_emergency':
+        return False
+    return bool(_env_bool('FRBOT_LOOTING_BASIC_FALLBACK_SHIFT_RMB', True))
+
+
+def _ensure_shift_rmb_click_point(ctx: RuntimeContext) -> None:
+    if (_env_str('FRBOT_LOOTING_BASIC_LOOT_X', '') or '').strip() and (_env_str('FRBOT_LOOTING_BASIC_LOOT_Y', '') or '').strip():
+        return
+
+    corpse_roi_name = (_env_str('FRBOT_LOOT_CORPSE_ROI', 'loot_corpse') or 'loot_corpse').strip() or 'loot_corpse'
+    roi = ctx.rois.get(str(corpse_roi_name))
+    if roi is None:
+        return
+
+    try:
+        x = int(getattr(roi, 'x', 0)) + (int(getattr(roi, 'width', 0)) // 2)
+        y = int(getattr(roi, 'y', 0)) + (int(getattr(roi, 'height', 0)) // 2)
+    except Exception:
+        return
+
+    os.environ['FRBOT_LOOTING_BASIC_LOOT_X'] = str(int(x))
+    os.environ['FRBOT_LOOTING_BASIC_LOOT_Y'] = str(int(y))
 
 
 def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
@@ -145,7 +185,22 @@ def run_looting_basic_only() -> int:
         logger = configure_logger()
         ctx.status.state = RuntimeState.RUNNING
 
-        outcome = execute_looting_basic_once(ctx, capture=capture, input_=input_, binding=binding)
+        try:
+            outcome = execute_looting_basic_once(ctx, capture=capture, input_=input_, binding=binding)
+        except PreflightFailed as exc:
+            if not _should_try_shift_rmb_fallback(exc):
+                raise
+            prev_allow_non_altq = os.environ.get('FRBOT_LOOTING_BASIC_ALLOW_NON_ALTQ')
+            os.environ['FRBOT_LOOTING_BASIC_ACTION'] = 'shift_rmb'
+            os.environ['FRBOT_LOOTING_BASIC_ALLOW_NON_ALTQ'] = '1'
+            _ensure_shift_rmb_click_point(ctx)
+            try:
+                outcome = execute_looting_basic_once(ctx, capture=capture, input_=input_, binding=binding)
+            finally:
+                if prev_allow_non_altq is None:
+                    os.environ.pop('FRBOT_LOOTING_BASIC_ALLOW_NON_ALTQ', None)
+                else:
+                    os.environ['FRBOT_LOOTING_BASIC_ALLOW_NON_ALTQ'] = str(prev_allow_non_altq)
 
         profile = (_env_str('FRBOT_PROFILE', '') or '').strip().lower()
         dump_force = profile == 'prod_emergency'

@@ -15,9 +15,13 @@ from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from diagnostics.logger import configure_logger
 from diagnostics.schema import base_context_fields
+from runtime.env_bootstrap import load_repo_env
 
 from runtime.deposit_basic_preflight import run as deposit_basic_preflight_run
 from runtime.deposit_runner import execute_deposit_tick
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:

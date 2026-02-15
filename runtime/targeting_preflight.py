@@ -33,6 +33,15 @@ InputAdapter: TypeAlias = Win32HwndKeyboard | MockWorldInput
 WindowBindingAdapter: TypeAlias = Win32WindowBinding | MockWindowBinding
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = (os.environ.get(name, '') or '').strip().lower()
+    if raw in {'1', 'true', 'yes', 'on'}:
+        return True
+    if raw in {'0', 'false', 'no', 'off'}:
+        return False
+    return bool(default)
+
+
 def _evidence_dir_default() -> Path:
     raw = (os.environ.get('FRBOT_REAL_FRAMES_DIR', '') or '').strip()
     if raw:
@@ -226,7 +235,8 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
         validate_prod_emergency_real_rois_in_bounds(rois=ctx.rois, frame=before)
 
         obs = detect_battle_list(before, battle_roi)
-        if obs is None:
+        allow_no_ocr = _env_bool('FRBOT_BATTLE_LIST_ALLOW_NO_OCR', False)
+        if obs is None and not allow_no_ocr:
             _dump_battle_list_debug(gate='targeting_full_preflight', frame=before, roi=battle_roi, reason='battle_list_not_detected')
             raise PreflightFailed('battle_list_not_detected')
 
@@ -278,7 +288,8 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
         raise PreflightFailed('targeting_window_binding_lost')
 
     obs = detect_battle_list(before, battle_roi)
-    if obs is None:
+    allow_no_ocr = _env_bool('FRBOT_BATTLE_LIST_ALLOW_NO_OCR', False)
+    if obs is None and not allow_no_ocr:
         raise PreflightFailed('battle_list_not_detected')
 
     ctx.status.state = RuntimeState.READY

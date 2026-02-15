@@ -13,11 +13,25 @@ from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from rules.targeting import select_targeting_intent
+from runtime.env_bootstrap import load_repo_env
 from runtime.battle_list_semantics import detect_battle_list
 from runtime.targeting_preflight import run as targeting_preflight_run
 from runtime.targeting_runner import execute_intent
 from runtime.profile import cap_ticks
 from runtime.pacing import wait_until_ns
+
+
+load_repo_env()
+
+
+_LAST_RUN_INPUTS_SENT = 0
+
+
+def consume_last_run_inputs_sent() -> int:
+    global _LAST_RUN_INPUTS_SENT
+    out = int(_LAST_RUN_INPUTS_SENT)
+    _LAST_RUN_INPUTS_SENT = 0
+    return int(out)
 
 
 def _env_str(name: str, default: str) -> str:
@@ -88,6 +102,8 @@ def run_targeting_only() -> int:
     - Terminates in finite time (max_total_ticks).
     """
 
+    global _LAST_RUN_INPUTS_SENT
+    _LAST_RUN_INPUTS_SENT = 0
     max_total_ticks = cap_ticks(_env_int('FRBOT_TARGETING_MAX_TICKS', 30))
 
     capture = None
@@ -129,6 +145,13 @@ def run_targeting_only() -> int:
                 raise PreflightFailed('battle_list_not_detected')
 
             obs = detect_battle_list(frame, battle_roi)
+            allow_no_ocr = _env_bool('FRBOT_BATTLE_LIST_ALLOW_NO_OCR', False)
+            if obs is None and not allow_no_ocr:
+                raise PreflightFailed('battle_list_not_detected')
+
+            if obs is None and allow_no_ocr:
+                continue
+
             if obs is None:
                 raise PreflightFailed('battle_list_not_detected')
 
@@ -147,6 +170,7 @@ def run_targeting_only() -> int:
 
             if res.intent is not None:
                 execute_intent(ctx, capture=capture, input_=input_, binding=binding, intent=res.intent)
+                _LAST_RUN_INPUTS_SENT = int(getattr(ctx.targeting, 'inputs_sent', 0))
 
             log_json(
                 logger,
@@ -171,6 +195,10 @@ def run_targeting_only() -> int:
         raise PreflightFailed('target_not_acquired')
 
     except PreflightFailed as exc:
+        try:
+            _LAST_RUN_INPUTS_SENT = int(getattr(ctx.targeting, 'inputs_sent', 0)) if 'ctx' in locals() else int(_LAST_RUN_INPUTS_SENT)
+        except Exception:
+            pass
         if dump_enabled():
             before, after = snapshot('targeting')
             # If no intent was executed, snapshot may be empty; fall back to direct capture.
@@ -187,11 +215,19 @@ def run_targeting_only() -> int:
         write_fatal(str(exc), exc)
         return 1
     except ContractViolation as exc:
+        try:
+            _LAST_RUN_INPUTS_SENT = int(getattr(ctx.targeting, 'inputs_sent', 0)) if 'ctx' in locals() else int(_LAST_RUN_INPUTS_SENT)
+        except Exception:
+            pass
         if 'Unsupported mode:' in str(exc):
             write_fatal('invalid_mode', exc)
             return 1
         write_fatal('runtime crashed', exc)
         return 1
     except Exception as exc:
+        try:
+            _LAST_RUN_INPUTS_SENT = int(getattr(ctx.targeting, 'inputs_sent', 0)) if 'ctx' in locals() else int(_LAST_RUN_INPUTS_SENT)
+        except Exception:
+            pass
         write_fatal('runtime crashed', exc)
         return 1

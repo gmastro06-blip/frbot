@@ -1,0 +1,376 @@
+{
+  "enabled": true,
+  "metadata": {
+    "import": {
+      "default_z": 7,
+      "format": "legacy_waypoints_in",
+      "labels": {
+        "debug": 4,
+        "finish": 20,
+        "larboard": 14,
+        "repeat_bait": 4,
+        "speed": 17,
+        "starboard": 11,
+        "start_svargrond_depot": 0,
+        "straight": 8,
+        "telescope": 8
+      },
+      "source": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\Waypoints\\antiguos\\quests\\sea_serpent\\waypoints.in",
+      "stats": {
+        "ignored_empty_or_comments": 4,
+        "ignored_unknown": 20,
+        "parsed_waypoints": 26,
+        "total_lines": 59
+      },
+      "warnings": [
+        {
+          "content": "action debug",
+          "line": 1,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action give_fish_captain",
+          "line": 7,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action buy_bait",
+          "line": 11,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action set_bait",
+          "line": 13,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action go_up",
+          "line": 16,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action telescope",
+          "line": 18,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action go_down",
+          "line": 20,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action straight",
+          "line": 24,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action repeat",
+          "line": 25,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action go_down",
+          "line": 28,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action starboard",
+          "line": 32,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action repeat",
+          "line": 33,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action go_down",
+          "line": 36,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action larboard",
+          "line": 40,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action repeat",
+          "line": 41,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action go_down",
+          "line": 44,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action speed",
+          "line": 48,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action repeat",
+          "line": 49,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action go_down",
+          "line": 52,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action passage",
+          "line": 55,
+          "reason": "unsupported_action"
+        }
+      ]
+    }
+  },
+  "name": "sea_serpent",
+  "run_to_target": false,
+  "waypoints": [
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32293,
+      "y": 31132,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32314,
+      "y": 31121,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "ladder"
+      },
+      "type": "use_ladder",
+      "x": 32341,
+      "y": 31119,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32353,
+      "y": 31124,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31043,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31942,
+      "y": 31042,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31936,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31942,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31946,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31946,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31946,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31946,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31946,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "ladder"
+      },
+      "type": "use_ladder",
+      "x": 32341,
+      "y": 31112,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32344,
+      "y": 31107,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "travel_venore"
+      },
+      "type": "travel",
+      "x": 32344,
+      "y": 31107,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:43:51+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "end",
+        "legacy_action": true
+      },
+      "type": "walk_ignore",
+      "x": 32344,
+      "y": 31107,
+      "z": 6
+    }
+  ]
+}

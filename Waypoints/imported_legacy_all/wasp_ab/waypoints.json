@@ -1,0 +1,471 @@
+{
+  "enabled": true,
+  "metadata": {
+    "import": {
+      "default_z": 7,
+      "format": "legacy_waypoints_in",
+      "labels": {
+        "continue": 34,
+        "count": 34,
+        "go_hunt": 9,
+        "hunt": 15,
+        "leave": 35,
+        "refill": 0,
+        "start": 0,
+        "start_trainer": 45,
+        "train": 43
+      },
+      "source": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\Waypoints\\antiguos\\wasp_ab\\waypoints.in",
+      "stats": {
+        "ignored_empty_or_comments": 0,
+        "ignored_unknown": 0,
+        "parsed_waypoints": 45,
+        "total_lines": 54
+      },
+      "warnings": []
+    }
+  },
+  "name": "wasp_ab",
+  "run_to_target": false,
+  "waypoints": [
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32681,
+      "y": 31686,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "deposit",
+        "legacy_action": true,
+        "legacy_raw": "action deposit"
+      },
+      "type": "walk_ignore",
+      "x": 32681,
+      "y": 31686,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32681,
+      "y": 31669,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32670,
+      "y": 31660,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32670,
+      "y": 31659,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "sell",
+        "legacy_action": true,
+        "legacy_raw": "action sell"
+      },
+      "type": "walk_ignore",
+      "x": 32670,
+      "y": 31659,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "buy_potions",
+        "legacy_action": true,
+        "legacy_raw": "action buy_potions"
+      },
+      "type": "walk_ignore",
+      "x": 32670,
+      "y": 31659,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32669,
+      "y": 31663,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "check_supplies",
+        "legacy_action": true,
+        "legacy_raw": "action check_supplies"
+      },
+      "type": "walk_ignore",
+      "x": 32669,
+      "y": 31663,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32659,
+      "y": 31664,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32656,
+      "y": 31673,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32656,
+      "y": 31674,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32645,
+      "y": 31693,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32638,
+      "y": 31713,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32616,
+      "y": 31716,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32607,
+      "y": 31702,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32603,
+      "y": 31704,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32612,
+      "y": 31703,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32616,
+      "y": 31700,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32612,
+      "y": 31683,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32618,
+      "y": 31706,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32634,
+      "y": 31700,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32623,
+      "y": 31688,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "rope"
+      },
+      "type": "rope",
+      "x": 32612,
+      "y": 31683,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32604,
+      "y": 31707,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32627,
+      "y": 31709,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32642,
+      "y": 31709,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32639,
+      "y": 31692,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32631,
+      "y": 31677,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "rope"
+      },
+      "type": "rope",
+      "x": 32622,
+      "y": 31691,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32607,
+      "y": 31697,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32605,
+      "y": 31701,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32603,
+      "y": 31703,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "rope"
+      },
+      "type": "rope",
+      "x": 32603,
+      "y": 31704,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "check",
+        "legacy_action": true,
+        "legacy_raw": "action check"
+      },
+      "type": "walk_ignore",
+      "x": 32603,
+      "y": 31704,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32610,
+      "y": 31712,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32630,
+      "y": 31713,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32640,
+      "y": 31709,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32649,
+      "y": 31684,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "ladder"
+      },
+      "type": "use_ladder",
+      "x": 32656,
+      "y": 31674,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32666,
+      "y": 31686,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32681,
+      "y": 31687,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "check_time",
+        "legacy_action": true
+      },
+      "type": "walk_ignore",
+      "x": 32681,
+      "y": 31687,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32681,
+      "y": 31687,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "end",
+        "legacy_action": true
+      },
+      "type": "walk_ignore",
+      "x": 32681,
+      "y": 31687,
+      "z": 6
+    }
+  ]
+}

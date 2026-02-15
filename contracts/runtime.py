@@ -83,6 +83,8 @@ class Waypoint:
     z: int
     radius_px: int
     max_ticks: int
+    waypoint_type: str = 'walk'
+    options: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -91,6 +93,9 @@ class CavebotTelemetry:
     # Marker RGB used for semantic minimap tracking. When None, runner falls back
     # to RuntimeConfig.player_marker_rgb.
     marker_rgb: tuple[int, int, int] | None = None
+    world_x: int | None = None
+    world_y: int | None = None
+    world_z: int | None = None
     # Virtual marker position used when the real minimap keeps the marker centered
     # and movement must be inferred from minimap scroll.
     virtual_x_px: int | None = None
@@ -130,7 +135,7 @@ class RuntimeConfig:
     # ROI config used for minimap detection/cropping.
     config_path: str = ''
 
-    # Waypoints (legacy file.json) path.
+    # Waypoints (legacy Waypoints/file.json) path.
     bot_config_path: str = ''
 
     enable_cavebot: bool = True
@@ -365,6 +370,7 @@ class TargetingState:
     attempt_target_name: Optional[str] = None
     attempt_count: int = 0
     attempt_started_ts_ms: int = 0
+    inputs_sent: int = 0
 
 
 @dataclass(slots=True)

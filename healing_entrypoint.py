@@ -13,10 +13,14 @@ from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from rules.healing import select_heal_intent
+from runtime.env_bootstrap import load_repo_env
 from runtime.healing_preflight import run as healing_preflight_run
 from runtime.healing_runner import _cooldown_ok_to_cast, _read_hp_mp, execute_heal_intent
 from runtime.profile import cap_ticks
 from runtime.pacing import wait_until_ns
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:

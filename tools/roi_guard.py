@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+from importlib import import_module
+
+try:
+    _bootstrap_mod = import_module("tools._bootstrap")
+except ModuleNotFoundError:
+    _bootstrap_mod = import_module("_bootstrap")
+
+_bootstrap_mod.bootstrap_tool_env(__file__)
+
 import argparse
 import json
 import os
@@ -7,12 +16,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-# When executed as a script (python tools/roi_guard.py), sys.path[0] is
-# tools/, not the repo root. Ensure repo-root imports like `diagnostics.*` work.
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 # Guard: hard-stop unless ROI config contains every ROI required by
 # - evidence inventory gates (diagnostics/evidence_inventory.py)

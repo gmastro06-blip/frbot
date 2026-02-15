@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -14,6 +16,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
     QCheckBox,
+    QDoubleSpinBox,
     QFormLayout,
     QFrame,
     QGridLayout,
@@ -38,13 +41,19 @@ from PySide6.QtWidgets import (
 )
 
 from logging_setup import setup_logger
+from diagnostics.jsonlog import log as log_json
 from models import Script, Waypoint, WaypointType, now_iso
 from storage import SchemaError, canonical_json, load_script, save_script
 from diagnostics.fatal import write_fatal
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
-from runtime.minimap_semantics import marker_config_from_env
-from runtime.preflight import preflight as runtime_preflight
+from contracts.errors import PreflightFailed
+from runtime.minimap_semantics import MarkerConfig, detect_player_marker as detect_minimap_marker, marker_config_from_env
+from runtime.minimap_localization import localize_minimap
 from runtime.route_recorder import MinimapRouteSampler, RouteRecordingSession, WaypointRecorder
+from runtime.route_preflight import run_capture_only as route_capture_only_preflight
+from runtime.tibia_map_data import TibiaMapDataset, load_tibia_map_dataset
+from runtime.env_bootstrap import load_repo_env
+from adapters.capture.obs_source_real import list_obs_input_names
 from adapters.windows import win32 as w32
 
 
@@ -58,6 +67,9 @@ _QMessageBox = cast(Any, QMessageBox)
 _LOG = setup_logger()
 
 
+load_repo_env()
+
+
 _DARK_BG = "#0f0f0f"
 _PANEL_BG = "#141414"
 _TEXT = "#d0d0d0"
@@ -67,6 +79,43 @@ _BORDER = "#2b2b2b"
 _BTN_BG = "#1a1a1a"
 _BTN_HOVER = "#232323"
 _BTN_PRESSED = "#2a2a2a"
+_DEFAULT_PLAYER_MARKER_RGB = "255,0,255"
+_DEFAULT_PLAYER_MARKER_TOL = "30"
+
+
+_REQUIRED_REAL_ROIS: set[str] = {"minimap", "battle_list", "hp_mp", "target_frame"}
+_ALLOWED_PROD_EMERGENCY_EXTRA_ROIS: set[str] = {
+    "target_hp_bar",
+    "combat_cooldown",
+    "combat_feedback",
+    "inventory_text",
+    "chat_loot_area",
+    "loot_corpse",
+    "depot_container",
+    "trade_inventory",
+    "trade_npc",
+    "trade_action",
+}
+_ALLOWED_PROD_FULL_EXTRA_ROIS: set[str] = {
+    "target_hp_bar",
+    "combat_cooldown",
+    "combat_feedback",
+    "hp_bar",
+    "mp_bar",
+    "hp_text",
+    "mp_text",
+    "heal_cooldown",
+    "heal_feedback",
+    "inventory_text",
+    "chat_loot_area",
+    "loot_corpse",
+    "loot_container_open",
+    "loot_take",
+    "depot_container",
+    "trade_inventory",
+    "trade_npc",
+    "trade_action",
+}
 
 
 def app_stylesheet() -> str:
@@ -368,10 +417,27 @@ class MainWindow(QMainWindow):
         self._route_binding: Any = None
         self._route_sampler: MinimapRouteSampler | None = None
         self._route_session: RouteRecordingSession | None = None
+        self._route_marker_cfg: MarkerConfig | None = None
+        self._route_tibia_dataset: TibiaMapDataset | None = None
+        self._route_world_by_rel: dict[tuple[int, int, int], tuple[int, int, int]] = {}
+        self._route_last_world: tuple[int, int, int] | None = None
+        self._route_world_lock_on: bool = False
+        self._route_world_lock_last_score: float | None = None
+        self._route_last_minimap_digest: str = ""
+        self._route_floor_change_streak: int = 0
+        self._route_last_tile: tuple[int, int, int] | None = None
         self._route_recording_active: bool = False
         self._waypoint_recorder: WaypointRecorder | None = None
         self._waypoint_export_path: str | None = None
         self._cavebot_running: bool = False
+        self._cavebot_timer = QTimer(self)
+        self._cavebot_proc: subprocess.Popen[Any] | None = None
+        self._cavebot_last_exit: int | None = None
+        self._cavebot_prev_waypoints_env: str | None = None
+        self._cavebot_prev_waypoints_file_env: str | None = None
+        self._cavebot_prev_auto_route_env: str | None = None
+        self._cavebot_prev_waypoint_space_env: str | None = None
+        self._last_loaded_script_path: str | None = None
 
         self._build_ui()
         self._wire_events()
@@ -379,6 +445,90 @@ class MainWindow(QMainWindow):
         self._sync_right_controls_from_script()
         self._sync_aux_controls_from_metadata()
         self._apply_runtime_env_from_ui()
+        self._restore_last_loaded_script()
+
+    def _ui_state_path(self) -> Path:
+        return Path.cwd() / "diagnostics" / "ui_state.json"
+
+    def _read_ui_state(self) -> dict[str, Any]:
+        path = self._ui_state_path()
+        if not path.exists():
+            return {}
+        try:
+            data = json.loads(path.read_text(encoding="utf-8", errors="replace") or "{}")
+        except Exception:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _write_ui_state(self) -> None:
+        try:
+            path = self._ui_state_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "last_script_path": str(self._last_loaded_script_path or "").strip(),
+            }
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            return
+
+    def _waypoints_dir(self) -> Path:
+        p = Path.cwd() / "Waypoints"
+        if p.exists() and p.is_dir():
+            return p
+        return Path.cwd()
+
+    def _default_load_dir(self) -> Path:
+        if self._current_path:
+            cur = Path(str(self._current_path))
+            if cur.exists() and cur.is_file():
+                return cur.parent
+
+        st = self._read_ui_state()
+        raw = str(st.get("last_script_path") or "").strip()
+        if raw:
+            p = Path(raw)
+            if p.exists() and p.is_file():
+                return p.parent
+
+        return self._waypoints_dir()
+
+    def _set_current_script_path(self, path: str | None) -> None:
+        val = str(path or "").strip()
+        if not val:
+            self._current_path = None
+            return
+        self._current_path = val
+        self._last_loaded_script_path = val
+        self._write_ui_state()
+
+    def _restore_last_loaded_script(self) -> None:
+        st = self._read_ui_state()
+        raw = str(st.get("last_script_path") or "").strip()
+        if not raw:
+            return
+        p = Path(raw)
+        if not p.exists() or not p.is_file():
+            self._last_loaded_script_path = None
+            self._write_ui_state()
+            return
+        try:
+            script = load_script(str(p))
+        except Exception as exc:
+            _LOG.warning("Failed to restore last loaded script %s: %s", p, exc)
+            self._last_loaded_script_path = None
+            self._write_ui_state()
+            return
+
+        self._script = script
+        self.model.set_script(self._script)
+        self._set_current_script_path(str(p))
+        self._last_saved_state = canonical_json(self._script)
+        self._refresh_script_list()
+        self._sync_right_controls_from_script()
+        self._sync_aux_controls_from_metadata()
+        self._apply_runtime_env_from_ui()
+        self._update_title()
+        _LOG.info("Restored last loaded script from %s", p)
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -598,7 +748,10 @@ class MainWindow(QMainWindow):
 
         self.lbl_route_status = QLabel("Recorder: detenido")
         self.lbl_route_counts = QLabel("Steps: 0 | Move: 0 | Rope: 0 | Shovel: 0 | Pick: 0 | Up: 0 | Down: 0")
+        self.lbl_route_world_lock = QLabel("✗ World lock: OFF")
         self.lbl_route_counts.setStyleSheet(f"color: {_MUTED};")
+        self.lbl_route_world_lock.setStyleSheet(f"color: {_ACCENT};")
+        self._update_route_world_lock_tooltip()
         self.btn_route_start = QPushButton("Iniciar grabación")
         self.btn_route_stop = QPushButton("Pausar")
         self.btn_route_apply = QPushButton("Aplicar ruta al editor")
@@ -609,6 +762,7 @@ class MainWindow(QMainWindow):
         self.btn_route_mark_up = QPushButton("Marcar Subir")
         self.btn_route_mark_down = QPushButton("Marcar Bajar")
         self.btn_route_export = QPushButton("Exportar sesión")
+        self.btn_route_save_recording = QPushButton("Guardar grabación")
         self.btn_route_open_folder = QPushButton("Abrir carpeta")
         self.route_steps_list = QListWidget()
         self.lbl_route_hotkeys = QLabel("Hotkeys: F5=Start, F6=Pausa/Resume, F7=Rope, F8=Shovel, F9=Pick, F10=Up, F11=Down, WASD/Flechas=Move")
@@ -626,6 +780,7 @@ class MainWindow(QMainWindow):
             self.btn_route_mark_up,
             self.btn_route_mark_down,
             self.btn_route_export,
+            self.btn_route_save_recording,
             self.btn_route_open_folder,
         ):
             btn.setMinimumHeight(34)
@@ -638,10 +793,12 @@ class MainWindow(QMainWindow):
         self.btn_route_mark_up.setEnabled(False)
         self.btn_route_mark_down.setEnabled(False)
         self.btn_route_export.setEnabled(False)
+        self.btn_route_save_recording.setEnabled(False)
         self.btn_route_open_folder.setEnabled(False)
 
         recorder_layout.addWidget(self.lbl_route_status)
         recorder_layout.addWidget(self.lbl_route_counts)
+        recorder_layout.addWidget(self.lbl_route_world_lock)
         recorder_layout.addWidget(self.btn_route_start)
         recorder_layout.addWidget(self.btn_route_stop)
         recorder_layout.addWidget(self.btn_route_apply)
@@ -652,6 +809,7 @@ class MainWindow(QMainWindow):
         recorder_layout.addWidget(self.btn_route_mark_up)
         recorder_layout.addWidget(self.btn_route_mark_down)
         recorder_layout.addWidget(self.btn_route_export)
+        recorder_layout.addWidget(self.btn_route_save_recording)
         recorder_layout.addWidget(self.btn_route_open_folder)
         recorder_layout.addWidget(self.route_steps_list, 1)
         recorder_layout.addWidget(self.lbl_route_hotkeys)
@@ -691,10 +849,12 @@ class MainWindow(QMainWindow):
         self.btn_cavebot_start = QPushButton("Start")
         self.btn_cavebot_stop = QPushButton("Stop")
         self.lbl_cavebot_status = QLabel("Estado: detenido")
+        self.lbl_cavebot_runtime = QLabel("Tick: 0 | WP: -")
         self.btn_cavebot_stop.setEnabled(False)
         cavebot_status_layout.addWidget(self.btn_cavebot_start)
         cavebot_status_layout.addWidget(self.btn_cavebot_stop)
         cavebot_status_layout.addWidget(self.lbl_cavebot_status, 1)
+        cavebot_status_layout.addWidget(self.lbl_cavebot_runtime)
 
         cavebot_shell = QVBoxLayout()
         cavebot_shell.setContentsMargins(0, 0, 0, 0)
@@ -722,11 +882,17 @@ class MainWindow(QMainWindow):
         self.spin_tick_hz = QSpinBox()
         self.spin_tick_hz.setRange(1, 120)
         self.spin_tick_hz.setValue(20)
+        self.spin_route_localize_min_score = QDoubleSpinBox()
+        self.spin_route_localize_min_score.setRange(0.0, 1.0)
+        self.spin_route_localize_min_score.setDecimals(2)
+        self.spin_route_localize_min_score.setSingleStep(0.01)
+        self.spin_route_localize_min_score.setValue(self._route_localize_min_score())
         self.chk_try_focus = QCheckBox("Intentar enfocar ventana")
         self.chk_try_focus.setChecked(True)
 
         settings_form.addRow("Config path", self.input_config_path)
         settings_form.addRow("Tick Hz", self.spin_tick_hz)
+        settings_form.addRow("World lock min score", self.spin_route_localize_min_score)
         settings_form.addRow("Focus", self.chk_try_focus)
         settings_layout.addWidget(settings_box)
 
@@ -779,6 +945,7 @@ class MainWindow(QMainWindow):
         self.spin_heal_hp_threshold.valueChanged.connect(self._on_aux_controls_changed)
         self.input_config_path.textChanged.connect(self._on_aux_controls_changed)
         self.spin_tick_hz.valueChanged.connect(self._on_aux_controls_changed)
+        self.spin_route_localize_min_score.valueChanged.connect(self._on_aux_controls_changed)
         self.chk_try_focus.stateChanged.connect(self._on_aux_controls_changed)
         self.btn_import_env.clicked.connect(self._on_import_env_clicked)
         self.btn_export_env.clicked.connect(self._on_export_env_clicked)
@@ -788,6 +955,7 @@ class MainWindow(QMainWindow):
         self.btn_route_apply.clicked.connect(self._on_route_apply_clicked)
         self.btn_route_reset.clicked.connect(self._on_route_reset_clicked)
         self.btn_route_export.clicked.connect(self._on_route_export_clicked)
+        self.btn_route_save_recording.clicked.connect(self._on_route_save_recording_clicked)
         self.btn_route_open_folder.clicked.connect(self._on_route_open_folder_clicked)
         self.shortcut_route_start.activated.connect(self._on_route_start_clicked)
         self.shortcut_route_stop.activated.connect(self._on_route_stop_clicked)
@@ -810,21 +978,646 @@ class MainWindow(QMainWindow):
         self.shortcut_move_down.activated.connect(lambda: self._on_route_move_key("down"))
         self.shortcut_move_right.activated.connect(lambda: self._on_route_move_key("right"))
         self._route_timer.timeout.connect(self._on_route_tick)
+        self._cavebot_timer.timeout.connect(self._on_cavebot_tick)
 
         for btn in self.action_buttons.values():
             btn.clicked.connect(self._on_action_button_clicked)
 
-    def _on_cavebot_start_clicked(self) -> None:
-        self._cavebot_running = True
-        self.btn_cavebot_start.setEnabled(False)
-        self.btn_cavebot_stop.setEnabled(True)
-        self.lbl_cavebot_status.setText("Estado: running")
+    def _new_cavebot_runtime_context(self) -> RuntimeContext:
+        base_ctx = self._new_route_runtime_context()
+        cfg = replace(
+            base_ctx.config,
+            enable_cavebot=True,
+            enable_targeting=False,
+            enable_healing=False,
+            enable_combat=False,
+        )
+        return RuntimeContext(
+            config=cfg,
+            status=RuntimeStatus(state=RuntimeState.INIT),
+            telemetry=RuntimeTelemetry(),
+        )
 
-    def _on_cavebot_stop_clicked(self) -> None:
+    def _waypoints_for_cavebot_from_script(self, script: Script) -> list[dict[str, object]]:
+        default_radius_px = 2
+        default_max_ticks = 30
+        anchor_x = 64
+        anchor_y = 38
+        anchor_z = 7
+        try:
+            default_radius_px = max(0, int(str(os.environ.get("FRBOT_CAVEBOT_RADIUS_PX", "2") or "2"), 10))
+        except Exception:
+            default_radius_px = 2
+        try:
+            default_max_ticks = max(1, int(str(os.environ.get("FRBOT_CAVEBOT_MAX_TICKS_PER_WAYPOINT", "30") or "30"), 10))
+        except Exception:
+            default_max_ticks = 30
+
+        explicit_anchor_x = os.environ.get("FRBOT_CAVEBOT_ANCHOR_X")
+        explicit_anchor_y = os.environ.get("FRBOT_CAVEBOT_ANCHOR_Y")
+        explicit_anchor_z = os.environ.get("FRBOT_CAVEBOT_ANCHOR_Z")
+
+        try:
+            if explicit_anchor_x is not None:
+                anchor_x = int(str(explicit_anchor_x or "").strip(), 10)
+        except Exception:
+            anchor_x = 64
+        try:
+            if explicit_anchor_y is not None:
+                anchor_y = int(str(explicit_anchor_y or "").strip(), 10)
+        except Exception:
+            anchor_y = 38
+        try:
+            if explicit_anchor_z is not None:
+                anchor_z = int(str(explicit_anchor_z or "").strip(), 10)
+        except Exception:
+            anchor_z = 7
+
+        if explicit_anchor_x is None or explicit_anchor_y is None:
+            try:
+                profile = str(os.environ.get("FRBOT_PROFILE", "prod_emergency") or "prod_emergency").strip().lower()
+                requested_cfg = str(self.input_config_path.text() or os.environ.get("FRBOT_CONFIG_PATH", "") or "").strip()
+                resolved_cfg = Path(self._resolve_valid_roi_config_path(requested_cfg, profile=profile))
+                data = json.loads(resolved_cfg.read_text(encoding="utf-8", errors="replace") or "{}")
+                rois = data.get("rois") if isinstance(data, dict) else None
+                minimap = rois.get("minimap") if isinstance(rois, dict) else None
+                if isinstance(minimap, dict):
+                    w = int(str(minimap.get("width", "0") or "0"), 10)
+                    h = int(str(minimap.get("height", "0") or "0"), 10)
+                    if explicit_anchor_x is None and w > 0:
+                        anchor_x = max(0, int(w // 2))
+                    if explicit_anchor_y is None and h > 0:
+                        anchor_y = max(0, int(h // 2))
+            except Exception:
+                pass
+
+        recorder_md = (getattr(script, "metadata", {}) or {}).get("recorder", {})
+        is_recorder_route = isinstance(recorder_md, dict) and bool(recorder_md)
+
+        enabled_waypoints: list[Waypoint] = [wp for wp in script.waypoints if bool(getattr(wp, "enabled", True))]
+        if enabled_waypoints and (not is_recorder_route):
+            small_coord_count = 0
+            for wp in enabled_waypoints:
+                try:
+                    xx = abs(int(getattr(wp, "x", 0)))
+                    yy = abs(int(getattr(wp, "y", 0)))
+                except Exception:
+                    continue
+                if xx <= 2048 and yy <= 2048:
+                    small_coord_count += 1
+            if small_coord_count >= max(1, int(len(enabled_waypoints) * 0.8)):
+                is_recorder_route = True
+
+        base_x = 0
+        base_y = 0
+        base_z = 0
+        if is_recorder_route:
+            for wp in enabled_waypoints:
+                try:
+                    base_x = int(getattr(wp, "x", 0))
+                    base_y = int(getattr(wp, "y", 0))
+                    base_z = int(getattr(wp, "z", 0))
+                except Exception:
+                    base_x, base_y, base_z = 0, 0, 0
+                break
+
+        route: list[dict[str, object]] = []
+        for idx, wp in enumerate(script.waypoints):
+            if not bool(getattr(wp, "enabled", True)):
+                continue
+            opts = dict(getattr(wp, "options", {}) or {})
+            try:
+                radius_px = max(0, int(opts.get("radius_px", default_radius_px)))
+            except Exception:
+                radius_px = int(default_radius_px)
+            try:
+                max_ticks = max(1, int(opts.get("max_ticks", default_max_ticks)))
+            except Exception:
+                max_ticks = int(default_max_ticks)
+
+            x_val = int(wp.x)
+            y_val = int(wp.y)
+            z_val = int(wp.z)
+            if is_recorder_route:
+                x_val = int(anchor_x) + (int(x_val) - int(base_x))
+                y_val = int(anchor_y) + (int(y_val) - int(base_y))
+                z_val = int(anchor_z) + (int(z_val) - int(base_z))
+
+            route.append(
+                {
+                    "waypoint_id": f"ui_wp_{int(idx)}",
+                    "x": int(x_val),
+                    "y": int(y_val),
+                    "z": int(z_val),
+                    "radius_px": int(radius_px),
+                    "max_ticks": int(max_ticks),
+                    "waypoint_type": str(getattr(wp, "type", "walk") or "walk"),
+                    "options": opts,
+                }
+            )
+        return route
+
+    def _script_waypoints_for_cavebot(self) -> list[dict[str, object]]:
+        return self._waypoints_for_cavebot_from_script(self._script)
+
+    def _apply_cavebot_route_env(self) -> None:
+        self._cavebot_prev_waypoints_env = os.environ.get("FRBOT_CAVEBOT_WAYPOINTS")
+        self._cavebot_prev_waypoints_file_env = os.environ.get("FRBOT_CAVEBOT_WAYPOINTS_FILE")
+        self._cavebot_prev_auto_route_env = os.environ.get("FRBOT_CAVEBOT_AUTO_ROUTE")
+        self._cavebot_prev_waypoint_space_env = os.environ.get("FRBOT_CAVEBOT_WAYPOINT_SPACE")
+
+        route = self._script_waypoints_for_cavebot()
+        if route:
+            def _coord_space_for_item(item: dict[str, object]) -> str:
+                options = item.get("options")
+                if not isinstance(options, dict):
+                    return ""
+                return str(options.get("coord_space", "") or "").strip().lower()
+
+            has_world = any(
+                _coord_space_for_item(item) == "world"
+                for item in route
+            )
+            if has_world:
+                os.environ["FRBOT_CAVEBOT_WAYPOINT_SPACE"] = "world"
+            else:
+                os.environ.pop("FRBOT_CAVEBOT_WAYPOINT_SPACE", None)
+
+            payload = json.dumps(route, ensure_ascii=False, separators=(",", ":"))
+            # Windows CreateProcess/env block can fail for very large vars.
+            # Keep margin below 32767 to avoid runtime startup errors.
+            if len(payload) >= 30000:
+                out_dir = Path.cwd() / "diagnostics"
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out_path = out_dir / "cavebot_ui_waypoints.json"
+                out_path.write_text(payload, encoding="utf-8")
+                os.environ["FRBOT_CAVEBOT_WAYPOINTS_FILE"] = str(out_path)
+                os.environ.pop("FRBOT_CAVEBOT_WAYPOINTS", None)
+            else:
+                os.environ["FRBOT_CAVEBOT_WAYPOINTS"] = payload
+                os.environ.pop("FRBOT_CAVEBOT_WAYPOINTS_FILE", None)
+            os.environ["FRBOT_CAVEBOT_AUTO_ROUTE"] = "0"
+            return
+
+        os.environ.pop("FRBOT_CAVEBOT_WAYPOINTS", None)
+        os.environ.pop("FRBOT_CAVEBOT_WAYPOINTS_FILE", None)
+        os.environ["FRBOT_CAVEBOT_AUTO_ROUTE"] = "1"
+
+    def _force_obs_projector_capture_env(self) -> None:
+        os.environ["FRBOT_CAPTURE_SOURCE"] = "obs"
+        proj_title = str(os.environ.get("FRBOT_OBS_PROJECTOR_TITLE", "") or "").strip()
+        if proj_title:
+            return
+        obs_source = str(os.environ.get("FRBOT_OBS_SOURCE_NAME", "Tibia_Fuente") or "Tibia_Fuente").strip() or "Tibia_Fuente"
+        os.environ["FRBOT_OBS_PROJECTOR_TITLE"] = f"Proyector en ventana (Fuente) - {obs_source}"
+
+    def _minimize_for_capture(self) -> None:
+        try:
+            self.showMinimized()
+            app = QApplication.instance()
+            if app is not None:
+                app.processEvents()
+        except Exception:
+            return
+
+    def _restore_cavebot_route_env(self) -> None:
+        if self._cavebot_prev_waypoints_env is None:
+            os.environ.pop("FRBOT_CAVEBOT_WAYPOINTS", None)
+        else:
+            os.environ["FRBOT_CAVEBOT_WAYPOINTS"] = str(self._cavebot_prev_waypoints_env)
+
+        if self._cavebot_prev_waypoints_file_env is None:
+            os.environ.pop("FRBOT_CAVEBOT_WAYPOINTS_FILE", None)
+        else:
+            os.environ["FRBOT_CAVEBOT_WAYPOINTS_FILE"] = str(self._cavebot_prev_waypoints_file_env)
+
+        if self._cavebot_prev_auto_route_env is None:
+            os.environ.pop("FRBOT_CAVEBOT_AUTO_ROUTE", None)
+        else:
+            os.environ["FRBOT_CAVEBOT_AUTO_ROUTE"] = str(self._cavebot_prev_auto_route_env)
+
+        if self._cavebot_prev_waypoint_space_env is None:
+            os.environ.pop("FRBOT_CAVEBOT_WAYPOINT_SPACE", None)
+        else:
+            os.environ["FRBOT_CAVEBOT_WAYPOINT_SPACE"] = str(self._cavebot_prev_waypoint_space_env)
+
+    def _route_try_localize_world(
+        self,
+        *,
+        frame: Any,
+        tile: tuple[int, int, int],
+    ) -> tuple[int, int, int] | None:
+        try:
+            if self._route_marker_cfg is None:
+                self._set_route_world_lock_status(False)
+                return None
+            raw_dir = str(os.environ.get("FRBOT_TIBIA_MAP_DATA_DIR", "") or "").strip()
+            if not raw_dir:
+                self._set_route_world_lock_status(False)
+                return None
+            if self._route_tibia_dataset is None:
+                self._route_tibia_dataset = load_tibia_map_dataset()
+
+            det = detect_minimap_marker(frame, self._route_marker_cfg)
+            if det is None:
+                self._set_route_world_lock_status(False)
+                return None
+
+            min_score = self._route_localize_min_score()
+
+            prev_world = self._route_last_world
+            if prev_world is not None and int(prev_world[2]) != int(tile[2]):
+                prev_world = None
+
+            loc = localize_minimap(
+                minimap_rgb=bytes(getattr(frame, "minimap_rgb", b"")),
+                minimap_width=int(getattr(frame, "minimap_width", 0)),
+                minimap_height=int(getattr(frame, "minimap_height", 0)),
+                floor_z=int(tile[2]),
+                dataset=self._route_tibia_dataset,
+                marker_px=(int(round(float(det.pos.px))), int(round(float(det.pos.py)))),
+                marker_rgb=(
+                    int(self._route_marker_cfg.rgb[0]),
+                    int(self._route_marker_cfg.rgb[1]),
+                    int(self._route_marker_cfg.rgb[2]),
+                ),
+                marker_tol=int(self._route_marker_cfg.tol),
+                prev_player_world=(int(prev_world[0]), int(prev_world[1])) if prev_world is not None else None,
+            )
+
+            if bool(loc.ambiguous):
+                self._set_route_world_lock_status(False, score=float(loc.score))
+                return None
+            if float(loc.score) < float(min_score):
+                self._set_route_world_lock_status(False, score=float(loc.score))
+                return None
+
+            out = (int(loc.player_x), int(loc.player_y), int(loc.player_z))
+            self._route_last_world = out
+            self._set_route_world_lock_status(True, score=float(loc.score))
+            return out
+        except Exception:
+            self._set_route_world_lock_status(False)
+            return None
+
+    def _annotate_script_with_world_coords(self, script: Script) -> Script:
+        mapping = dict(self._route_world_by_rel)
+        if not mapping:
+            return script
+
+        used = 0
+        for wp in script.waypoints:
+            rel = (int(getattr(wp, "x", 0)), int(getattr(wp, "y", 0)), int(getattr(wp, "z", 0)))
+            world = mapping.get(rel)
+            if world is None:
+                continue
+            opts = dict(getattr(wp, "options", {}) or {})
+            opts["coord_space"] = "world"
+            opts["world_x"] = int(world[0])
+            opts["world_y"] = int(world[1])
+            opts["world_z"] = int(world[2])
+            wp.options = opts
+            used += 1
+
+        md = dict(getattr(script, "metadata", {}) or {})
+        rec = dict(md.get("recorder", {}) or {})
+        rec["coord_space"] = "world"
+        rec["world_waypoints"] = int(used)
+        rec["world_waypoints_total"] = int(len(script.waypoints))
+        md["recorder"] = rec
+        script.metadata = md
+        return script
+
+    def _build_route_script_for_output(self) -> Script:
+        if self._route_session is None:
+            raise RuntimeError("route_session_missing")
+        script = self._route_session.build_script()
+        return self._annotate_script_with_world_coords(script)
+
+    def _terminate_cavebot_process(self, proc: object) -> None:
+        try:
+            if getattr(proc, "poll")() is not None:
+                return
+        except Exception:
+            return
+
+        pid = 0
+        try:
+            pid = int(getattr(proc, "pid", 0) or 0)
+        except Exception:
+            pid = 0
+
+        if sys.platform == "win32" and int(pid) > 0:
+            try:
+                subprocess.run(
+                    ["taskkill", "/PID", str(int(pid)), "/T", "/F"],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                )
+            except Exception:
+                pass
+
+        try:
+            if getattr(proc, "poll")() is None:
+                getattr(proc, "terminate")()
+                try:
+                    getattr(proc, "wait")(timeout=3)
+                except Exception:
+                    getattr(proc, "kill")()
+        except Exception:
+            pass
+
+    def _stop_cavebot_runtime(self, *, status_text: str) -> None:
+        self._cavebot_timer.stop()
+        proc = self._cavebot_proc
+        if proc is not None:
+            self._terminate_cavebot_process(proc)
         self._cavebot_running = False
+        self._cavebot_proc = None
+        self._restore_cavebot_route_env()
+
         self.btn_cavebot_start.setEnabled(True)
         self.btn_cavebot_stop.setEnabled(False)
-        self.lbl_cavebot_status.setText("Estado: detenido")
+        self.lbl_cavebot_status.setText(f"Estado: {status_text}")
+        self.lbl_cavebot_runtime.setText("Tick: 0 | WP: -")
+
+    def _read_last_fatal_reason(self) -> str:
+        try:
+            p = Path.cwd() / "diagnostics" / "fatal.log"
+            if not p.exists():
+                return "unknown"
+            payload = json.loads(p.read_text(encoding="utf-8", errors="replace") or "{}")
+            reason = str(payload.get("reason") or "unknown").strip() or "unknown"
+            return reason
+        except Exception:
+            return "unknown"
+
+    def _candidate_cavebot_trace_paths(self) -> list[Path]:
+        candidates: list[Path] = []
+        raw_frames_dir = str(os.environ.get("FRBOT_REAL_FRAMES_DIR", "") or "").strip()
+        if raw_frames_dir:
+            candidates.append(Path(raw_frames_dir) / "cavebot_trace.jsonl")
+        cwd = Path.cwd()
+        candidates.extend(
+            [
+                cwd / "diagnostics" / "frames" / "cavebot_trace.jsonl",
+                cwd / "diagnostics" / "frames_emergency" / "cavebot_trace.jsonl",
+                cwd / "diagnostics" / "frames_full" / "cavebot_trace.jsonl",
+            ]
+        )
+
+        existing: list[Path] = []
+        seen: set[str] = set()
+        for p in candidates:
+            key = str(p.resolve()) if p.exists() else str(p)
+            if key in seen:
+                continue
+            seen.add(key)
+            if p.exists() and p.is_file():
+                existing.append(p)
+
+        existing.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        return existing
+
+    def _read_latest_cavebot_trace_event(self) -> dict[str, Any] | None:
+        for path in self._candidate_cavebot_trace_paths():
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except Exception:
+                continue
+            for raw in reversed(lines):
+                row = str(raw or "").strip()
+                if not row:
+                    continue
+                try:
+                    payload = json.loads(row)
+                except Exception:
+                    continue
+                if not isinstance(payload, dict):
+                    continue
+                if str(payload.get("event", "") or "").strip() == "":
+                    continue
+                return payload
+        return None
+
+    def _format_cavebot_runtime_from_trace(self, payload: dict[str, Any]) -> str:
+        tick = payload.get("tick_index", "?")
+        wp = "-"
+        waypoint = payload.get("waypoint")
+        if isinstance(waypoint, dict):
+            wp = str(waypoint.get("waypoint_id", "-") or "-")
+        blocked = str(payload.get("blocked_reason", "none") or "none")
+        roi_sanity = str(payload.get("roi_sanity_reason", "") or "").strip()
+        pnf = bool(payload.get("pnf", False))
+        keys_raw = payload.get("last_keys_sent")
+        keys = "-"
+        if isinstance(keys_raw, list):
+            keys = ",".join([str(k) for k in keys_raw if str(k or "").strip()]) or "-"
+        elif str(payload.get("key", "") or "").strip():
+            keys = str(payload.get("key", "") or "").strip()
+
+        try:
+            dist_after = float(payload.get("distance_after_px", 0.0) or 0.0)
+        except Exception:
+            dist_after = 0.0
+        try:
+            angle = float(payload.get("angle_deg", 0.0) or 0.0)
+        except Exception:
+            angle = 0.0
+
+        roi_info = ""
+        if blocked == "roi_invalid" and roi_sanity:
+            roi_info = f" | roi:{roi_sanity}"
+
+        return (
+            f"Tick: {tick} | WP: {wp} | block:{blocked}{roi_info} | pnf:{1 if pnf else 0} "
+            f"| key:{keys} | d:{dist_after:.1f} | a:{angle:.0f}"
+        )
+
+    def _build_cavebot_process_env(self) -> dict[str, str]:
+        env = dict(os.environ)
+        profile = str(env.get("FRBOT_PROFILE", "prod_emergency") or "prod_emergency").strip().lower()
+        env["FRBOT_PROFILE"] = "prod_full" if profile == "prod_full" else "prod_emergency"
+        env["FRBOT_MODE"] = "cavebot_full" if env["FRBOT_PROFILE"] == "prod_full" else "cavebot"
+        env["FRBOT_CAPTURE_SOURCE"] = "obs_source"
+        obs_src = str(env.get("FRBOT_OBS_SOURCE_NAME", "Tibia_Fuente") or "Tibia_Fuente").strip() or "Tibia_Fuente"
+        env["FRBOT_OBS_SOURCE_NAME"] = obs_src
+        default_cfg = "config/rois_prod_full.json" if env["FRBOT_PROFILE"] == "prod_full" else "rois_prod_emergency.json"
+        requested_cfg = str(self.input_config_path.text() or env.get("FRBOT_CONFIG_PATH", default_cfg) or default_cfg).strip() or default_cfg
+        resolved_cfg = self._resolve_valid_roi_config_path(requested_cfg, profile=env["FRBOT_PROFILE"])
+        env["FRBOT_CONFIG_PATH"] = str(resolved_cfg)
+        env["FRBOT_TRY_FOCUS"] = "1" if bool(self.chk_try_focus.isChecked()) else str(env.get("FRBOT_TRY_FOCUS", "1") or "1")
+        env.setdefault("FRBOT_CAVEBOT_WRONG_DIRECTION_ANGLE_DEG", "130")
+        env.setdefault("FRBOT_CAVEBOT_WRONG_DIRECTION_ABORT_STREAK", "6")
+        env.setdefault("FRBOT_CAVEBOT_MARKER_AREA_RATIO_MAX", "0.80")
+        env.setdefault("FRBOT_CAVEBOT_STUCK_WINDOW", "12")
+
+        marker_rgb = str(env.get("FRBOT_PLAYER_MARKER_RGB", "") or "").strip()
+        marker_tol = str(env.get("FRBOT_PLAYER_MARKER_TOL", "") or "").strip()
+        if marker_rgb in {"", "0,200,0"}:
+            env["FRBOT_PLAYER_MARKER_RGB"] = "255,0,255"
+        if marker_tol in {"", "45"}:
+            env["FRBOT_PLAYER_MARKER_TOL"] = "30"
+
+        # Guard against invalid HWND inherited from shell profile/history.
+        raw_hwnd = str(env.get("FRBOT_WINDOW_HWND", "") or "").strip()
+        raw_title = str(env.get("FRBOT_WINDOW_TITLE", "") or "").strip()
+
+        def _is_hwnd_placeholder(s: str) -> bool:
+            ss = str(s or "").strip().lower()
+            if not ss:
+                return False
+            if ss.startswith("0x") and len(ss) > 2 and set(ss[2:]) == {"x"}:
+                return True
+            return ss in {"0xyourhwnd", "yourhwnd", "0x<yourhwnd>"}
+
+        hwnd_ok = False
+        if raw_hwnd and not _is_hwnd_placeholder(raw_hwnd):
+            try:
+                hwnd_ok = int(raw_hwnd, 0) >= 0
+            except Exception:
+                hwnd_ok = False
+
+        if not hwnd_ok:
+            env.pop("FRBOT_WINDOW_HWND", None)
+
+        if raw_title:
+            env["FRBOT_WINDOW_TITLE"] = raw_title
+        elif not hwnd_ok:
+            # Startup guards require one selector; default to Tibia title substring.
+            env["FRBOT_WINDOW_TITLE"] = "Tibia"
+
+        return {str(k): str(v) for k, v in env.items()}
+
+    def _roi_config_schema_ok(self, path: Path, *, profile: str) -> bool:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8", errors="replace") or "{}")
+        except Exception:
+            return False
+        if not isinstance(data, dict):
+            return False
+        rois = data.get("rois")
+        if not isinstance(rois, dict):
+            return False
+        if not _REQUIRED_REAL_ROIS.issubset(set(rois.keys())):
+            return False
+        for name, roi in rois.items():
+            if not isinstance(name, str) or not isinstance(roi, dict):
+                return False
+            vx = roi.get("x")
+            vy = roi.get("y")
+            vw = roi.get("width")
+            vh = roi.get("height")
+            if vx is None or vy is None or vw is None or vh is None:
+                return False
+            try:
+                x = int(str(vx))
+                y = int(str(vy))
+                w = int(str(vw))
+                h = int(str(vh))
+            except Exception:
+                return False
+            if x < 0 or y < 0 or w <= 0 or h <= 0:
+                return False
+
+        keys = set(rois.keys())
+        extra = keys - set(_REQUIRED_REAL_ROIS)
+        if profile == "prod_full":
+            if not extra.issubset(set(_ALLOWED_PROD_FULL_EXTRA_ROIS)):
+                return False
+        else:
+            if not extra.issubset(set(_ALLOWED_PROD_EMERGENCY_EXTRA_ROIS)):
+                return False
+        return True
+
+    def _resolve_valid_roi_config_path(self, requested: str, *, profile: str) -> str:
+        profile_key = "prod_full" if str(profile or "").strip().lower() == "prod_full" else "prod_emergency"
+        if profile_key == "prod_full":
+            defaults = ["config/rois_prod_full.json", "rois_prod_full.json", "rois_prod_emergency.json"]
+        else:
+            defaults = ["rois_prod_emergency.json", "config/rois_prod_full.json", "rois_prod_full.json"]
+        candidates = [str(requested or "").strip(), *defaults]
+        seen: set[str] = set()
+        for raw in candidates:
+            p_raw = str(raw or "").strip()
+            if not p_raw or p_raw in seen:
+                continue
+            seen.add(p_raw)
+            p = Path(p_raw)
+            if not p.is_absolute():
+                p = (Path.cwd() / p).resolve()
+            if not p.exists() or not p.is_file():
+                continue
+            if self._roi_config_schema_ok(p, profile=profile_key):
+                return str(p)
+        return str(requested or ("config/rois_prod_full.json" if profile_key == "prod_full" else "rois_prod_emergency.json"))
+
+    def _on_cavebot_start_clicked(self) -> None:
+        if bool(self._cavebot_running):
+            return
+        try:
+            log_json(_LOG, event="ui_action", gate="ui", action="cavebot_start", phase="begin")
+            self._minimize_for_capture()
+            self._apply_runtime_env_from_ui()
+            self._force_obs_projector_capture_env()
+            self._apply_cavebot_route_env()
+
+            env = self._build_cavebot_process_env()
+            python_exec = str(sys.executable or "").strip() or "python"
+            self._cavebot_proc = subprocess.Popen(
+                [python_exec, "main.py"],
+                cwd=str(Path.cwd()),
+                env=env,
+            )
+            self._cavebot_running = True
+
+            self._cavebot_timer.setInterval(350)
+            self._cavebot_timer.start()
+
+            self.btn_cavebot_start.setEnabled(False)
+            self.btn_cavebot_stop.setEnabled(True)
+            self.lbl_cavebot_status.setText("Estado: running")
+            self.lbl_cavebot_runtime.setText("Tick: process | WP: external")
+            log_json(_LOG, event="ui_action", gate="ui", action="cavebot_start", phase="success")
+        except Exception as exc:
+            _LOG.exception("Failed to start cavebot: %s", exc)
+            log_json(_LOG, event="ui_action", gate="ui", action="cavebot_start", phase="failed", reason=str(exc))
+            write_fatal("cavebot_ui_start_failed", exc, details={"reason": str(exc)})
+            self._stop_cavebot_runtime(status_text=f"error ({str(exc)})")
+            self._show_error("Cavebot", f"No se pudo iniciar Cavebot.\n\n{exc}")
+
+    def _on_cavebot_stop_clicked(self) -> None:
+        self._stop_cavebot_runtime(status_text="detenido")
+
+    def _on_cavebot_tick(self) -> None:
+        if not bool(self._cavebot_running):
+            return
+        proc = self._cavebot_proc
+        if proc is None:
+            self._stop_cavebot_runtime(status_text="error (proceso no inicializado)")
+            return
+        try:
+            code = proc.poll()
+            if code is None:
+                self.lbl_cavebot_status.setText("Estado: running")
+                trace_payload = self._read_latest_cavebot_trace_event()
+                if trace_payload is not None:
+                    self.lbl_cavebot_runtime.setText(self._format_cavebot_runtime_from_trace(trace_payload))
+                return
+
+            self._cavebot_last_exit = int(code)
+            if int(code) == 0:
+                self._stop_cavebot_runtime(status_text="detenido (ok)")
+                return
+
+            fatal_reason = self._read_last_fatal_reason()
+            self._stop_cavebot_runtime(status_text=f"error ({fatal_reason})")
+        except Exception as exc:
+            _LOG.exception("Cavebot process polling failed: %s", exc)
+            write_fatal("cavebot_ui_tick_failed", exc, details={"reason": str(exc)})
+            self._stop_cavebot_runtime(status_text=f"error ({str(exc)})")
 
     def _collect_healing_config(self) -> dict[str, Any]:
         return {
@@ -837,6 +1630,7 @@ class MainWindow(QMainWindow):
         return {
             "config_path": str(self.input_config_path.text() or "config/rois_prod_full.json").strip() or "config/rois_prod_full.json",
             "tick_hz": int(self.spin_tick_hz.value()),
+            "route_localize_min_score": max(0.0, min(1.0, float(self.spin_route_localize_min_score.value()))),
             "try_focus": bool(self.chk_try_focus.isChecked()),
         }
 
@@ -850,6 +1644,7 @@ class MainWindow(QMainWindow):
         self.spin_heal_hp_threshold.blockSignals(True)
         self.input_config_path.blockSignals(True)
         self.spin_tick_hz.blockSignals(True)
+        self.spin_route_localize_min_score.blockSignals(True)
         self.chk_try_focus.blockSignals(True)
         try:
             self.chk_healing_enabled.setChecked(bool(healing_md.get("enabled", True)))
@@ -860,6 +1655,11 @@ class MainWindow(QMainWindow):
             self.input_config_path.setText(str(general_md.get("config_path", "config/rois_prod_full.json") or "config/rois_prod_full.json"))
             tick_hz = int(general_md.get("tick_hz", 20) or 20)
             self.spin_tick_hz.setValue(max(1, min(120, int(tick_hz))))
+            try:
+                localize_min_score = float(general_md.get("route_localize_min_score", self._route_localize_min_score()) or self._route_localize_min_score())
+            except Exception:
+                localize_min_score = self._route_localize_min_score()
+            self.spin_route_localize_min_score.setValue(max(0.0, min(1.0, float(localize_min_score))))
             self.chk_try_focus.setChecked(bool(general_md.get("try_focus", True)))
         finally:
             self.chk_healing_enabled.blockSignals(False)
@@ -867,6 +1667,7 @@ class MainWindow(QMainWindow):
             self.spin_heal_hp_threshold.blockSignals(False)
             self.input_config_path.blockSignals(False)
             self.spin_tick_hz.blockSignals(False)
+            self.spin_route_localize_min_score.blockSignals(False)
             self.chk_try_focus.blockSignals(False)
 
     def _write_aux_controls_to_metadata(self) -> None:
@@ -891,13 +1692,17 @@ class MainWindow(QMainWindow):
             "FRBOT_HEAL_HP_THRESHOLD": f"{hp_ratio:.2f}",
             "FRBOT_CONFIG_PATH": str(settings["config_path"]),
             "FRBOT_TICK_HZ": str(int(settings["tick_hz"])),
+            "FRBOT_ROUTE_LOCALIZE_MIN_SCORE": f"{float(settings['route_localize_min_score']):.2f}",
             "FRBOT_TRY_FOCUS": "1" if bool(settings["try_focus"]) else "0",
+            "FRBOT_PLAYER_MARKER_RGB": str(os.environ.get("FRBOT_PLAYER_MARKER_RGB", _DEFAULT_PLAYER_MARKER_RGB) or _DEFAULT_PLAYER_MARKER_RGB),
+            "FRBOT_PLAYER_MARKER_TOL": str(os.environ.get("FRBOT_PLAYER_MARKER_TOL", _DEFAULT_PLAYER_MARKER_TOL) or _DEFAULT_PLAYER_MARKER_TOL),
         }
 
     def _on_aux_controls_changed(self, *_: Any) -> None:
         try:
             self._write_aux_controls_to_metadata()
             self._apply_runtime_env_from_ui()
+            self._update_route_world_lock_tooltip()
             self._mark_dirty()
         except Exception as exc:
             _LOG.exception("Failed to sync auxiliary UI controls: %s", exc)
@@ -962,6 +1767,7 @@ class MainWindow(QMainWindow):
         self.spin_heal_hp_threshold.blockSignals(True)
         self.input_config_path.blockSignals(True)
         self.spin_tick_hz.blockSignals(True)
+        self.spin_route_localize_min_score.blockSignals(True)
         self.chk_try_focus.blockSignals(True)
         try:
             if "FRBOT_ENABLE_HEALING" in env_values:
@@ -986,6 +1792,13 @@ class MainWindow(QMainWindow):
             if "FRBOT_TICK_HZ" in env_values:
                 self.spin_tick_hz.setValue(_env_int(env_values.get("FRBOT_TICK_HZ", "20"), 20, 1, 120))
 
+            if "FRBOT_ROUTE_LOCALIZE_MIN_SCORE" in env_values:
+                try:
+                    localize_min_score = float(str(env_values.get("FRBOT_ROUTE_LOCALIZE_MIN_SCORE", "0.55")).strip())
+                except Exception:
+                    localize_min_score = 0.55
+                self.spin_route_localize_min_score.setValue(max(0.0, min(1.0, float(localize_min_score))))
+
             if "FRBOT_TRY_FOCUS" in env_values:
                 self.chk_try_focus.setChecked(_env_bool(env_values.get("FRBOT_TRY_FOCUS", "1"), True))
         finally:
@@ -994,6 +1807,7 @@ class MainWindow(QMainWindow):
             self.spin_heal_hp_threshold.blockSignals(False)
             self.input_config_path.blockSignals(False)
             self.spin_tick_hz.blockSignals(False)
+            self.spin_route_localize_min_score.blockSignals(False)
             self.chk_try_focus.blockSignals(False)
 
     def _on_import_env_clicked(self) -> None:
@@ -1020,6 +1834,7 @@ class MainWindow(QMainWindow):
                 "FRBOT_HEAL_HP_THRESHOLD",
                 "FRBOT_CONFIG_PATH",
                 "FRBOT_TICK_HZ",
+                "FRBOT_ROUTE_LOCALIZE_MIN_SCORE",
                 "FRBOT_TRY_FOCUS",
             ]
             applied = [k for k in supported_keys if k in env_values]
@@ -1040,33 +1855,36 @@ class MainWindow(QMainWindow):
             return 7
 
     def _update_route_counters(self) -> None:
-        recorder = self._waypoint_recorder
-        if recorder is None:
+        session = self._route_session
+        if session is None:
             self.lbl_route_counts.setText("Steps: 0 | Move: 0 | Rope: 0 | Shovel: 0 | Pick: 0 | Up: 0 | Down: 0")
             return
 
-        steps = list(recorder.steps)
-        total = int(len(steps))
+        waypoints = list(session.waypoints)
+        total = int(len(waypoints))
         move = 0
         rope = 0
         shovel = 0
         pick = 0
         up = 0
         down = 0
-        for step in steps:
-            t = str(getattr(step, 'action_kind', '') or '').strip().lower()
-            if t == 'move':
+        for wp in waypoints:
+            wp_type = str(getattr(wp, 'type', '') or '').strip().lower()
+            action_kind = str((getattr(wp, 'options', {}) or {}).get('action_kind', '')).strip().lower()
+            if wp_type == WaypointType.WALK.value:
                 move += 1
-            elif t == 'rope':
+            elif wp_type == WaypointType.ROPE.value:
                 rope += 1
-            elif t == 'shovel':
-                shovel += 1
-            elif t == 'pick':
-                pick += 1
-            elif t == 'stairs_up':
-                up += 1
-            elif t == 'stairs_down':
-                down += 1
+            elif wp_type == WaypointType.USE_RIGHT_CLICK.value:
+                if action_kind == 'pick':
+                    pick += 1
+                else:
+                    shovel += 1
+            elif wp_type == WaypointType.USE_LADDER.value:
+                if action_kind == 'stairs_down':
+                    down += 1
+                else:
+                    up += 1
 
         self.lbl_route_counts.setText(
             f"Steps: {total} | Move: {move} | Rope: {rope} | Shovel: {shovel} | Pick: {pick} | Up: {up} | Down: {down}"
@@ -1074,15 +1892,57 @@ class MainWindow(QMainWindow):
 
     def _set_route_controls_enabled(self, *, recording: bool) -> None:
         self.btn_route_start.setEnabled(not bool(recording))
-        self.btn_route_stop.setEnabled(self._waypoint_recorder is not None)
-        self.btn_route_apply.setEnabled(self._waypoint_recorder is not None and not bool(recording))
+        self.btn_route_stop.setEnabled(self._route_session is not None)
+        self.btn_route_apply.setEnabled(self._route_session is not None and not bool(recording))
         self.btn_route_mark_rope.setEnabled(bool(recording))
         self.btn_route_mark_shovel.setEnabled(bool(recording))
         self.btn_route_mark_pick.setEnabled(bool(recording))
         self.btn_route_mark_up.setEnabled(bool(recording))
         self.btn_route_mark_down.setEnabled(bool(recording))
-        self.btn_route_export.setEnabled(self._waypoint_recorder is not None)
-        self.btn_route_open_folder.setEnabled(self._waypoint_recorder is not None)
+        self.btn_route_export.setEnabled(self._route_session is not None)
+        self.btn_route_save_recording.setEnabled(self._route_session is not None)
+        self.btn_route_open_folder.setEnabled(self._route_session is not None)
+
+    def _route_localize_min_score(self) -> float:
+        ui_spin = getattr(self, "spin_route_localize_min_score", None)
+        if ui_spin is not None:
+            try:
+                return max(0.0, min(1.0, float(ui_spin.value())))
+            except Exception:
+                pass
+        raw = str(os.environ.get("FRBOT_ROUTE_LOCALIZE_MIN_SCORE", "0.55") or "0.55").strip()
+        try:
+            val = float(raw)
+        except Exception:
+            val = 0.55
+        return max(0.0, min(1.0, float(val)))
+
+    def _update_route_world_lock_tooltip(self) -> None:
+        min_score = self._route_localize_min_score()
+        self.lbl_route_world_lock.setToolTip(
+            f"Localización absoluta minimap→mundo. Umbral ON/OFF: score >= {float(min_score):.2f} (FRBOT_ROUTE_LOCALIZE_MIN_SCORE)."
+        )
+
+    def _set_route_world_lock_status(self, enabled: bool, *, score: float | None = None) -> None:
+        self._route_world_lock_on = bool(enabled)
+        self._update_route_world_lock_tooltip()
+        if score is not None:
+            self._route_world_lock_last_score = float(score)
+        if bool(enabled):
+            if score is None:
+                self.lbl_route_world_lock.setText("✓ World lock: ON")
+            else:
+                self.lbl_route_world_lock.setText(f"✓ World lock: ON ({float(score):.2f})")
+            self.lbl_route_world_lock.setStyleSheet(f"color: {_TEXT};")
+            return
+        shown_score = score
+        if shown_score is None:
+            shown_score = self._route_world_lock_last_score
+        if shown_score is None:
+            self.lbl_route_world_lock.setText("✗ World lock: OFF")
+        else:
+            self.lbl_route_world_lock.setText(f"✗ World lock: OFF ({float(shown_score):.2f})")
+        self.lbl_route_world_lock.setStyleSheet(f"color: {_ACCENT};")
 
     def _new_route_runtime_context(self) -> RuntimeContext:
         window_hwnd = 0
@@ -1119,8 +1979,8 @@ class MainWindow(QMainWindow):
             enable_healing=False,
             enable_combat=False,
             minimap_roi=str(os.environ.get("FRBOT_MINIMAP_ROI", "minimap") or "minimap"),
-            player_marker_rgb=str(os.environ.get("FRBOT_PLAYER_MARKER_RGB", "255,0,255") or "255,0,255"),
-            player_marker_tol=int(str(os.environ.get("FRBOT_PLAYER_MARKER_TOL", "30") or "30")),
+            player_marker_rgb=str(os.environ.get("FRBOT_PLAYER_MARKER_RGB", _DEFAULT_PLAYER_MARKER_RGB) or _DEFAULT_PLAYER_MARKER_RGB),
+            player_marker_tol=int(str(os.environ.get("FRBOT_PLAYER_MARKER_TOL", _DEFAULT_PLAYER_MARKER_TOL) or _DEFAULT_PLAYER_MARKER_TOL)),
             player_marker_min_pixels=int(str(os.environ.get("FRBOT_PLAYER_MARKER_MIN_PIXELS", "5") or "5")),
             player_marker_max_pixels=int(str(os.environ.get("FRBOT_PLAYER_MARKER_MAX_PIXELS", "0") or "0")),
             window_hwnd=int(window_hwnd),
@@ -1138,52 +1998,9 @@ class MainWindow(QMainWindow):
             self.lbl_route_status.setText("Recorder: ya está grabando")
             return
         try:
-            ctx = self._new_route_runtime_context()
-            try:
-                capture, _input, binding = runtime_preflight(ctx)
-            except Exception as first_exc:
-                reason = str(first_exc or "").strip().lower()
-                if "obs_source_not_found" not in reason:
-                    if "window_not_foreground" not in reason:
-                        raise
-                    prev_profile = os.environ.get("FRBOT_PROFILE")
-                    try:
-                        os.environ["FRBOT_PROFILE"] = "ui_local"
-                        os.environ["FRBOT_TRY_FOCUS"] = "1"
-                        os.environ["FRBOT_FOREGROUND_RETRIES"] = "12"
-                        os.environ["FRBOT_FOREGROUND_DELAY_MS"] = "120"
-                        ctx = self._new_route_runtime_context()
-                        capture, _input, binding = runtime_preflight(ctx)
-                        self.lbl_route_status.setText("Recorder: fallback local (sin guard foreground prod)")
-                    finally:
-                        if prev_profile is None:
-                            os.environ.pop("FRBOT_PROFILE", None)
-                        else:
-                            os.environ["FRBOT_PROFILE"] = str(prev_profile)
-                else:
-                    os.environ["FRBOT_CAPTURE_SOURCE"] = "client"
-                    ctx = self._new_route_runtime_context()
-                    try:
-                        capture, _input, binding = runtime_preflight(ctx)
-                        self.lbl_route_status.setText("Recorder: fallback a captura cliente")
-                    except Exception as second_exc:
-                        reason2 = str(second_exc or "").strip().lower()
-                        if "window_not_foreground" not in reason2:
-                            raise
-                        prev_profile = os.environ.get("FRBOT_PROFILE")
-                        try:
-                            os.environ["FRBOT_PROFILE"] = "ui_local"
-                            os.environ["FRBOT_TRY_FOCUS"] = "1"
-                            os.environ["FRBOT_FOREGROUND_RETRIES"] = "12"
-                            os.environ["FRBOT_FOREGROUND_DELAY_MS"] = "120"
-                            ctx = self._new_route_runtime_context()
-                            capture, _input, binding = runtime_preflight(ctx)
-                            self.lbl_route_status.setText("Recorder: fallback local (sin guard foreground prod)")
-                        finally:
-                            if prev_profile is None:
-                                os.environ.pop("FRBOT_PROFILE", None)
-                            else:
-                                os.environ["FRBOT_PROFILE"] = str(prev_profile)
+            log_json(_LOG, event="ui_action", gate="ui", action="route_record_start", phase="begin")
+            self._force_obs_projector_capture_env()
+            ctx, capture = self._route_capture_with_obs_fallback()
 
             marker_cfg = marker_config_from_env(
                 str(ctx.config.player_marker_rgb),
@@ -1195,51 +2012,117 @@ class MainWindow(QMainWindow):
             )
 
             self._route_capture = capture
-            self._route_binding = binding
+            self._route_binding = None
             self._route_sampler = MinimapRouteSampler(
                 marker_cfg=marker_cfg,
                 pixels_per_tile=float(ctx.config.pixels_per_tile),
                 z=int(self._route_z()),
             )
-            self._waypoint_recorder = WaypointRecorder(
-                capture=capture,
-                input_adapter=_input,
-                binding=binding,
-                marker_cfg=marker_cfg,
-                out_dir=Path.cwd() / "diagnostics" / "waypoints",
-                max_steps=2000,
+            self._route_marker_cfg = marker_cfg
+            self._route_tibia_dataset = None
+            self._route_world_by_rel = {}
+            self._route_last_world = None
+            self._route_world_lock_last_score = None
+            self._set_route_world_lock_status(False)
+            self._route_session = RouteRecordingSession(
+                script_name=f"recorded_route_{int(time.time())}",
+                default_z=int(self._route_z()),
+                simplify_straight_every=3,
             )
-            self._waypoint_recorder.start(
-                {
-                    "script_name": f"waypoints_{int(time.time())}",
-                    "window_title": str(ctx.config.window_title_substring),
-                    "window_hwnd": int(ctx.config.window_hwnd),
-                    "capture_source": str(os.environ.get("FRBOT_CAPTURE_SOURCE", "") or ""),
-                }
-            )
+            self._route_last_minimap_digest = ""
+            self._route_floor_change_streak = 0
+            self._route_last_tile = None
+            self.route_steps_list.clear()
             self._route_recording_active = True
+            self._route_timer.start()
             self._set_route_controls_enabled(recording=True)
             self.lbl_route_status.setText("Recorder: grabando...")
             self._update_route_counters()
+            log_json(_LOG, event="ui_action", gate="ui", action="route_record_start", phase="success")
         except Exception as exc:
             _LOG.exception("Failed to start route recorder: %s", exc)
+            log_json(_LOG, event="ui_action", gate="ui", action="route_record_start", phase="failed", reason=str(exc))
             write_fatal("waypoint_record_failed", exc, details={"reason": str(exc), "phase": "start"})
             self._show_error("Route Recorder", f"No se pudo iniciar la grabación.\n\n{exc}")
 
+    def _route_capture_with_obs_fallback(self) -> tuple[RuntimeContext, Any]:
+        ctx = self._new_route_runtime_context()
+        try:
+            return ctx, route_capture_only_preflight(ctx)
+        except PreflightFailed as exc:
+            reason = str(exc)
+            if reason not in {
+                "obs_source_not_found",
+                "minimap_player_not_found",
+                "minimap_not_detected",
+                "capture_black_or_unavailable",
+                "obs_capture_invalid_content",
+            }:
+                raise
+
+        for cand in self._pick_obs_source_candidates():
+            os.environ["FRBOT_OBS_SOURCE_NAME"] = str(cand)
+            self.lbl_route_status.setText(f"Recorder: reintentando con fuente OBS '{cand}'...")
+            try:
+                ctx = self._new_route_runtime_context()
+                return ctx, route_capture_only_preflight(ctx)
+            except PreflightFailed:
+                continue
+
+        ctx = self._new_route_runtime_context()
+        return ctx, route_capture_only_preflight(ctx)
+
+    def _pick_obs_source_candidates(self) -> list[str]:
+        current = str(os.environ.get("FRBOT_OBS_SOURCE_NAME", "") or "").strip().lower()
+        candidates = list_obs_input_names()
+        if not candidates:
+            return []
+
+        def _score(name: str) -> int:
+            n = str(name or "").strip().lower()
+            score = 0
+            if current and current in n:
+                score += 5
+            if "tibia" in n:
+                score += 10
+            if "game" in n:
+                score += 4
+            if "window" in n:
+                score += 3
+            if "display" in n or "monitor" in n:
+                score += 2
+            if "captur" in n or "fuente" in n:
+                score += 1
+            return score
+
+        ordered = sorted(candidates, key=_score, reverse=True)
+        out: list[str] = []
+        seen: set[str] = set()
+        for name in ordered:
+            s = str(name or "").strip()
+            if not s:
+                continue
+            key = s.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(s)
+        return out
+
     def _on_route_stop_clicked(self) -> None:
         try:
-            if self._waypoint_recorder is None:
+            if self._route_session is None:
                 self.lbl_route_status.setText("Recorder: ya está detenido")
                 self._set_route_controls_enabled(recording=False)
                 return
 
             if bool(self._route_recording_active):
-                self._waypoint_recorder.pause()
+                self._route_timer.stop()
                 self._route_recording_active = False
                 self.btn_route_stop.setText("Reanudar")
-                self.lbl_route_status.setText(f"Recorder: pausado ({len(self._waypoint_recorder.steps)} steps)")
+                self.lbl_route_status.setText(f"Recorder: pausado ({len(self._route_session.waypoints)} steps)")
             else:
-                self._waypoint_recorder.resume()
+                self._route_timer.start()
                 self._route_recording_active = True
                 self.btn_route_stop.setText("Pausar")
                 self.lbl_route_status.setText("Recorder: grabando...")
@@ -1253,47 +2136,13 @@ class MainWindow(QMainWindow):
 
     def _on_route_apply_clicked(self) -> None:
         try:
-            if self._waypoint_recorder is None:
+            if self._route_session is None:
                 return
             if self._route_recording_active:
-                self._waypoint_recorder.pause()
+                self._route_timer.stop()
                 self._route_recording_active = False
 
-            steps = list(self._waypoint_recorder.steps)
-            waypoints: list[Waypoint] = []
-            for step in steps:
-                options = {
-                    "action_kind": str(step.action_kind),
-                    "key_or_click": str(step.key_or_click),
-                    "before_ppm": str(step.before_ppm),
-                    "after_ppm": str(step.after_ppm),
-                    "metrics": dict(step.metrics),
-                }
-                wp_type = WaypointType.WALK.value if str(step.action_kind) == "move" else WaypointType.USE_RIGHT_CLICK.value
-                if str(step.action_kind) == "rope":
-                    wp_type = WaypointType.ROPE.value
-                elif str(step.action_kind) in {"stairs_up", "stairs_down"}:
-                    wp_type = WaypointType.USE_LADDER.value
-
-                waypoints.append(
-                    Waypoint(
-                        type=str(wp_type),
-                        x=int(step.step_index),
-                        y=0,
-                        z=int(self._route_z()),
-                        options=options,
-                        enabled=True,
-                        created_at=str(step.ts),
-                    )
-                )
-
-            script = Script(
-                name=f"recorded_route_{int(time.time())}",
-                enabled=True,
-                run_to_target=False,
-                waypoints=waypoints,
-                metadata={"waypoint_recorder_jsonl": str(self._waypoint_recorder.jsonl_path)},
-            )
+            script = self._build_route_script_for_output()
             self._script = script
             self.model.set_script(self._script)
             self._refresh_script_list()
@@ -1309,32 +2158,25 @@ class MainWindow(QMainWindow):
 
     def _on_route_reset_clicked(self) -> None:
         try:
-            autosaved_path: str | None = None
-            if self._waypoint_recorder is not None and len(self._waypoint_recorder.steps) > 0:
-                try:
-                    out_path = self._waypoint_recorder.stop(save=True)
-                    autosaved_path = str(out_path) if out_path is not None else None
-                    _LOG.info("Autosaved recorded route before reset: %s", autosaved_path)
-                except Exception as exc:
-                    _LOG.exception("Failed to autosave route before reset: %s", exc)
-
+            self._route_timer.stop()
             self._route_recording_active = False
             self._route_capture = None
             self._route_binding = None
             self._route_sampler = None
             self._route_session = None
+            self._route_marker_cfg = None
+            self._route_tibia_dataset = None
+            self._route_world_by_rel = {}
+            self._route_last_world = None
+            self._route_world_lock_last_score = None
+            self._set_route_world_lock_status(False)
             self._waypoint_recorder = None
+            self._route_last_minimap_digest = ""
+            self._route_floor_change_streak = 0
+            self._route_last_tile = None
             self.route_steps_list.clear()
             self.btn_route_stop.setText("Pausar")
-            if autosaved_path:
-                self.lbl_route_status.setText(f"Recorder: sesión reiniciada (autosave: {Path(autosaved_path).name})")
-                _QMessageBox.information(
-                    self,
-                    "Route Recorder",
-                    f"Sesión reiniciada.\nRuta auto-guardada en:\n{autosaved_path}",
-                )
-            else:
-                self.lbl_route_status.setText("Recorder: sesión reiniciada")
+            self.lbl_route_status.setText("Recorder: sesión reiniciada")
             self._update_route_counters()
             self._set_route_controls_enabled(recording=False)
         except Exception as exc:
@@ -1344,19 +2186,11 @@ class MainWindow(QMainWindow):
 
     def _on_route_mark_action(self, action: str) -> None:
         try:
-            if self._waypoint_recorder is None or not bool(self._route_recording_active):
+            if self._route_session is None or not bool(self._route_recording_active):
                 return
-            key_map = {
-                "rope": str(os.environ.get("FRBOT_ROPE_KEY", "F8") or "F8"),
-                "shovel": str(os.environ.get("FRBOT_SHOVEL_KEY", "F9") or "F9"),
-                "pick": str(os.environ.get("FRBOT_PICK_KEY", "F10") or "F10"),
-                "stairs_up": str(os.environ.get("FRBOT_STAIRS_UP_KEY", "PageUp") or "PageUp"),
-                "stairs_down": str(os.environ.get("FRBOT_STAIRS_DOWN_KEY", "PageDown") or "PageDown"),
-            }
             a = str(action)
-            key = str(key_map.get(a, ""))
-            step = self._waypoint_recorder.record_action(a, key)
-            self.route_steps_list.addItem(f"#{step.step_index} {step.action_kind} [{step.key_or_click}]")
+            _ = self._route_session.mark_action(a)
+            self.route_steps_list.addItem(f"#{len(self._route_session.waypoints) - 1} {a}")
             self.lbl_route_status.setText(f"Recorder: acción {action} marcada")
             self._update_route_counters()
         except Exception as exc:
@@ -1365,27 +2199,65 @@ class MainWindow(QMainWindow):
             self._show_error("Route Recorder", f"No se pudo marcar acción {action}.\n\n{exc}")
 
     def _on_route_tick(self) -> None:
-        return
-
-    def _on_route_move_key(self, key: str) -> None:
         try:
-            if self._waypoint_recorder is None or not bool(self._route_recording_active):
+            if not bool(self._route_recording_active):
                 return
-            step = self._waypoint_recorder.record_move(str(key))
-            self.route_steps_list.addItem(f"#{step.step_index} move [{step.key_or_click}]")
-            self.lbl_route_status.setText(f"Recorder: move {key}")
+            if self._route_capture is None or self._route_sampler is None or self._route_session is None:
+                return
+
+            frame = self._route_capture.grab()
+            tile = self._route_sampler.sample_tile(frame)
+            if tile is None:
+                return
+
+            added = self._route_session.record_tile(int(tile[0]), int(tile[1]), int(tile[2]))
+            if added:
+                world = self._route_try_localize_world(frame=frame, tile=tile)
+                if world is not None:
+                    self._route_world_by_rel[(int(tile[0]), int(tile[1]), int(tile[2]))] = (
+                        int(world[0]),
+                        int(world[1]),
+                        int(world[2]),
+                    )
+                self.route_steps_list.addItem(f"#{len(self._route_session.waypoints) - 1} move ({int(tile[0])},{int(tile[1])},{int(tile[2])})")
+
+            prev_digest = str(self._route_last_minimap_digest or "")
+            cur_digest = str(frame.minimap_digest_hex or "")
+            if prev_digest and cur_digest and prev_digest != cur_digest and self._route_last_tile == tile:
+                self._route_floor_change_streak += 1
+            else:
+                self._route_floor_change_streak = 0
+
+            if int(self._route_floor_change_streak) >= 2:
+                _ = self._route_session.mark_action("stairs_up")
+                self.route_steps_list.addItem(f"#{len(self._route_session.waypoints) - 1} stairs_up (auto)")
+                self._route_floor_change_streak = 0
+
+            self._route_last_minimap_digest = cur_digest
+            self._route_last_tile = tile
             self._update_route_counters()
         except Exception as exc:
-            _LOG.exception("Failed to record move key: %s", exc)
-            write_fatal("waypoint_record_failed", exc, details={"reason": str(exc), "phase": "move", "key": str(key)})
-            self._show_error("Route Recorder", f"No se pudo grabar movimiento {key}.\n\n{exc}")
+            _LOG.exception("Failed in route recorder tick: %s", exc)
+            write_fatal("waypoint_record_failed", exc, details={"reason": str(exc), "phase": "tick"})
+            self._show_error("Route Recorder", f"No se pudo capturar waypoint.\n\n{exc}")
+            self._route_timer.stop()
+            self._route_recording_active = False
+            self._set_route_controls_enabled(recording=False)
+
+    def _on_route_move_key(self, key: str) -> None:
+        return
 
     def _on_route_export_clicked(self) -> None:
         try:
-            if self._waypoint_recorder is None:
+            if self._route_session is None:
                 return
-            out_path = self._waypoint_recorder.stop(save=True)
-            self._waypoint_export_path = str(out_path) if out_path is not None else None
+            script = self._build_route_script_for_output()
+            out_dir = Path.cwd() / "diagnostics" / "waypoints"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_path = out_dir / f"{script.name}.json"
+            save_script(str(out_path), script)
+            self._waypoint_export_path = str(out_path)
+            self._route_timer.stop()
             self._route_recording_active = False
             self.btn_route_stop.setText("Pausar")
             self._set_route_controls_enabled(recording=False)
@@ -1395,6 +2267,35 @@ class MainWindow(QMainWindow):
             _LOG.exception("Failed to export route recorder session: %s", exc)
             write_fatal("waypoint_record_failed", exc, details={"reason": str(exc), "phase": "export"})
             self._show_error("Route Recorder", f"No se pudo exportar sesión.\n\n{exc}")
+
+    def _on_route_save_recording_clicked(self) -> None:
+        try:
+            if self._route_session is None:
+                self.lbl_route_status.setText("Recorder: no hay sesión para guardar")
+                return
+
+            if self._route_recording_active:
+                self._route_timer.stop()
+                self._route_recording_active = False
+                self.btn_route_stop.setText("Pausar")
+
+            script = self._build_route_script_for_output()
+            out_dir = Path.cwd() / "Waypoints"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            default_path = out_dir / f"{script.name}.json"
+            path, _ = QFileDialog.getSaveFileName(self, "Guardar grabación", str(default_path), "JSON (*.json)")
+            if not path:
+                self._set_route_controls_enabled(recording=False)
+                return
+
+            save_script(path, script)
+            self._waypoint_export_path = str(path)
+            self.lbl_route_status.setText(f"Recorder: guardado {Path(path).name}")
+            self._set_route_controls_enabled(recording=False)
+        except Exception as exc:
+            _LOG.exception("Failed to save waypoint recording: %s", exc)
+            write_fatal("waypoint_record_failed", exc, details={"reason": str(exc), "phase": "save_recording"})
+            self._show_error("Route Recorder", f"No se pudo guardar la grabación.\n\n{exc}")
 
     def _on_route_open_folder_clicked(self) -> None:
         try:
@@ -1484,12 +2385,12 @@ class MainWindow(QMainWindow):
             self._write_aux_controls_to_metadata()
             path = self._current_path
             if not path:
-                path, _ = QFileDialog.getSaveFileName(self, "Save Script", str(Path.cwd() / "script.json"), "JSON (*.json)")
+                path, _ = QFileDialog.getSaveFileName(self, "Save Script", str(self._waypoints_dir() / "script.json"), "JSON (*.json)")
                 if not path:
                     return
 
             save_script(path, self._script)
-            self._current_path = path
+            self._set_current_script_path(path)
             self._last_saved_state = canonical_json(self._script)
             self._update_title()
             _LOG.info("Saved script to %s", path)
@@ -1503,14 +2404,14 @@ class MainWindow(QMainWindow):
 
     def _on_load_clicked(self) -> None:
         try:
-            path, _ = QFileDialog.getOpenFileName(self, "Load Script", str(Path.cwd()), "JSON (*.json)")
+            path, _ = QFileDialog.getOpenFileName(self, "Load Script", str(self._default_load_dir()), "JSON (*.json)")
             if not path:
                 return
 
             script = load_script(path)
             self._script = script
             self.model.set_script(self._script)
-            self._current_path = path
+            self._set_current_script_path(path)
             self._last_saved_state = canonical_json(self._script)
             self._refresh_script_list()
             self._sync_right_controls_from_script()
@@ -1553,6 +2454,9 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
         try:
+            if bool(self._cavebot_running):
+                self._stop_cavebot_runtime(status_text="detenido")
+
             if not self._is_dirty():
                 event.accept()
                 return
@@ -1589,3 +2493,14 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             event.ignore()
+
+
+def main() -> int:
+    app = QApplication(sys.argv)
+    w = MainWindow()
+    w.show()
+    return int(app.exec())
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

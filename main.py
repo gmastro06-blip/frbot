@@ -10,7 +10,11 @@ import json
 from pathlib import Path
 
 from diagnostics.fatal import write_fatal
+from runtime.env_bootstrap import load_repo_env
 from runtime.runner import run
+
+
+load_repo_env()
 
 
 def _mode() -> str:

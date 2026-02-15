@@ -1,0 +1,28 @@
+{
+  "enabled": true,
+  "metadata": {
+    "healing": {
+      "enabled": true,
+      "heal_key": "F1",
+      "hp_threshold_percent": 50
+    },
+    "settings": {
+      "config_path": "config/rois_prod_full.json",
+      "tick_hz": 20,
+      "try_focus": true
+    }
+  },
+  "name": "script1",
+  "run_to_target": false,
+  "waypoints": [
+    {
+      "created_at": "2026-02-13T17:25:53+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 10,
+      "y": 20,
+      "z": 7
+    }
+  ]
+}

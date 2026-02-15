@@ -15,6 +15,7 @@ from diagnostics.logger import configure_logger
 from diagnostics.last_frames import snapshot
 from diagnostics.schema import base_context_fields
 from rules.combat import select_combat_intent
+from runtime.env_bootstrap import load_repo_env
 from runtime.combat_preflight import run as combat_preflight_run
 from runtime.combat_runner import execute_combat_intent
 from runtime.pacing import wait_until_ns
@@ -22,6 +23,9 @@ from runtime.profile import cap_ticks, enforce_feature_allowed
 
 
 _GATE = 'combat_full'
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:

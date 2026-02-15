@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import TypeAlias
 
 from adapters.capture.mock_world import MockWorldCapture
@@ -73,8 +74,18 @@ def _dir(raw: str) -> Literal['N', 'S', 'E', 'W']:
 def _load_waypoints_from_env(ctx: RuntimeContext) -> tuple[Waypoint, ...]:
     raw = (os.environ.get('FRBOT_CAVEBOT_WAYPOINTS', '') or '').strip()
     if not raw:
-        # Caller decides whether missing waypoints is fatal.
-        raise PreflightFailed('cavebot_waypoint_stuck')
+        raw_path = (os.environ.get('FRBOT_CAVEBOT_WAYPOINTS_FILE', '') or '').strip()
+        if raw_path:
+            p = Path(raw_path)
+            if not p.exists() or not p.is_file():
+                raise PreflightFailed('cavebot_waypoint_stuck')
+            try:
+                raw = (p.read_text(encoding='utf-8', errors='replace') or '').strip()
+            except Exception as exc:
+                raise PreflightFailed(f'cavebot_waypoint_stuck invalid_waypoints_file: {exc}') from exc
+        if not raw:
+            # Caller decides whether missing waypoints is fatal.
+            raise PreflightFailed('cavebot_waypoint_stuck')
 
     # Prefer JSON for explicitness.
     if raw.lstrip().startswith('['):
@@ -93,6 +104,9 @@ def _load_waypoints_from_env(ctx: RuntimeContext) -> tuple[Waypoint, ...]:
             z = int(item.get('z', 7))
             radius_px = int(item.get('radius_px', 0))
             max_ticks = int(item.get('max_ticks', 0))
+            wp_type = str(item.get('waypoint_type', item.get('type', 'walk')) or 'walk').strip().lower()
+            raw_options = item.get('options', {})
+            options = dict(raw_options) if isinstance(raw_options, dict) else {}
             if radius_px < 0 or max_ticks <= 0:
                 raise PreflightFailed('cavebot_waypoint_stuck')
             wps.append(
@@ -103,6 +117,8 @@ def _load_waypoints_from_env(ctx: RuntimeContext) -> tuple[Waypoint, ...]:
                     z=z,
                     radius_px=int(radius_px),
                     max_ticks=int(max_ticks),
+                    waypoint_type=str(wp_type),
+                    options=options,
                 )
             )
         return tuple(wps)
@@ -129,6 +145,8 @@ def _load_waypoints_from_env(ctx: RuntimeContext) -> tuple[Waypoint, ...]:
                 z=z,
                 radius_px=int(radius_px),
                 max_ticks=int(max_ticks),
+                waypoint_type='walk',
+                options={},
             )
         )
     return tuple(wps2)
@@ -344,6 +362,8 @@ def cavebot_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
                     z=7,
                     radius_px=int(max(0, radius_px)),
                     max_ticks=int(max(1, max_ticks)),
+                    waypoint_type='walk',
+                    options={},
                 ),
             )
         else:

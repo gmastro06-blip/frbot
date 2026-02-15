@@ -1,0 +1,24 @@
+{
+  "enabled": true,
+  "metadata": {
+    "healing": {
+      "enabled": true,
+      "heal_key": "F1",
+      "hp_threshold_percent": 50
+    },
+    "recorded_at": "2026-02-15T10:38:32+01:00",
+    "recorder": {
+      "default_z": 0,
+      "simplify_straight_every": 3
+    },
+    "settings": {
+      "config_path": "config/rois_prod_full.json",
+      "route_localize_min_score": 0.73,
+      "tick_hz": 20,
+      "try_focus": true
+    }
+  },
+  "name": "recorded_route_1771148305",
+  "run_to_target": false,
+  "waypoints": []
+}

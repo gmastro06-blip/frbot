@@ -14,8 +14,8 @@ This document lists what is missing or unproven for â€œoperational in real modeâ
 
 ## Bot config gaps
 
-- Waypoint-driven cavebot requires a waypoint source (e.g. `FRBOT_BOT_CONFIG_PATH=file.json`).
-- There is no validated, game-agnostic bot config schema; only the legacy `file.json` loader is supported.
+- Waypoint-driven cavebot requires a waypoint source (e.g. `FRBOT_BOT_CONFIG_PATH=Waypoints/file.json`).
+- There is no validated, game-agnostic bot config schema; only the legacy `Waypoints/file.json` loader is supported.
 
 ## Verification gaps
 

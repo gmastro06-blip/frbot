@@ -13,9 +13,13 @@ from diagnostics.frame_dump import dump_enabled
 from diagnostics.jsonlog import log as log_json
 from diagnostics.logger import configure_logger
 from diagnostics.schema import base_context_fields
+from runtime.env_bootstrap import load_repo_env
 
 from runtime.looting_full_preflight import run as looting_full_preflight_run
 from runtime.looting_full_runner import execute_looting_full
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:

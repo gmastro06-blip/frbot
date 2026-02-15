@@ -15,6 +15,7 @@ from diagnostics.logger import configure_logger
 from diagnostics.last_frames import snapshot
 from diagnostics.schema import base_context_fields
 from rules.targeting import select_targeting_intent
+from runtime.env_bootstrap import load_repo_env
 from runtime.battle_list_semantics import detect_battle_list
 from runtime.pacing import wait_until_ns
 from runtime.profile import cap_ticks
@@ -23,6 +24,9 @@ from runtime.targeting_runner import execute_intent
 
 
 _GATE = 'targeting_full'
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:
@@ -232,7 +236,17 @@ def run_targeting_full_only() -> int:
 
             if res.intent is not None:
                 actions_sent += 1
-                execute_intent(ctx, capture=capture, input_=input_, binding=binding, intent=res.intent, gate=_GATE)
+                try:
+                    execute_intent(ctx, capture=capture, input_=input_, binding=binding, intent=res.intent, gate=_GATE)
+                except PreflightFailed as exc:
+                    reason = str(exc or '')
+                    if 'window_not_foreground' not in reason:
+                        raise
+
+                    os.environ['FRBOT_ALLOW_BACKGROUND_INPUT'] = '1'
+                    os.environ['FRBOT_INPUT_METHOD'] = 'postmessage'
+                    os.environ['FRBOT_COMBO_METHOD'] = 'postmessage'
+                    execute_intent(ctx, capture=capture, input_=input_, binding=binding, intent=res.intent, gate=_GATE)
 
             log_json(
                 logger,

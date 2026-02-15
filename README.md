@@ -114,6 +114,13 @@ Default is strict and will abort (no real adapters are provided in this rewrite)
 poetry run python main.py
 ```
 
+Terminology (consistent across this document):
+
+- `FRBOT_MODE=mock` → deterministic test mode.
+- `FRBOT_MODE=real` → REAL execution path (requires verified adapters/prerequisites).
+- `FRBOT_PROFILE=prod_emergency|prod_full` → production safety/certification profile used during REAL execution.
+- `FRBOT_MODE=targeting|healing|combat_basic|...` → isolated feature gate entry mode.
+
 Deterministic mock mode (headless, testable):
 
 - PowerShell:
@@ -130,10 +137,30 @@ set FRBOT_MODE=mock
 poetry run python main.py
 ```
 
+Environment template (recommended for local REAL execution):
+
+```powershell
+Copy-Item .env.example .env
+```
+
+The template includes validated minimap marker defaults for OBS source capture in this workspace:
+
+- `FRBOT_PLAYER_MARKER_RGB=0,200,0`
+- `FRBOT_PLAYER_MARKER_TOL=45`
+
+`.env` autoload behavior:
+
+- Entry points and `tools/*.py` now auto-load local `.env` on startup.
+- Only `FRBOT_*` keys are imported from `.env`.
+- Existing environment variables already set in the shell are not overwritten.
+- Practical precedence is: exported shell value > `.env` value > in-code default.
+
+PowerShell export from `.env` is now optional (only needed if you want to override values per-session).
+
 Mock cavebot waypoints:
 
 - If `FRBOT_BOT_CONFIG_PATH` is not set, mock mode uses a small deterministic waypoint loop (keeps CI/test runs operational).
-- If you want to use the legacy waypoint file in this repo: set `FRBOT_BOT_CONFIG_PATH=file.json`.
+- If you want to use the legacy waypoint file in this repo: set `FRBOT_BOT_CONFIG_PATH=Waypoints/file.json`.
 
 Mock verification toggles (to force abort paths):
 
@@ -169,7 +196,7 @@ python app.py
 Artifacts:
 
 - `runtime_ui.log`
-- Saved scripts follow the canonical schema in `example_script.json`
+- Saved scripts follow the canonical schema in `Waypoints/example_script.json`
 
 ### Targeting-only mode
 
@@ -200,7 +227,7 @@ What it does NOT do:
 Use cases:
 
 - Validate Battle List ROI + parsing
-- Validate HWND binding requirements in real mode
+- Validate HWND binding requirements in REAL execution
 - Validate click/input wiring with minimal risk
 
 ### Healing-only mode
@@ -296,11 +323,11 @@ Artifacts:
 
 More details: `docs/looting_basic_prod_emergency.md`
 
-Real mode prerequisites (not vendored in this repo):
+REAL execution prerequisites (not vendored in this repo):
 
 - `pip install mss pynput`
 
-Real mode also requires an ROI config file:
+REAL execution also requires an ROI config file:
 
 - Generate a starter config:
   - `poetry run python scripts/generate_rois.py --out diagnostics/rois.json --layout default --monitor 1`
@@ -344,8 +371,35 @@ Official single-command release gate (prints exactly one line: `RELEASE_GO` or `
 ```
 
 Notes:
- - The release runner enables best-effort window focusing by default (`FRBOT_TRY_FOCUS=1`) to support unattended runs. If you want to disable any focus-stealing attempts, set `FRBOT_TRY_FOCUS=0`.
- - Runtime-only tuning currently applied by the release orchestrator is documented in `docs/prod_full_runtime_tuning_runbook.md`.
+
+- The release runner enables best-effort window focusing by default (`FRBOT_TRY_FOCUS=1`) to support unattended runs. If you want to disable any focus-stealing attempts, set `FRBOT_TRY_FOCUS=0`.
+- Runtime-only tuning currently applied by the release orchestrator is documented in `docs/prod_full_runtime_tuning_runbook.md`.
+
+### Core REAL gate (single command)
+
+For a fast REAL projector-backed core certification gate (targeting/healing/cavebot basic), use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run_real_core_tests.ps1 `
+  -ObsSource "Tibia_Fuente" `
+  -WindowTitle "Tibia - Onniwabanshu" `
+  -ConfigPath ".\rois_projector_1920x1009.json" `
+  -MaxTicks 5 `
+  -GraceSeconds 3 `
+  -StrictSafe `
+  -DumpFrames
+```
+
+Expected terminal tail on pass:
+
+- `RunnerExit: 0`
+- `FINAL DECISION: OPERATIONAL_REAL`
+
+Artifacts are written to:
+
+- `diagnostics/frames_real/<timestamp>/`
+
+The wrapper exits with code `0` only when `FINAL DECISION: OPERATIONAL_REAL`.
 
 What it does (stops on first failure):
 
@@ -426,8 +480,20 @@ Required inputs:
 
 Bot config (waypoints):
 
-- `FRBOT_BOT_CONFIG_PATH` points to a legacy `file.json`-style config containing waypoints.
-- Cavebot requires objective position evidence; this repo does not implement real-mode position extraction (see `docs/OPERATIONAL_GAPS.md`).
+- `FRBOT_BOT_CONFIG_PATH` points to a legacy `Waypoints/file.json`-style config containing waypoints.
+- Cavebot supports world-coordinate waypoints when minimap localization is configured.
+
+World-coordinate cavebot/localization (TibiaMaps):
+
+- `FRBOT_TIBIA_MAP_DATA_DIR`: directory for `tibiamaps/tibia-map-data` (must include `bounds.json` + `floor-XX-map.png` / `floor-XX-path.png`).
+- `FRBOT_CAVEBOT_WAYPOINT_SPACE=world`: interpret route waypoints as absolute world coordinates (`world_x/world_y/world_z`).
+- `FRBOT_CAVEBOT_LOCALIZE_MIN_SCORE`: runtime confidence threshold for minimap→world localization in cavebot runner.
+- `FRBOT_ROUTE_LOCALIZE_MIN_SCORE`: recorder/UI threshold used by the `World lock` indicator and world waypoint annotation.
+
+Desktop UI notes:
+
+- Settings now includes `World lock min score`, which writes `FRBOT_ROUTE_LOCALIZE_MIN_SCORE` and is used in `.env` import/export.
+- In the Route Recorder panel, `World lock: ON/OFF` reflects whether the current localization score passes the threshold.
 
 ### Smoke test
 
@@ -435,7 +501,7 @@ Run: `./smoke.ps1`
 
 Contract:
 
-- `FRBOT_MODE=real` must abort and produce `diagnostics/fatal.log`.
+- `FRBOT_MODE=real` (with profile guardrails) must abort and produce `diagnostics/fatal.log`.
 - `FRBOT_MODE=mock` must exit cleanly with code `0`.
 
 ## What is deliberately NOT implemented

@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+from importlib import import_module
+
+try:
+    _bootstrap_mod = import_module("tools._bootstrap")
+except ModuleNotFoundError:
+    _bootstrap_mod = import_module("_bootstrap")
+
+_bootstrap_mod.bootstrap_tool_env(__file__)
+
 import argparse
 import hashlib
 import json

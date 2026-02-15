@@ -208,7 +208,12 @@ def execute_intent(
         binding.assert_bound()
         input_ts_ns = int(time.monotonic_ns())
         attach_snapshot(event, stage='input', ts_ns=input_ts_ns, status=binding.snapshot())
-        input_.click(click_x, click_y)
+        click_frame = getattr(input_, 'click_frame', None)
+        if callable(click_frame):
+            click_frame(int(click_x), int(click_y), frame_w=int(before.width), frame_h=int(before.height))
+        else:
+            input_.click(click_x, click_y)
+        ctx.targeting.inputs_sent += 1
     except Exception as exc:
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
 

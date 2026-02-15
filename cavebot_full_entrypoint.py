@@ -14,12 +14,16 @@ from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from diagnostics.logger import configure_logger
 from diagnostics.schema import base_context_fields
+from runtime.env_bootstrap import load_repo_env
 from runtime.cavebot_preflight import run as cavebot_preflight_run
 from runtime.cavebot_runner import execute_cavebot_tick
 from runtime.profile import cap_ticks
 
 
 _GATE = 'cavebot_full'
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:

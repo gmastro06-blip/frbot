@@ -1,0 +1,21 @@
+label train
+node (33621, 31900, 6)
+node (33612, 31898, 6)
+stand (33610, 31898, 6)
+node (33602, 31898, 7)
+action check_train
+label sword
+use (33600, 31896, 7)
+action end
+label club
+use (33603, 31896, 7)
+action end
+label axe
+use (33598, 31898, 7)
+action end
+label distance
+use (33600, 31901, 7)
+action end
+label magic
+use (33603, 31901, 7)
+action end

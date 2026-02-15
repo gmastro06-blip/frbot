@@ -296,3 +296,69 @@ def test_cavebot_window_binding_lost(tmp_path: Path, monkeypatch: MonkeyPatch) -
 
     fatal = (tmp_path / 'diagnostics' / 'fatal.log').read_text(encoding='utf-8', errors='replace')
     assert 'cavebot_window_binding_lost' in fatal
+
+
+def test_cavebot_executes_dialog_waypoints_hi_blessing_yes(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    _base_env(monkeypatch, tmp_path)
+
+    monkeypatch.setenv(
+        'FRBOT_CAVEBOT_WAYPOINTS',
+        json.dumps(
+            [
+                {
+                    'waypoint_id': 'wp_hi',
+                    'x': 10,
+                    'y': 10,
+                    'z': 7,
+                    'radius_px': 2,
+                    'max_ticks': 5,
+                    'waypoint_type': 'walk_ignore',
+                    'options': {
+                        'action_kind': 'call',
+                        'legacy_call': 'say',
+                        'legacy_payload': '"sentence":"hi"',
+                    },
+                },
+                {
+                    'waypoint_id': 'wp_blessing',
+                    'x': 10,
+                    'y': 10,
+                    'z': 7,
+                    'radius_px': 2,
+                    'max_ticks': 5,
+                    'waypoint_type': 'walk_ignore',
+                    'options': {
+                        'action_kind': 'call',
+                        'legacy_call': 'say',
+                        'legacy_payload': '"sentence":"enhanced"',
+                    },
+                },
+                {
+                    'waypoint_id': 'wp_yes',
+                    'x': 10,
+                    'y': 10,
+                    'z': 7,
+                    'radius_px': 2,
+                    'max_ticks': 5,
+                    'waypoint_type': 'walk_ignore',
+                    'options': {
+                        'action_kind': 'call',
+                        'legacy_call': 'say',
+                        'legacy_payload': '"sentence":"yes"',
+                    },
+                },
+            ]
+        ),
+    )
+
+    assert run_cavebot_only() == 0
+
+    runtime_log = (tmp_path / 'diagnostics' / 'runtime.log').read_text(encoding='utf-8', errors='replace')
+    assert 'WAYPOINT_REACHED' in runtime_log
+    assert 'inputs_sent":3' in runtime_log
+
+    trace_log = (tmp_path / 'diagnostics' / 'frames' / 'cavebot_trace.jsonl').read_text(encoding='utf-8', errors='replace')
+    assert 'WAYPOINT_ACTION' in trace_log
+    assert '"phrase": "hi"' in trace_log
+    assert '"phrase": "enhanced"' in trace_log
+    assert '"phrase": "yes"' in trace_log

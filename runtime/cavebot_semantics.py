@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -96,6 +97,17 @@ def _sample_luma_std(rgb: bytes, *, width: int, height: int, max_pixels: int = 2
 
 def _rgb_delta(a: tuple[int, int, int], b: tuple[int, int, int]) -> float:
     return float(((float(a[0]) - float(b[0])) ** 2 + (float(a[1]) - float(b[1])) ** 2 + (float(a[2]) - float(b[2])) ** 2) ** 0.5)
+
+
+def _marker_area_ratio_limit() -> float:
+    raw = str(os.environ.get("FRBOT_CAVEBOT_MARKER_AREA_RATIO_MAX") or "").strip()
+    if not raw:
+        return 0.10
+    try:
+        val = float(raw)
+    except Exception:
+        return 0.10
+    return max(0.10, min(1.00, float(val)))
 
 
 def _component_candidates(
@@ -309,10 +321,14 @@ def select_player_marker(
     prev = prev_marker
     prev_pos = (int(prev.x_px), int(prev.y_px)) if prev is not None else None
     prev_area = int(prev.pixel_count) if prev is not None else None
+    center_x = int(max(0, int(getattr(frame, 'minimap_width', 0)) // 2))
+    center_y = int(max(0, int(getattr(frame, 'minimap_height', 0)) // 2))
 
     def dist_to_prev(c: MarkerCandidate) -> float:
         if prev_pos is None:
-            return 0.0
+            dx = float(int(c.x_px) - int(center_x))
+            dy = float(int(c.y_px) - int(center_y))
+            return float((dx * dx + dy * dy) ** 0.5)
         dx = float(int(c.x_px) - int(prev_pos[0]))
         dy = float(int(c.y_px) - int(prev_pos[1]))
         return float((dx * dx + dy * dy) ** 0.5)
@@ -323,9 +339,10 @@ def select_player_marker(
         return float(abs(int(c.pixel_count) - int(prev_area)) / float(prev_area))
 
     eligible: list[MarkerCandidate] = []
+    area_ratio_limit = _marker_area_ratio_limit()
     for c in candidates:
         if prev_area is not None and prev_area > 0:
-            if float(area_ratio(c)) > 0.10:
+            if float(area_ratio(c)) > float(area_ratio_limit):
                 continue
         eligible.append(c)
 
@@ -361,7 +378,7 @@ def select_player_marker(
 
     # Confidence: inverse of a normalized composite score.
     max_dim = float(max(1, int(getattr(frame, 'minimap_width', 1)), int(getattr(frame, 'minimap_height', 1))))
-    d_norm = float(dist_to_prev(best)) / max_dim if prev_pos is not None else 0.0
+    d_norm = float(dist_to_prev(best)) / max_dim
     rgb_norm = float(_rgb_delta(best.mean_rgb, marker_rgb)) / (255.0 * (3.0 ** 0.5))
     a_norm = float(area_ratio(best))
     score = 0.60 * d_norm + 0.30 * rgb_norm + 0.10 * a_norm

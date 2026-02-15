@@ -1,0 +1,535 @@
+{
+  "enabled": true,
+  "metadata": {
+    "import": {
+      "default_z": 7,
+      "format": "legacy_waypoints_in",
+      "labels": {
+        "debug": 6,
+        "finish": 38,
+        "larboard": 26,
+        "repeat_bait": 6,
+        "speed": 32,
+        "starboard": 20,
+        "start_svargrond_depot": 0,
+        "straight": 14,
+        "telescope": 13
+      },
+      "source": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\Waypoints\\antiguos\\quests\\sea_serpent\\waypoints.in",
+      "stats": {
+        "ignored_empty_or_comments": 4,
+        "ignored_unknown": 0,
+        "parsed_waypoints": 46,
+        "total_lines": 59
+      },
+      "warnings": []
+    }
+  },
+  "name": "quests_sea_serpent",
+  "run_to_target": false,
+  "waypoints": [
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "debug",
+        "legacy_action": true,
+        "legacy_raw": "action debug"
+      },
+      "type": "walk_ignore",
+      "x": 32293,
+      "y": 31132,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32293,
+      "y": 31132,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32314,
+      "y": 31121,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "ladder"
+      },
+      "type": "use_ladder",
+      "x": 32341,
+      "y": 31119,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32353,
+      "y": 31124,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "give_fish_captain",
+        "legacy_action": true,
+        "legacy_raw": "action give_fish_captain"
+      },
+      "type": "walk_ignore",
+      "x": 32353,
+      "y": 31124,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31043,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "buy_bait",
+        "legacy_action": true,
+        "legacy_raw": "action buy_bait"
+      },
+      "type": "walk_ignore",
+      "x": 31949,
+      "y": 31043,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31942,
+      "y": 31042,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "set_bait",
+        "legacy_action": true,
+        "legacy_raw": "action set_bait"
+      },
+      "type": "walk_ignore",
+      "x": 31942,
+      "y": 31042,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31936,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31942,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "go_up",
+        "legacy_action": true,
+        "legacy_raw": "action go_up"
+      },
+      "type": "walk_ignore",
+      "x": 31942,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "telescope",
+        "legacy_action": true,
+        "legacy_raw": "action telescope"
+      },
+      "type": "walk_ignore",
+      "x": 31942,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "go_down",
+        "legacy_action": true,
+        "legacy_raw": "action go_down"
+      },
+      "type": "walk_ignore",
+      "x": 31942,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31946,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "straight",
+        "legacy_action": true,
+        "legacy_raw": "action straight"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "repeat",
+        "legacy_action": true,
+        "legacy_raw": "action repeat"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "go_down",
+        "legacy_action": true,
+        "legacy_raw": "action go_down"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31946,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "starboard",
+        "legacy_action": true,
+        "legacy_raw": "action starboard"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "repeat",
+        "legacy_action": true,
+        "legacy_raw": "action repeat"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "go_down",
+        "legacy_action": true,
+        "legacy_raw": "action go_down"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31946,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "larboard",
+        "legacy_action": true,
+        "legacy_raw": "action larboard"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "repeat",
+        "legacy_action": true,
+        "legacy_raw": "action repeat"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "go_down",
+        "legacy_action": true,
+        "legacy_raw": "action go_down"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31946,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "speed",
+        "legacy_action": true,
+        "legacy_raw": "action speed"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "repeat",
+        "legacy_action": true,
+        "legacy_raw": "action repeat"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "go_down",
+        "legacy_action": true,
+        "legacy_raw": "action go_down"
+      },
+      "type": "walk_ignore",
+      "x": 31950,
+      "y": 31044,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31946,
+      "y": 31046,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "passage",
+        "legacy_action": true,
+        "legacy_raw": "action passage"
+      },
+      "type": "walk_ignore",
+      "x": 31949,
+      "y": 31044,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "ladder"
+      },
+      "type": "use_ladder",
+      "x": 32341,
+      "y": 31112,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32344,
+      "y": 31107,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "travel_venore"
+      },
+      "type": "travel",
+      "x": 32344,
+      "y": 31107,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:06+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "end",
+        "legacy_action": true
+      },
+      "type": "walk_ignore",
+      "x": 32344,
+      "y": 31107,
+      "z": 6
+    }
+  ]
+}

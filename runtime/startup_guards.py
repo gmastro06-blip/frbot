@@ -362,7 +362,9 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
             write_fatal('window_minimized', pf, details=d)
         raise pf
 
-    if int(info.foreground_hwnd) != int(hwnd):
+    allow_bg_input = _env_bool('FRBOT_ALLOW_BACKGROUND_INPUT', False)
+
+    if int(info.foreground_hwnd) != int(hwnd) and not bool(allow_bg_input):
         # Optional operator-wait for foreground (still no focus stealing).
         retries_opt = _env_int_opt('FRBOT_FOREGROUND_RETRIES')
         retries = int(retries_opt) if retries_opt is not None else 0

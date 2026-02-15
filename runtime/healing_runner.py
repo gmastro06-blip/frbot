@@ -108,6 +108,7 @@ def execute_heal_intent(
     """
 
     now_ms = int(time.monotonic_ns() // 1_000_000)
+    allow_no_evidence = str(os.environ.get('FRBOT_HEAL_ALLOW_NO_EVIDENCE', '0') or '0').strip().lower() not in {'', '0', 'false', 'no', 'off'}
     if ctx.healing.attempt_count == 0:
         ctx.healing.attempt_started_ts_ms = now_ms
 
@@ -303,6 +304,11 @@ def execute_heal_intent(
     ctx.healing.last.mp_percent = float(after_mp)
     ctx.healing.last.source = src  # type: ignore[assignment]
     ctx.healing.last.confidence = 1.0
+
+    if not evidence_ok and bool(allow_no_evidence):
+        ctx.healing.attempt_count = 0
+        ctx.healing.attempt_started_ts_ms = 0
+        return True
 
     if not evidence_ok:
         ctx.healing.attempt_count += 1

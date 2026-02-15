@@ -12,9 +12,13 @@ from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
+from runtime.env_bootstrap import load_repo_env
 from runtime.trade_preflight import run as trade_preflight_run
 from runtime.trade_runner import execute_trade_tick
 from runtime.profile import enforce_feature_allowed
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:

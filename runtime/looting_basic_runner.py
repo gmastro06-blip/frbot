@@ -644,7 +644,8 @@ def execute_looting_basic_once(
                 # Other profiles keep legacy default of Shift+RMB.
                 default_gesture = 'alt_q' if profile == 'prod_full' else 'shift_rmb'
                 action = (os.environ.get('FRBOT_TIBIA_LOOT_GESTURE', '') or default_gesture).strip().lower()
-            if profile == 'prod_emergency':
+            allow_non_altq_emergency = _env_bool('FRBOT_LOOTING_BASIC_ALLOW_NON_ALTQ', False)
+            if profile == 'prod_emergency' and not bool(allow_non_altq_emergency):
                 # Strict certification contract: Alt+Q is the only allowed input action.
                 action = 'alt_q'
 

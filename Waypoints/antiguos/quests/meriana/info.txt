@@ -1,0 +1,5 @@
+You can use any setup for your level/vocation.
+Make sure you add:
+- Spell levitate to spells
+- Rake item to items
+- Start venore boat

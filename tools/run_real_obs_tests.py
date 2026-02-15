@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+from importlib import import_module
+
+try:
+    _bootstrap_mod = import_module("tools._bootstrap")
+except ModuleNotFoundError:
+    _bootstrap_mod = import_module("_bootstrap")
+
+_bootstrap_mod.bootstrap_tool_env(__file__)
+
 import json
 import os
 import subprocess
@@ -590,6 +599,8 @@ def main() -> int:
 
         # Still allow backend env to exist, but it must not affect obs_source capture.
         os.environ.setdefault("FRBOT_CAPTURE_BACKEND", "mss")
+        os.environ.setdefault("FRBOT_ROUTE_LOCALIZE_MIN_SCORE", "0.55")
+        os.environ.setdefault("FRBOT_CAVEBOT_LOCALIZE_MIN_SCORE", "0.55")
 
         # Semantic audit precondition: at least one idle BEFORE/AFTER pair must exist.
         # This must happen before any gate that could emit input.

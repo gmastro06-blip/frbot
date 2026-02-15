@@ -11,9 +11,13 @@ from diagnostics.emergency_capture import try_dump_window_frame
 from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
+from runtime.env_bootstrap import load_repo_env
 from runtime.looting_preflight import run as looting_preflight_run
 from runtime.looting_runner import execute_looting_tick
 from runtime.profile import enforce_feature_allowed
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:

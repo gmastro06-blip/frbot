@@ -15,7 +15,7 @@ class LoadedBotConfig:
 
 
 def _iter_waypoint_nodes(data: Any) -> Iterable[dict[str, Any]]:
-    # Supports the legacy file.json structure used in this repo.
+    # Supports the legacy Waypoints/file.json structure used in this repo.
     if not isinstance(data, dict):
         return
 

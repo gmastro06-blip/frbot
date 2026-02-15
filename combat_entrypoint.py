@@ -12,10 +12,14 @@ from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from rules.combat import select_combat_intent
+from runtime.env_bootstrap import load_repo_env
 from runtime.combat_preflight import run as combat_preflight_run
 from runtime.combat_runner import execute_combat_intent
 from runtime.profile import enforce_feature_allowed
 from runtime.pacing import wait_until_ns
+
+
+load_repo_env()
 
 
 def _env_str(name: str, default: str) -> str:
