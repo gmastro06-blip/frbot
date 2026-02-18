@@ -28,6 +28,7 @@ from runtime.inventory_semantics import (
     scan_beef_candidates_in_frame,
 )
 from runtime.pacing import sleep_ms
+from runtime.error_policy import should_reraise
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -71,7 +72,32 @@ def _try_dump_looting_pair(
             reason=str(reason),
             out_dir=_frames_dir_for_looting_evidence(),
         )
-    except Exception:
+    except Exception as e:
+        if __name__ == '__main__':
+            # Keep behavior when running as a script, but surface in strict mode.
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                try:
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
+        else:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                try:
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         return (None, None)
 
 
@@ -119,7 +145,9 @@ def _try_write_looting_basic_last_result(
                     after_candidate = str(items[-1].name).replace('_before.ppm', '_after.ppm')
                     if (out_dir / after_candidate).exists():
                         after_scan = str(after_candidate)
-            except Exception:
+            except Exception as e:
+                if should_reraise():
+                    raise
                 before_scan = None
                 after_scan = None
 
@@ -133,13 +161,17 @@ def _try_write_looting_basic_last_result(
                 v = (chat_evidence.debug or {}).get('delta_latency_ms')
                 if v is not None:
                     delta_latency_ms = float(v)
-            except Exception:
+            except Exception as e:
+                if should_reraise():
+                    raise
                 delta_latency_ms = None
             try:
                 v2 = (chat_evidence.debug or {}).get('max_latency_ms')
                 if v2 is not None:
                     max_latency_ms = float(v2)
-            except Exception:
+            except Exception as e:
+                if should_reraise():
+                    raise
                 max_latency_ms = None
 
         payload: dict[str, object] = {
@@ -178,7 +210,9 @@ def _try_write_looting_basic_last_result(
             json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + '\n',
             encoding='utf-8',
         )
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         return
 
 
@@ -198,7 +232,9 @@ def _try_dump_click_overlay(*, reason: str, frame: Frame | None, x: int | None, 
             y=int(y),
             reason=str(reason),
         )
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         return
 
 
@@ -290,7 +326,15 @@ def execute_looting_basic_once(
             try:
                 setattr(exc, 'details', {'event_correlation': event})
             except Exception:
-                pass
+                try:
+                    if should_reraise():
+                        raise
+                except Exception:
+                    try:
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
             raise exc
 
     before_ts_ns = int(time.monotonic_ns())
@@ -378,6 +422,15 @@ def execute_looting_basic_once(
                 return False
             return corpse_ratio >= corpse_ratio_min
         except Exception:
+            try:
+                if should_reraise():
+                    raise
+            except Exception:
+                try:
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             return False
 
     def _try_dump_emergency_candidates(*, reason: str, before_frame: Frame, after_frames: list[Frame]) -> list[dict[str, object]]:
@@ -458,6 +511,15 @@ def execute_looting_basic_once(
             )
             return stable
         except Exception:
+            try:
+                if should_reraise():
+                    raise
+            except Exception:
+                try:
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             return []
 
     def _context_menu_like_opened(*, before_frame: Frame, after_frame: Frame, x: int, y: int) -> bool:
@@ -542,6 +604,15 @@ def execute_looting_basic_once(
 
             return True
         except Exception:
+            try:
+                if should_reraise():
+                    raise
+            except Exception:
+                try:
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             return False
 
     # Read BEFORE inventory (pair read happens after AFTER grab).
@@ -579,6 +650,15 @@ def execute_looting_basic_once(
             out_dir = Path(_frames_dir_for_looting_evidence())
             out_dir.mkdir(parents=True, exist_ok=True)
         except Exception:
+            try:
+                if should_reraise():
+                    raise
+            except Exception:
+                try:
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             return []
 
         if player_xy is None:
@@ -595,6 +675,15 @@ def execute_looting_basic_once(
                 max_suggestions=int(_env_int('FRBOT_CORPSE_SUGGEST_MAX') or 12),
             )
         except Exception:
+            try:
+                if should_reraise():
+                    raise
+            except Exception:
+                try:
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             return []
 
         payload: list[dict[str, object]] = [
@@ -730,7 +819,8 @@ def execute_looting_basic_once(
         if loot_action is not None:
             event['intent']['loot_action'] = dict(loot_action)
     except Exception:
-        pass
+        if should_reraise():
+            raise
 
     ctx.looting.attempts_used += 1
 
@@ -1162,5 +1252,9 @@ def execute_looting_basic_once(
         )
     except Exception:
         # Best-effort: attaching debug details must not change the failure reason.
-        pass
+        try:
+            if should_reraise():
+                raise
+        except Exception:
+            pass
     raise failure

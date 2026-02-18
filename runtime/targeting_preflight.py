@@ -27,6 +27,7 @@ from runtime.config_loader import load_rois
 from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
 from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_obs_projector_hwnd
 from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
+from runtime.error_policy import should_reraise
 
 
 CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MeldBoundWindowRealCapture | ObsSourceRealCapture | MockWorldAnyCapture
@@ -101,6 +102,8 @@ def _dump_battle_list_debug(*, gate: str, frame: Frame, roi: Roi, reason: str) -
             encoding='utf-8',
         )
     except Exception:
+        if should_reraise():
+            raise
         return
 
 

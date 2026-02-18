@@ -21,6 +21,8 @@ from runtime.env import parse_window_hwnd_env
 from runtime.event_correlation import attach_snapshot, new_event, validate
 from runtime.targeting_preflight import targeting_preflight
 from runtime.pacing import wait_until_ns
+from runtime.trace_utils import serialize_for_trace
+from runtime.error_policy import should_reraise
 
 
 def _load_config_from_env() -> RuntimeConfig:
@@ -77,7 +79,9 @@ def _decode_target_frame_name(rgb: bytes, width: int) -> str:
         out.append(int(r))
     try:
         return bytes(out).decode('ascii', errors='ignore').strip()
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         return ''
 
 
@@ -226,6 +230,8 @@ def execute_intent(
                     )
         except Exception as exc:
             print(f'[targeting_runner] OCR fallback error: {exc}')
+            if should_reraise():
+                raise
 
     # If OCR fails, try structure-based detection
     has_structure = False
@@ -301,6 +307,8 @@ def execute_intent(
     try:
         post_click_ms = int(os.environ.get('FRBOT_POST_CLICK_DELAY_MS', '150') or '150')
     except Exception:
+        if should_reraise():
+            raise
         post_click_ms = 150
     if post_click_ms > 0:
         wait_until_ns(int(time.monotonic_ns() + (int(post_click_ms) * 1_000_000)))
@@ -343,6 +351,8 @@ def execute_intent(
                     )
         except Exception as exc:
             print(f'[targeting_runner] OCR fallback error (obs2): {exc}')
+            if should_reraise():
+                raise
 
     # If OCR fails, try structure-based detection
     has_structure2 = False
@@ -364,13 +374,19 @@ def execute_intent(
     event['correlation_reason'] = str(corr_reason)
     if corr_details:
         event['correlation_details'] = dict(corr_details)
-    ctx.telemetry.last_event_correlation = dict(event)
+    ctx.telemetry.last_event_correlation = serialize_for_trace(event)
     if not corr_ok:
         corr_exc = PreflightFailed('binding_correlation_failed')
         try:
             setattr(corr_exc, 'details', {'event_correlation': event})
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         raise corr_exc
 
     after_row = None

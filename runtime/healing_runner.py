@@ -22,6 +22,8 @@ from runtime.healing_semantics import (
 )
 from runtime.pacing import wait_until_ns
 from runtime.event_correlation import attach_snapshot, new_event, validate
+from runtime.trace_utils import serialize_for_trace
+from runtime.error_policy import should_reraise
 
 
 def _read_hp_mp(ctx: RuntimeContext, frame: Frame) -> tuple[float, float, str]:
@@ -154,11 +156,15 @@ def execute_heal_intent(
             return False
         try:
             px_tol = int(os.environ.get('FRBOT_HEAL_COOLDOWN_DELTA_PX_TOL', '15') or '15')
-        except Exception:
+        except Exception as e:
+            if should_reraise():
+                raise
             px_tol = 15
         try:
             ratio_thr = float(os.environ.get('FRBOT_HEAL_COOLDOWN_DELTA_RATIO_MIN', '0.008') or '0.008')
-        except Exception:
+        except Exception as e:
+            if should_reraise():
+                raise
             ratio_thr = 0.008
 
         changed = 0
@@ -175,11 +181,15 @@ def execute_heal_intent(
     # Real UI and OBS capture may lag behind inputs; poll for evidence with a bounded window.
     try:
         max_wait_ms = int(os.environ.get('FRBOT_POST_HEAL_DELAY_MS', '350') or '350')
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         max_wait_ms = 350
     try:
         poll_ms = int(os.environ.get('FRBOT_POST_HEAL_POLL_MS', '60') or '60')
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         poll_ms = 60
     max_wait_ms = max(0, int(max_wait_ms))
     poll_ms = max(10, int(poll_ms))
@@ -199,8 +209,10 @@ def execute_heal_intent(
             if feedback_roi is not None:
                 before_fb_rgb = _crop_rgb(before, feedback_roi)
         except Exception:
-            before_cd_rgb = b''
-            before_fb_rgb = b''
+                before_cd_rgb = b''
+                before_fb_rgb = b''
+                if should_reraise():
+                    raise
 
     marker = parse_rgb_triplet(os.environ.get('FRBOT_HEAL_COOLDOWN_RGB', '255,255,0') or '255,255,0', default=(255, 255, 0))
     tol = int(os.environ.get('FRBOT_HEAL_COOLDOWN_TOL', '0') or '0')
@@ -241,6 +253,8 @@ def execute_heal_intent(
             except Exception:
                 cd_delta = False
                 fb_delta = False
+                if should_reraise():
+                    raise
 
         fb_visible = _feedback_visible(ctx, cand)
 
@@ -248,7 +262,9 @@ def execute_heal_intent(
         hp_up = (float(cand_hp) - float(before_hp)) >= float(intent.expected.hp_increase_min)
         try:
             mp_dec_min = float(os.environ.get('FRBOT_HEAL_MP_DECREASE_MIN', '0.005') or '0.005')
-        except Exception:
+        except Exception as e:
+            if should_reraise():
+                raise
             mp_dec_min = 0.005
         mp_down = (float(before_mp) - float(cand_mp)) >= float(mp_dec_min)
 
@@ -278,13 +294,14 @@ def execute_heal_intent(
     event['correlation_reason'] = str(corr_reason)
     if corr_details:
         event['correlation_details'] = dict(corr_details)
-    ctx.telemetry.last_event_correlation = dict(event)
+    ctx.telemetry.last_event_correlation = serialize_for_trace(event)
     if not corr_ok:
         exc = PreflightFailed('binding_correlation_failed')
         try:
             setattr(exc, 'details', {'event_correlation': event})
         except Exception:
-            pass
+            if should_reraise():
+                raise
         raise exc
 
     hp_up = (float(after_hp) - float(before_hp)) >= float(intent.expected.hp_increase_min)
@@ -292,7 +309,9 @@ def execute_heal_intent(
     # Mana cost is often observable even when HP is full (or delayed).
     try:
         mp_dec_min = float(os.environ.get('FRBOT_HEAL_MP_DECREASE_MIN', '0.005') or '0.005')
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         mp_dec_min = 0.005
     mp_down = (float(before_mp) - float(after_mp)) >= float(mp_dec_min)
 
@@ -332,7 +351,6 @@ def execute_heal_intent(
 
                 # Best-effort ROI deltas for quicker diagnosis.
                 try:
-
                     def _mad(a: bytes, b: bytes) -> float | None:
                         if not a or not b or len(a) != len(b):
                             return None
@@ -351,11 +369,17 @@ def execute_heal_intent(
                     if roi_mads:
                         details['roi_mads'] = roi_mads
                 except Exception:
-                    pass
+                    if should_reraise():
+                        raise
 
-                setattr(abort_exc, 'details', details)
+                try:
+                    setattr(abort_exc, 'details', details)
+                except Exception:
+                    if should_reraise():
+                        raise
             except Exception:
-                pass
+                if should_reraise():
+                    raise
 
             raise abort_exc
         return False

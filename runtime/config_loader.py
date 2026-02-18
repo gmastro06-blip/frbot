@@ -170,7 +170,13 @@ def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 		try:
 			os.environ['FRBOT_ROI_CONFIG_SHA'] = str(computed_sha)
 		except Exception:
-			pass
+			try:
+				from runtime.error_policy import should_reraise
+
+				if should_reraise():
+					raise
+			except Exception:
+				pass
 
 		# REAL-mode certification requires a minimal, fixed ROI inventory.
 		if mode == 'real':

@@ -17,6 +17,7 @@ from runtime.battle_list_semantics import crop_roi_rgb
 from runtime.event_correlation import attach_snapshot, new_event, validate
 from runtime.trade import select_trade_intent
 from runtime.trade_semantics import TradeDelta, compute_trade_delta, detect_npc_window, is_trade_success, read_trade_inventory
+from runtime.error_policy import should_reraise
 
 
 def _frames_dir_for_trade_evidence() -> Path:
@@ -45,7 +46,9 @@ def _try_dump_click_overlay(*, reason: str, frame: Frame | None, x: int | None, 
             y=int(y),
             reason=str(reason),
         )
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         return
 
 
@@ -193,7 +196,8 @@ def execute_trade_tick(
             try:
                 event['intent']['click'] = {'x': int(cx), 'y': int(cy)}
             except Exception:
-                pass
+                if should_reraise():
+                    raise
             _try_dump_click_overlay(reason='trade_action_click', frame=before, x=int(cx), y=int(cy))
             input_.click(cx, cy)
     except Exception as exc:
@@ -217,7 +221,13 @@ def execute_trade_tick(
         try:
             setattr(corr_exc, 'details', {'event_correlation': event})
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         raise corr_exc
 
     if pixel_fallback_ok:
@@ -228,7 +238,9 @@ def execute_trade_tick(
         try:
             px_tol = int(os.environ.get('FRBOT_TRADE_DELTA_PX_TOL', '15') or '15')
             ratio_thr = float(os.environ.get('FRBOT_TRADE_DELTA_RATIO_MIN', '0.01') or '0.01')
-        except Exception:
+        except Exception as e:
+            if should_reraise():
+                raise
             px_tol = 15
             ratio_thr = 0.01
 

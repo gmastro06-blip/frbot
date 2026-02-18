@@ -16,6 +16,7 @@ from runtime.healing_runner import _read_hp_mp
 from runtime.healing_semantics import detect_cooldown_marker, parse_rgb_triplet
 from runtime.event_correlation import attach_snapshot, new_event, validate
 from runtime.pacing import wait_until_ns
+from runtime.error_policy import should_reraise
 
 
 def _decode_name_from_target_frame(rgb: bytes, width: int) -> str:
@@ -35,7 +36,9 @@ def _decode_name_from_target_frame(rgb: bytes, width: int) -> str:
         out.append(int(r))
     try:
         return bytes(out).decode('ascii', errors='ignore').strip()
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         return ''
 
 
@@ -241,7 +244,9 @@ def execute_combat_intent(
     # Real UI and OBS capture may lag behind inputs; add bounded pacing.
     try:
         post_attack_ms = int(os.environ.get('FRBOT_POST_ATTACK_DELAY_MS', '150') or '150')
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         post_attack_ms = 150
     if post_attack_ms > 0:
         wait_until_ns(int(time.monotonic_ns() + (int(post_attack_ms) * 1_000_000)))
@@ -249,11 +254,15 @@ def execute_combat_intent(
     # Sample multiple AFTER frames in a bounded window to tolerate UI/capture latency.
     try:
         after_window_ms = int(os.environ.get('FRBOT_COMBAT_AFTER_WINDOW_MS', '900') or '900')
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         after_window_ms = 900
     try:
         after_poll_ms = int(os.environ.get('FRBOT_COMBAT_AFTER_POLL_MS', '120') or '120')
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         after_poll_ms = 120
     after_window_ms = max(0, min(int(after_window_ms), 3000))
     after_poll_ms = max(50, min(int(after_poll_ms), 500))
@@ -269,20 +278,26 @@ def execute_combat_intent(
     try:
         cd_px_tol = int(os.environ.get('FRBOT_COMBAT_COOLDOWN_DELTA_PX_TOL', '15') or '15')
         cd_ratio_thr = float(os.environ.get('FRBOT_COMBAT_COOLDOWN_DELTA_RATIO_MIN', '0.003') or '0.003')
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         cd_px_tol = 15
         cd_ratio_thr = 0.003
     try:
         fb_px_tol = int(os.environ.get('FRBOT_COMBAT_FEEDBACK_DELTA_PX_TOL', '15') or '15')
         fb_ratio_thr = float(os.environ.get('FRBOT_COMBAT_FEEDBACK_DELTA_RATIO_MIN', '0.0015') or '0.0015')
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         fb_px_tol = 15
         fb_ratio_thr = 0.0015
 
     try:
         bl_px_tol = int(os.environ.get('FRBOT_COMBAT_BATTLE_LIST_DELTA_PX_TOL', '15') or '15')
         bl_ratio_thr = float(os.environ.get('FRBOT_COMBAT_BATTLE_LIST_DELTA_RATIO_MIN', '0.02') or '0.02')
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         bl_px_tol = 15
         bl_ratio_thr = 0.02
 
@@ -407,7 +422,8 @@ def execute_combat_intent(
             try:
                 setattr(corr_exc, 'details', {'event_correlation': event})
             except Exception:
-                pass
+                if should_reraise():
+                    raise
             raise corr_exc
 
     if not saw_locked:

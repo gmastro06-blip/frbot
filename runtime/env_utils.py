@@ -9,6 +9,7 @@ import os
 from typing import TypeVar, Callable
 
 from contracts.errors import PreflightFailed
+from runtime.error_policy import should_reraise
 
 T = TypeVar('T')
 
@@ -41,6 +42,8 @@ def env_int(name: str, default: int = 0) -> int:
     try:
         return int(raw) if raw is not None else int(default)
     except Exception:
+        if should_reraise():
+            raise
         return int(default)
 
 
@@ -50,6 +53,8 @@ def env_float(name: str, default: float = 0.0) -> float:
     try:
         return float(raw) if raw is not None else float(default)
     except Exception:
+        if should_reraise():
+            raise
         return float(default)
 
 
@@ -85,4 +90,6 @@ def parse_or_default(
     try:
         return parser(raw)
     except Exception:
+        if should_reraise():
+            raise
         return default

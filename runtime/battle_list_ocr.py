@@ -22,6 +22,7 @@ from PIL import Image, ImageOps
 import numpy as np
 from contracts.capture import Frame
 from contracts.evidence import Roi
+from runtime.error_policy import should_reraise
 
 
 # === Configuration ===
@@ -378,7 +379,8 @@ def _verify_tesseract(cmd: str) -> bool:
         if result.returncode == 0 and result.stdout:
             return True
     except Exception:
-        pass
+        if should_reraise():
+            raise
     return False
 
 

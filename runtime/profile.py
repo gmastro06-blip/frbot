@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 from contracts.errors import PreflightFailed
+from runtime.error_policy import should_reraise
 
 
 _PROD_EMERGENCY: str = 'prod_emergency'
@@ -59,6 +60,8 @@ def cap_ticks(requested: int) -> int:
     try:
         req = int(requested)
     except Exception:
+        if should_reraise():
+            raise
         req = int(requested) if isinstance(requested, int) else 0
 
     if is_prod_emergency():
@@ -84,6 +87,8 @@ def default_session_seconds(default: float) -> float:
         try:
             d = float(default)
         except Exception:
+            if should_reraise():
+                raise
             d = 1.0
         return float(max(d, 1.0))
 

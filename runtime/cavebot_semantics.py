@@ -7,6 +7,7 @@ from typing import Optional
 
 from contracts.capture import Frame
 from contracts.runtime import MinimapMarker, Waypoint
+from runtime.error_policy import should_reraise
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,7 +279,8 @@ def select_player_marker(
                         },
                     )
     except Exception:
-        pass
+        if should_reraise():
+            raise
 
     candidates = _component_candidates(
         frame,

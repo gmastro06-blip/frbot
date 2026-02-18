@@ -24,6 +24,7 @@ from runtime.combat_semantics import read_target_hp_percent
 from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
 from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_obs_projector_hwnd
 from runtime.pacing import wait_until_ns
+from runtime.error_policy import should_reraise
 
 
 CaptureAdapter: TypeAlias = MssBoundWindowRealCapture | MeldBoundWindowRealCapture | ObsSourceRealCapture | MockWorldAnyCapture
@@ -181,7 +182,8 @@ def combat_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter,
             record_before('combat_full', f)
             record_after('combat_full', f)
         except Exception:
-            pass
+            if should_reraise():
+                raise
 
         # Target must be locked and identifiable.
         # In REAL, target lock can be lost between gates (e.g., while healing).
@@ -214,7 +216,8 @@ def combat_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter,
                 record_before('combat_full', f2)
                 record_after('combat_full', f2)
             except Exception:
-                pass
+                if should_reraise():
+                    raise
 
             name = _get_locked_target_name(ctx, f2)
 

@@ -62,6 +62,13 @@ def _dump_looting_preflight_failure_frame(*, reason: str, before: Frame) -> None
             out_dir=str(out_dir),
         )
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         return
 
 
@@ -293,7 +300,13 @@ def looting_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
             except Exception:
                 # Best-effort diagnostics: failures while dumping emergency calibration
                 # evidence must not mask the primary preflight failure.
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             raise PreflightFailed('looting_inventory_unreadable')
 
         # PROD-EMERGENCY contract: binary inventory overlay must exist in the capture.
@@ -416,7 +429,13 @@ def looting_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
                     )
                 except Exception:
                     # Best-effort diagnostics: failure to dump calibration hints is non-fatal.
-                    pass
+                    try:
+                        from runtime.error_policy import should_reraise
+
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
                 raise PreflightFailed('looting_inventory_unreadable')
         else:
             if read_inventory(f0, inv_roi) is None:

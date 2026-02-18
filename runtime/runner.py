@@ -39,6 +39,7 @@ from runtime.minimap_semantics import (
 )
 from runtime.profile import cap_ticks, default_session_seconds, is_prod_emergency
 from runtime.pacing import wait_until_ns
+from runtime.error_policy import should_reraise
 
 
 def _env_str(name: str, default: str = '') -> str:
@@ -50,7 +51,9 @@ def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
     try:
         return int(str(raw).strip(), 10) if raw is not None else int(default)
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         return int(default)
 
 
@@ -77,6 +80,8 @@ def _write_evidence_manifest(*, frames_dir: Path, capture: object) -> None:
         frames_dir.mkdir(parents=True, exist_ok=True)
         (frames_dir / 'evidence_manifest.json').write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
     except Exception:
+        if should_reraise():
+            raise
         return
 
 
@@ -86,6 +91,8 @@ def _dump_gate_pair_if_enabled(*, frames_dir: Path, gate: str, before: Frame | N
     try:
         dump_pair(gate=str(gate), before=before, after=after, reason=str(reason), out_dir=frames_dir)
     except Exception:
+        if should_reraise():
+            raise
         return
 
 
@@ -95,7 +102,9 @@ def _env_ms(name: str, default_ms: int) -> int:
         return int(default_ms)
     try:
         return int(str(raw).strip(), 10)
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         return int(default_ms)
 
 
@@ -123,7 +132,8 @@ def _assert_centroid_in_minimap_bounds(*, frame: Frame, cx: float, cy: float) ->
         try:
             setattr(exc, 'details', {'cx': float(cx), 'cy': float(cy), 'minimap_width': int(w), 'minimap_height': int(h)})
         except Exception:
-            pass
+            if should_reraise():
+                raise
         raise exc
 
 
@@ -136,6 +146,8 @@ def _append_cavebot_trace(*, frames_dir: Path, payload: dict[str, Any]) -> None:
         with p.open('a', encoding='utf-8') as f:
             f.write(json.dumps(serialize_for_trace(payload), sort_keys=True) + '\n')
     except Exception:
+        if should_reraise():
+            raise
         return
 
 
@@ -408,6 +420,8 @@ def run() -> int:
                 frames_dir.mkdir(parents=True, exist_ok=True)
                 (frames_dir / 'cavebot_trace.jsonl').write_text('', encoding='utf-8')
             except Exception:
+                if should_reraise():
+                    raise
                 pass
 
         capture, input_, binding = preflight(ctx)
@@ -429,6 +443,8 @@ def run() -> int:
                 a1 = capture.grab()
                 _dump_gate_pair_if_enabled(frames_dir=frames_dir, gate='healing', before=b1, after=a1, reason='startup_evidence')
             except Exception:
+                if should_reraise():
+                    raise
                 pass
 
         # Fresh trace per run (avoids mixing segments across runs).
@@ -491,6 +507,8 @@ def run() -> int:
             if str(effective_min_pixels).strip():
                 min_pixels = int(str(effective_min_pixels).strip(), 10)
         except Exception:
+            if should_reraise():
+                raise
             min_pixels = ctx.config.player_marker_min_pixels
         marker_cfg = marker_config_from_env(
             str(effective_rgb),
@@ -558,6 +576,8 @@ def run() -> int:
                         )
                         marker_overlay_dumped = True
                 except Exception:
+                    if should_reraise():
+                        raise
                     marker_overlay_dumped = True
             tile = tracker.observe_tile(det.pos)
             ctx.position.x = int(tile.x)
@@ -738,6 +758,8 @@ def run() -> int:
                         os.environ['FRBOT_PLAYER_MARKER_RGB_EFFECTIVE'] = f"{int(chosen_cfg.rgb[0])},{int(chosen_cfg.rgb[1])},{int(chosen_cfg.rgb[2])}"
                         os.environ['FRBOT_PLAYER_MARKER_MIN_PIXELS_EFFECTIVE'] = str(int(chosen_cfg.min_pixels))
                     except Exception:
+                        if should_reraise():
+                            raise
                         pass
 
                     tracker = SemanticTracker(pixels_per_tile=float(ctx.config.pixels_per_tile), z=int(z0))
@@ -874,6 +896,8 @@ def run() -> int:
                                 },
                             )
                         except Exception:
+                            if should_reraise():
+                                raise
                             pass
                         raise abort_exc
 
@@ -914,6 +938,8 @@ def run() -> int:
                                 },
                             )
                         except Exception:
+                            if should_reraise():
+                                raise
                             pass
                         raise abort_exc
                     if prev_after_dist is not None and not (float(dist_after) < float(prev_after_dist)):
@@ -946,6 +972,8 @@ def run() -> int:
                                 },
                             )
                         except Exception:
+                            if should_reraise():
+                                raise
                             pass
                         raise abort_exc
                     prev_after_dist = float(dist_after)
@@ -1036,7 +1064,13 @@ def run() -> int:
                         },
                     )
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
 
         # PROD-EMERGENCY: dump BEFORE/AFTER evidence when available.
         if dump_enabled():
@@ -1049,7 +1083,13 @@ def run() -> int:
 
                     try_dump_window_frame(gate='runtime', reason=str(exc))
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         write_fatal(str(exc), exc)
         return 1
     except Exception as exc:

@@ -58,6 +58,11 @@ def _read_container_open(frame: Frame | None, roi: Roi | None) -> bool | None:
                     return True
         return False
     except Exception:
+        try:
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         return None
 
 

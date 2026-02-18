@@ -24,6 +24,13 @@ def _env_int(name: str, default: int = 0) -> int:
     try:
         return int(raw, 0)  # Support hex
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         return int(default)
 
 
@@ -34,6 +41,13 @@ def _env_float(name: str, default: float = 0.0) -> float:
     try:
         return float(raw)
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         return float(default)
 
 

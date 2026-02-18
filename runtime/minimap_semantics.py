@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+from runtime.error_policy import should_reraise
+
 from contracts.capture import Frame
 from contracts.runtime import Tile
 
@@ -45,6 +47,8 @@ def _parse_rgb_triplet(raw: str, *, default: tuple[int, int, int]) -> tuple[int,
     try:
         r, g, b = (int(parts[0]), int(parts[1]), int(parts[2]))
     except Exception:
+        if should_reraise():
+            raise
         return default
     r = max(0, min(255, r))
     g = max(0, min(255, g))
@@ -64,30 +68,40 @@ def marker_config_from_env(
     try:
         tol = int(tol_raw)
     except Exception:
+        if should_reraise():
+            raise
         tol = 30
     tol = max(0, min(255, tol))
 
     try:
         min_pixels = int(min_pixels_raw)
     except Exception:
+        if should_reraise():
+            raise
         min_pixels = 5
     min_pixels = max(1, min(10_000, min_pixels))
 
     try:
         max_pixels = int(max_pixels_raw)
     except Exception:
+        if should_reraise():
+            raise
         max_pixels = 0
     max_pixels = max(0, min(1_000_000, max_pixels))
 
     try:
         min_fill_ratio = float(min_fill_ratio_raw)
     except Exception:
+        if should_reraise():
+            raise
         min_fill_ratio = 0.15
     min_fill_ratio = max(0.0, min(1.0, float(min_fill_ratio)))
 
     try:
         max_aspect_ratio = float(max_aspect_ratio_raw)
     except Exception:
+        if should_reraise():
+            raise
         max_aspect_ratio = 4.0
     max_aspect_ratio = max(1.0, min(50.0, float(max_aspect_ratio)))
 

@@ -222,11 +222,25 @@ def _load_patterns() -> tuple[list[int], int]:
     try:
         data = json.loads(Path(p).read_text(encoding='utf-8'))
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         return [], 0
 
     try:
         tol = int(data.get('tolerance', 6))
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         tol = 6
     tol = max(0, min(int(tol), 32))
 
@@ -240,6 +254,13 @@ def _load_patterns() -> tuple[list[int], int]:
                 continue
             hashes.append(int(hx, 16))
         except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             continue
 
     return hashes, int(tol)
@@ -271,6 +292,13 @@ def detect_loot_from_chat(
     try:
         prefix_w = int((os.environ.get('FRBOT_CHAT_LOOT_PREFIX_W', '220') or '220').strip() or '220')
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         prefix_w = 220
     prefix_w = max(40, min(int(prefix_w), int(w)))
 
@@ -289,6 +317,13 @@ def detect_loot_from_chat(
     try:
         px_tol = int((os.environ.get('FRBOT_CHAT_LOOT_PX_TOL', '18') or '18').strip() or '18')
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         px_tol = 18
     px_tol = max(0, min(int(px_tol), 255))
 
@@ -379,18 +414,39 @@ def detect_loot_from_chat(
     try:
         min_changed_px = int((os.environ.get('FRBOT_CHAT_LOOT_MIN_CHANGED_PIXELS', '600') or '600').strip() or '600')
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         min_changed_px = 600
     min_changed_px = max(1, int(min_changed_px))
 
     try:
         min_ratio = float((os.environ.get('FRBOT_CHAT_LOOT_MIN_RATIO', '0.0015') or '0.0015').strip() or '0.0015')
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         min_ratio = 0.0015
     min_ratio = max(0.0, float(min_ratio))
 
     try:
         max_ratio = float((os.environ.get('FRBOT_CHAT_LOOT_MAX_RATIO', '0.20') or '0.20').strip() or '0.20')
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         max_ratio = 0.20
     max_ratio = max(0.0, float(max_ratio))
 
@@ -499,30 +555,65 @@ def detect_loot_from_chat(
         try:
             green_delta = int((os.environ.get('FRBOT_CHAT_LOOT_GREEN_DELTA', '25') or '25').strip() or '25')
         except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             green_delta = 25
         green_delta = max(0, min(int(green_delta), 255))
 
         try:
             green_min_g = int((os.environ.get('FRBOT_CHAT_LOOT_GREEN_MIN_G', '60') or '60').strip() or '60')
         except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             green_min_g = 60
         green_min_g = max(0, min(int(green_min_g), 255))
 
         try:
             min_green_ratio = float((os.environ.get('FRBOT_CHAT_LOOT_GREEN_MIN_RATIO', '0.08') or '0.08').strip() or '0.08')
         except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             min_green_ratio = 0.08
         min_green_ratio = max(0.0, min(float(min_green_ratio), 1.0))
 
         try:
             max_green_ratio = float((os.environ.get('FRBOT_CHAT_LOOT_GREEN_MAX_RATIO', '0.98') or '0.98').strip() or '0.98')
         except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             max_green_ratio = 0.98
         max_green_ratio = max(0.0, min(float(max_green_ratio), 1.0))
 
         try:
             min_green_px = int((os.environ.get('FRBOT_CHAT_LOOT_GREEN_MIN_PIXELS', '120') or '120').strip() or '120')
         except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             min_green_px = 120
         min_green_px = max(0, int(min_green_px))
 

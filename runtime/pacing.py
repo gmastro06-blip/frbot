@@ -4,6 +4,8 @@ import select
 import sys
 import time
 
+from runtime.error_policy import should_reraise
+
 
 def _yield_to_os() -> None:
     """Yield execution to the OS scheduler (best-effort).
@@ -19,6 +21,8 @@ def _yield_to_os() -> None:
 
         ctypes.windll.kernel32.SwitchToThread()
     except Exception:
+        if should_reraise():
+            raise
         return
 
 
@@ -32,6 +36,8 @@ def sleep_ms(ms: float) -> None:
     try:
         v = float(ms)
     except Exception:
+        if should_reraise():
+            raise
         v = 0.0
 
     if not (v > 0.0):
@@ -49,6 +55,8 @@ def sleep_ms(ms: float) -> None:
             return
         except Exception:
             # Fall back to yield loop.
+            if should_reraise():
+                raise
             pass
 
     # Cross-platform wait without time.sleep: select timeout.
@@ -56,6 +64,8 @@ def sleep_ms(ms: float) -> None:
         select.select([], [], [], float(v) / 1000.0)
     except Exception:
         # Last resort: bounded yield loop.
+        if should_reraise():
+            raise
         end = time.monotonic_ns() + int(v * 1_000_000.0)
         wait_until_ns(end)
 
@@ -64,6 +74,8 @@ def sleep_s(seconds: float) -> None:
     try:
         v = float(seconds)
     except Exception:
+        if should_reraise():
+            raise
         v = 0.0
     sleep_ms(v * 1000.0)
 

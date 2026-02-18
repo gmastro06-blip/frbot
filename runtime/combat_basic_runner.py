@@ -15,6 +15,7 @@ from diagnostics.frame_dump import dump_enabled
 from diagnostics.overlay_dump import dump_click_point_overlay
 
 from runtime.combat_basic_semantics import CombatBasicEvidence, feedback_visible, read_target_hp_percent, target_frame_active
+from runtime.error_policy import should_reraise
 
 
 def _env_str(name: str, default: str) -> str:
@@ -31,7 +32,9 @@ def _parse_click_point_f(raw: str) -> tuple[float, float] | None:
         return None
     try:
         return float(bits[0]), float(bits[1])
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         return None
 
 
@@ -42,7 +45,9 @@ def _parse_click_point_i(raw: str) -> tuple[int, int] | None:
     x, y = pt
     try:
         return int(round(float(x))), int(round(float(y)))
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         return None
 
 
@@ -118,7 +123,12 @@ def _click_at(input_: InputAdapter, ctx: RuntimeContext, *, x: int, y: int, righ
         if callable(rc):
             rc(int(x), int(y))
             return
-    input_.click(int(x), int(y))
+    try:
+        input_.click(int(x), int(y))
+    except Exception as e:
+        if should_reraise():
+            raise
+        raise
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -132,7 +142,9 @@ def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
     try:
         return int(raw) if raw is not None else int(default)
-    except Exception:
+    except Exception as e:
+        if should_reraise():
+            raise
         return int(default)
 
 

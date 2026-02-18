@@ -41,7 +41,14 @@ def _dump_preflight_failure_frames(*, reason: str, before: Frame) -> None:
         if not dump_enabled():
             return
         dump_pair(gate='preflight', before=before, after=None, reason=str(reason), out_dir=_frames_dir_for_preflight())
-    except Exception:
+    except Exception as e:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         return
 
 CaptureAdapter: TypeAlias = MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture | ObsSourceRealCapture | MockWorldCapture

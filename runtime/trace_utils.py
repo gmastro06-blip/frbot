@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import is_dataclass, asdict
 from typing import Any
 
+from runtime.error_policy import should_reraise
+
 
 def serialize_for_trace(obj: Any) -> Any:
     """Recursively coerce objects to JSON-serializable primitives.
@@ -21,6 +23,8 @@ def serialize_for_trace(obj: Any) -> Any:
         try:
             return obj.hex()
         except Exception:
+            if should_reraise():
+                raise
             return str(obj)
     # is_dataclass can be True for both instances and classes; ensure instance
     if is_dataclass(obj) and not isinstance(obj, type):
@@ -28,6 +32,8 @@ def serialize_for_trace(obj: Any) -> Any:
             return serialize_for_trace(asdict(obj))
         except Exception:
             # Fallback to attribute inspection
+            if should_reraise():
+                raise
             pass
     if isinstance(obj, dict):
         out: dict[str, Any] = {}
@@ -48,9 +54,13 @@ def serialize_for_trace(obj: Any) -> Any:
         if isinstance(d, dict) and d:
             return serialize_for_trace(d)
     except Exception:
+        if should_reraise():
+            raise
         pass
 
     try:
         return str(obj)
     except Exception:
+        if should_reraise():
+            raise
         return repr(obj)

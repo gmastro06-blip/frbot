@@ -25,6 +25,7 @@ from runtime.tibia_map_data import TibiaMapDataset, load_tibia_map_dataset
 from runtime.event_correlation import attach_snapshot, new_event, validate
 from runtime.trace_utils import serialize_for_trace
 from runtime.cavebot_trace_helpers import make_waypoint_payload
+from runtime.error_policy import should_reraise
 
 
 _DATASET_CACHE: dict[str, TibiaMapDataset] = {}
@@ -81,6 +82,8 @@ def _effective_waypoint_for_frame(
         if tx is not None and ty is not None:
             prev_world = (int(tx), int(ty))
     except Exception:
+        if should_reraise():
+            raise
         prev_world = None
 
     loc = localize_minimap(
@@ -99,6 +102,8 @@ def _effective_waypoint_for_frame(
     try:
         min_score = float(min_score_raw)
     except Exception:
+        if should_reraise():
+            raise
         min_score = 0.55
     min_score = max(0.0, min(1.0, float(min_score)))
 
@@ -275,6 +280,8 @@ def _wrong_direction_threshold_deg(*, real_mode: bool) -> float:
     try:
         val = float(raw)
     except Exception:
+        if should_reraise():
+            raise
         return 90.0
     if val < 90.0:
         return 90.0
@@ -292,6 +299,8 @@ def _wrong_direction_abort_streak(*, real_mode: bool) -> int:
     try:
         val = int(raw)
     except Exception:
+        if should_reraise():
+            raise
         return 1
     return max(1, int(val))
 
@@ -312,6 +321,8 @@ def _dead_reckon_step_px(*, real_mode: bool) -> int:
     try:
         val = int(raw)
     except Exception:
+        if should_reraise():
+            raise
         return 1
     return max(1, min(int(val), 4))
 
@@ -735,7 +746,8 @@ def _marker_rgb(ctx: RuntimeContext) -> tuple[int, int, int]:
         if isinstance(rgb, (tuple, list)) and len(rgb) == 3:
             return (int(rgb[0]), int(rgb[1]), int(rgb[2]))
     except Exception:
-        pass
+        if should_reraise():
+            raise
     return _parse_rgb(ctx.config.player_marker_rgb)
 
 
@@ -1454,7 +1466,8 @@ def execute_cavebot_tick(
     try:
         ctx.cavebot_gate.telemetry.wrong_direction_streak = 0
     except Exception:
-        pass
+        if should_reraise():
+            raise
 
     if status == 'cavebot_no_progress':
         # No semantic progress: allow bounded retries, then deterministically abort stuck.

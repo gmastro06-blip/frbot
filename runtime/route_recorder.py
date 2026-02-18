@@ -440,6 +440,13 @@ class WaypointRecorder:
             snap = self._binding.snapshot()
             return int(getattr(snap, "hwnd", 0) or 0)
         except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             return 0
 
     def _frame_path(self, *, step_index: int, suffix: str) -> str:

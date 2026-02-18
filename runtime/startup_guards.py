@@ -8,6 +8,7 @@ from pathlib import Path
 from dataclasses import asdict, dataclass
 
 from adapters.windows import win32 as w32
+from runtime.error_policy import should_reraise
 from contracts.errors import PreflightFailed
 from diagnostics.fatal import write_fatal
 from runtime.env import parse_window_hwnd_env
@@ -79,6 +80,8 @@ def _found_titles() -> list[str]:
     try:
         wins = w32.list_top_level_windows(title_substring='', visible_only=True)
     except Exception:
+        if should_reraise():
+            raise
         return []
     out: list[str] = []
     for wi in wins:
@@ -92,6 +95,8 @@ def _list_found_windows() -> list[dict[str, object]]:
     try:
         wins, _mons = w32.list_visible_windows_diagnostic()
     except Exception:
+        if should_reraise():
+            raise
         return []
     out: list[dict[str, object]] = []
     for wi in wins[:80]:
@@ -115,6 +120,8 @@ def _write_window_diagnostics_json(*, expected_title: str, resolved_hwnd: int, r
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
     except Exception:
+        if should_reraise():
+            raise
         return
 
 
@@ -129,6 +136,8 @@ def _ensure_trace_initialized() -> None:
         if not p.exists():
             p.write_text('', encoding='utf-8')
     except Exception:
+        if should_reraise():
+            raise
         return
 
 
@@ -141,6 +150,8 @@ def _resolve_hwnd_by_title(title: str) -> tuple[int, str]:
         if exact is not None:
             return int(exact.hwnd), str(exact.title)
     except Exception:
+        if should_reraise():
+            raise
         pass
 
     try:
@@ -148,6 +159,8 @@ def _resolve_hwnd_by_title(title: str) -> tuple[int, str]:
         if sub is not None:
             return int(sub.hwnd), str(sub.title)
     except Exception:
+        if should_reraise():
+            raise
         pass
     return 0, ''
 
@@ -156,22 +169,32 @@ def _collect_details(*, hwnd: int, title_substring: str) -> StartupGuardDetails:
     try:
         fg = int(w32.get_foreground_window())
     except Exception:
+        if should_reraise():
+            raise
         fg = 0
     try:
         title_now = str(w32.get_window_text(int(hwnd))) if int(hwnd) > 0 else ''
     except Exception:
+        if should_reraise():
+            raise
         title_now = ''
     try:
         visible = bool(w32.is_window_visible(int(hwnd))) if int(hwnd) > 0 else False
     except Exception:
+        if should_reraise():
+            raise
         visible = False
     try:
         minimized = bool(w32.is_window_minimized(int(hwnd))) if int(hwnd) > 0 else False
     except Exception:
+        if should_reraise():
+            raise
         minimized = False
     try:
         dpi = w32.get_dpi_awareness_status()
     except Exception:
+        if should_reraise():
+            raise
         dpi = {}
 
     return StartupGuardDetails(
@@ -332,7 +355,11 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         try:
             os.environ['FRBOT_WINDOW_HWND'] = hex(int(hwnd))
         except Exception:
-            pass
+            try:
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
 
     found_windows = _list_found_windows()
     info = _collect_details(hwnd=int(hwnd), title_substring=str(title_substring))
@@ -403,7 +430,11 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
                 try:
                     w32.try_focus_window(int(hwnd), timeout_s=0.15)
                 except Exception:
-                    pass
+                    try:
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
             try:
                 fg_now = int(w32.get_foreground_window())
             except Exception:

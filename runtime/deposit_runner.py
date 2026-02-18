@@ -238,7 +238,9 @@ def execute_deposit_tick(
             try:
                 px_tol = int(os.environ.get('FRBOT_DEPOSIT_DEPOT_DELTA_PX_TOL', '15') or '15')
                 ratio_thr = float(os.environ.get('FRBOT_DEPOSIT_DEPOT_DELTA_RATIO_MIN', '0.01') or '0.01')
-            except Exception:
+            except Exception as e:
+                if __import__('runtime.error_policy').should_reraise():
+                    raise
                 px_tol = 15
                 ratio_thr = 0.01
             ratio = _changed_ratio(depot_rgb_before, depot_rgb_after, px_tol=int(px_tol))

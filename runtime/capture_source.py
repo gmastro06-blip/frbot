@@ -64,15 +64,36 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
     try:
         windows_seen, monitors_seen = w32.list_visible_windows_diagnostic()
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         windows_seen, monitors_seen = [], []
 
     try:
         fg_hwnd = int(w32.get_foreground_window() or 0)
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         fg_hwnd = 0
     try:
         fg_title = str(w32.get_window_text(int(fg_hwnd))) if int(fg_hwnd) > 0 else ''
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         fg_title = ''
 
     # Best-effort resolve Tibia/input HWND for diagnostics (never required foreground).
@@ -83,6 +104,13 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
         try:
             tibia_hwnd = int(raw_tibia_hwnd, 0)
         except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             tibia_hwnd = 0
     if tibia_hwnd <= 0 and tibia_title:
         try:
@@ -90,6 +118,13 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
             if match is not None:
                 tibia_hwnd = int(match.hwnd)
         except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             tibia_hwnd = 0
 
     projector_candidates: list[dict[str, object]] = []
@@ -168,7 +203,10 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
     except PreflightFailed:
         raise
     except Exception:
-        pass
+        from runtime.error_policy import should_reraise
+
+        if should_reraise():
+            raise
 
     try:
         if not w32.is_window_visible(hwnd):
@@ -178,7 +216,10 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
     except PreflightFailed:
         raise
     except Exception:
-        pass
+        from runtime.error_policy import should_reraise
+
+        if should_reraise():
+            raise
 
     try:
         if w32.is_window_minimized(hwnd):
@@ -188,7 +229,10 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
     except PreflightFailed:
         raise
     except Exception:
-        pass
+        from runtime.error_policy import should_reraise
+
+        if should_reraise():
+            raise
 
     # Rect must be valid for ROI cropping.
     try:
@@ -263,6 +307,13 @@ def resolve_input_hwnd(*, hwnd: int, title_substring: str) -> int:
     try:
         match = w32.find_window_by_title_substring(needle)
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         match = None
     if match is None:
         return 0
@@ -277,5 +328,12 @@ def resolve_input_hwnd(*, hwnd: int, title_substring: str) -> int:
         if w32.is_window_minimized(mh):
             return 0
     except Exception:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         return 0
     return mh
