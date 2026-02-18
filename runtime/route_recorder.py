@@ -446,7 +446,13 @@ class WaypointRecorder:
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             return 0
 
     def _frame_path(self, *, step_index: int, suffix: str) -> str:

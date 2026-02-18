@@ -70,7 +70,13 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         windows_seen, monitors_seen = [], []
 
     try:
@@ -82,7 +88,13 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         fg_hwnd = 0
     try:
         fg_title = str(w32.get_window_text(int(fg_hwnd))) if int(fg_hwnd) > 0 else ''
@@ -93,7 +105,13 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         fg_title = ''
 
     # Best-effort resolve Tibia/input HWND for diagnostics (never required foreground).
@@ -110,7 +128,13 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             tibia_hwnd = 0
     if tibia_hwnd <= 0 and tibia_title:
         try:
@@ -124,7 +148,13 @@ def resolve_obs_projector_hwnd() -> tuple[int, str]:
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             tibia_hwnd = 0
 
     projector_candidates: list[dict[str, object]] = []
@@ -313,7 +343,13 @@ def resolve_input_hwnd(*, hwnd: int, title_substring: str) -> int:
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         match = None
     if match is None:
         return 0
@@ -334,6 +370,12 @@ def resolve_input_hwnd(*, hwnd: int, title_substring: str) -> int:
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         return 0
     return mh

@@ -85,7 +85,13 @@ def _try_dump_looting_pair(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                    try:
+                        from runtime.error_policy import should_reraise
+
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
         else:
             try:
                 from runtime.error_policy import should_reraise
@@ -97,7 +103,13 @@ def _try_dump_looting_pair(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                    try:
+                        from runtime.error_policy import should_reraise
+
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
         return (None, None)
 
 
@@ -334,7 +346,13 @@ def execute_looting_basic_once(
                         if should_reraise():
                             raise
                     except Exception:
-                        pass
+                        try:
+                            from runtime.error_policy import should_reraise
+
+                            if should_reraise():
+                                raise
+                        except Exception:
+                            pass
             raise exc
 
     before_ts_ns = int(time.monotonic_ns())
@@ -430,7 +448,13 @@ def execute_looting_basic_once(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                    try:
+                        from runtime.error_policy import should_reraise
+
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
             return False
 
     def _try_dump_emergency_candidates(*, reason: str, before_frame: Frame, after_frames: list[Frame]) -> list[dict[str, object]]:
@@ -519,7 +543,13 @@ def execute_looting_basic_once(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                    try:
+                        from runtime.error_policy import should_reraise
+
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
             return []
 
     def _context_menu_like_opened(*, before_frame: Frame, after_frame: Frame, x: int, y: int) -> bool:
@@ -612,7 +642,13 @@ def execute_looting_basic_once(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                    try:
+                        from runtime.error_policy import should_reraise
+
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
             return False
 
     # Read BEFORE inventory (pair read happens after AFTER grab).
@@ -658,7 +694,13 @@ def execute_looting_basic_once(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                    try:
+                        from runtime.error_policy import should_reraise
+
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
             return []
 
         if player_xy is None:
@@ -683,7 +725,13 @@ def execute_looting_basic_once(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                    try:
+                        from runtime.error_policy import should_reraise
+
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
             return []
 
         payload: list[dict[str, object]] = [
@@ -1256,5 +1304,11 @@ def execute_looting_basic_once(
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
     raise failure

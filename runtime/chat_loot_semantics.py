@@ -228,7 +228,13 @@ def _load_patterns() -> tuple[list[int], int]:
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         return [], 0
 
     try:
@@ -240,7 +246,13 @@ def _load_patterns() -> tuple[list[int], int]:
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         tol = 6
     tol = max(0, min(int(tol), 32))
 
@@ -260,7 +272,13 @@ def _load_patterns() -> tuple[list[int], int]:
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             continue
 
     return hashes, int(tol)
@@ -298,7 +316,13 @@ def detect_loot_from_chat(
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         prefix_w = 220
     prefix_w = max(40, min(int(prefix_w), int(w)))
 
@@ -323,7 +347,13 @@ def detect_loot_from_chat(
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         px_tol = 18
     px_tol = max(0, min(int(px_tol), 255))
 
@@ -420,7 +450,13 @@ def detect_loot_from_chat(
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         min_changed_px = 600
     min_changed_px = max(1, int(min_changed_px))
 
@@ -433,7 +469,13 @@ def detect_loot_from_chat(
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         min_ratio = 0.0015
     min_ratio = max(0.0, float(min_ratio))
 
@@ -446,7 +488,13 @@ def detect_loot_from_chat(
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         max_ratio = 0.20
     max_ratio = max(0.0, float(max_ratio))
 
@@ -561,7 +609,13 @@ def detect_loot_from_chat(
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             green_delta = 25
         green_delta = max(0, min(int(green_delta), 255))
 
@@ -574,7 +628,13 @@ def detect_loot_from_chat(
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             green_min_g = 60
         green_min_g = max(0, min(int(green_min_g), 255))
 
@@ -587,7 +647,13 @@ def detect_loot_from_chat(
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             min_green_ratio = 0.08
         min_green_ratio = max(0.0, min(float(min_green_ratio), 1.0))
 
@@ -600,7 +666,13 @@ def detect_loot_from_chat(
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             max_green_ratio = 0.98
         max_green_ratio = max(0.0, min(float(max_green_ratio), 1.0))
 
@@ -613,7 +685,13 @@ def detect_loot_from_chat(
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
             min_green_px = 120
         min_green_px = max(0, int(min_green_px))
 
