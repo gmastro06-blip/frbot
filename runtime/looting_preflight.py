@@ -59,6 +59,8 @@ def _read_container_open(frame: Frame | None, roi: Roi | None) -> bool | None:
         return False
     except Exception:
         try:
+            from runtime.error_policy import should_reraise
+
             if should_reraise():
                 raise
         except Exception:
