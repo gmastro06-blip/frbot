@@ -1,0 +1,25 @@
+﻿**********************
+Inicio de la transcripción de Windows PowerShell
+Hora de inicio: 20260216150018
+Nombre de usuario: SAKURA\gmast
+Usuario RunAs: SAKURA\gmast
+Nombre de la configuración: 
+Máquina: SAKURA (Microsoft Windows NT 10.0.26200.0)
+Aplicación host: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -Command Start-Transcript -Path qa_logs/transcript.txt -Force
+Id. de proceso: 27124
+PSVersion: 5.1.26100.7705
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.7705
+BuildVersion: 10.0.26100.7705
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+La transcripción ha comenzado. El archivo de salida es qa_logs/transcript.txt
+PS>$global:?
+True
+**********************
+Fin de la transcripción de Windows PowerShell
+Hora de finalización: 20260216150018
+**********************

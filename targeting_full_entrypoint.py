@@ -5,6 +5,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
@@ -99,7 +100,7 @@ def _write_last_result(
     before_ppm: str | None,
     after_ppm: str | None,
     evidence_reason: str,
-    event_correlation: dict | None = None,
+    event_correlation: dict[str, Any] | None = None,
 ) -> None:
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)

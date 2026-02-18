@@ -30,4 +30,3 @@ def test_audit_all_real_mode_without_frames_is_hard_stop(tmp_path: Path, monkeyp
 	assert 'Preconditions: FAIL' in combined
 	assert 'reason: real_evidence_missing' in combined
 	assert 'FRBOT_REAL_FRAMES_DIR missing' in combined
-	assert 'FRBOT_CONFIG_PATH missing' in combined

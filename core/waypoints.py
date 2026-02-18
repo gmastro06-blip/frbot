@@ -8,12 +8,12 @@ from contracts.models import Coordinate, Waypoint
 
 def validate_waypoints(waypoints: Sequence[Waypoint]) -> None:
     if waypoints is None:
-        raise ContractViolation('waypoints must not be None')
+        raise ContractViolation("waypoints must not be None")
 
     # Explicit: empty waypoint lists are allowed but must be handled by runtime.
     for idx, wp in enumerate(waypoints):
         if not isinstance(wp, Waypoint):
-            raise ContractViolation(f'waypoints[{idx}] is not a Waypoint')
+            raise ContractViolation(f"waypoints[{idx}] is not a Waypoint")
 
 
 def iter_waypoint_coords(waypoints: Iterable[Waypoint]) -> Iterator[Coordinate]:

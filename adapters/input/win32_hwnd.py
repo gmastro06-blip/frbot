@@ -3,18 +3,19 @@ from __future__ import annotations
 import ctypes
 import os
 import sys
+import time
 from types import SimpleNamespace
 from typing import Any, cast
-
-_ctypes_wintypes: Any = None
-try:
-    from ctypes import wintypes as _ctypes_wintypes  # type: ignore
-except Exception:  # pragma: no cover
-    _ctypes_wintypes = None
 
 from adapters.windows.win32 import get_dpi_awareness_status, is_window, is_window_minimized, is_window_visible
 from contracts.input import InputAdapter
 from contracts.verification import VerificationResult
+
+_ctypes_wintypes: Any = None
+try:
+    from ctypes import wintypes as _ctypes_wintypes
+except Exception:  # pragma: no cover
+    _ctypes_wintypes = None
 
 
 _IS_WINDOWS = sys.platform == 'win32'
@@ -537,6 +538,8 @@ class Win32HwndKeyboard(InputAdapter):
         if user32 is None or kernel32 is None:
             raise RuntimeError('win32_unavailable')
         self._hwnd = int(hwnd)
+        self._last_focus_attempt_ms: int = 0
+        self._last_combo_press_ms: int = 0
 
     def verify(self) -> VerificationResult:
         try:
@@ -561,11 +564,147 @@ class Win32HwndKeyboard(InputAdapter):
         # Deterministic no-op: do nothing.
         return
 
+    def _ensure_focus_if_needed(self) -> bool:
+        """Ensure window is foreground before input.
+
+        Returns True if window is now foreground, False otherwise.
+        Uses throttling to avoid spamming SetForegroundWindow.
+        """
+        hwnd_i = int(self._hwnd)
+        fg = int(user32.GetForegroundWindow() or 0) if user32 is not None else 0
+        if fg == hwnd_i:
+            return True
+
+        # Throttling: only try focus if enough time passed since last attempt
+        now = int(time.time() * 1000)  # ms
+        last = getattr(self, '_last_focus_attempt_ms', 0)
+        throttle_ms = int(os.environ.get('FRBOT_FOCUS_THROTTLE_MS', '500'))
+        if (now - last) < throttle_ms:
+            return False
+
+        self._last_focus_attempt_ms = now
+
+        # Try to bring window to foreground
+        if user32 is not None:
+            _result = user32.SetForegroundWindow(wintypes.HWND(hwnd_i))    
+            fg2 = int(user32.GetForegroundWindow() or 0)
+            success = (fg2 == hwnd_i)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(
+                "[INPUT_FOCUS] hwnd=%d, method=SetForegroundWindow, attempted=%s, success=%s, fg_before=%d, fg_after=%d, throttle_ms=%d",
+                hwnd_i, True, success, fg, fg2, throttle_ms
+            )
+            return success
+        return False
+
+    def get_window_readiness(self) -> dict[str, Any]:
+        """Get window readiness status for input.
+
+        Returns dict with:
+        - hwnd: window handle
+        - is_minimized: True if minimized
+        - is_visible: True if visible
+        - is_foreground: True if foreground window
+        - ready_for_input: True if ready for SendInput/PostMessage
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        hwnd_i = int(self._hwnd)
+        readiness = {
+            'hwnd': hwnd_i,
+            'is_minimized': False,
+            'is_visible': False,
+            'is_foreground': False,
+            'ready_for_input': False,
+        }
+
+        if user32 is None:
+            logger.warning("[INPUT_READINESS] user32 not available")
+            return readiness
+
+        # Check minimized (IsIconic)
+        try:
+            readiness['is_minimized'] = bool(user32.IsIconic(wintypes.HWND(hwnd_i)))
+        except Exception:
+            pass
+
+        # Check visible (IsWindowVisible)
+        try:
+            readiness['is_visible'] = bool(user32.IsWindowVisible(wintypes.HWND(hwnd_i)))
+        except Exception:
+            pass
+
+        # Check foreground
+        try:
+            fg = int(user32.GetForegroundWindow() or 0)
+            readiness['is_foreground'] = (fg == hwnd_i)
+        except Exception:
+            pass
+
+        # Ready for input if visible and not minimized (PostMessage can work)
+        # For SendInput, must be foreground
+        readiness['ready_for_input'] = readiness['is_visible'] and not readiness['is_minimized']
+
+        logger.info(
+            "[INPUT_READINESS] hwnd=%d, minimized=%s, visible=%s, foreground=%s, ready=%s",
+            hwnd_i, readiness['is_minimized'], readiness['is_visible'],
+            readiness['is_foreground'], readiness['ready_for_input']
+        )
+
+        return readiness
+
+    def ensure_window_ready_for_input(self) -> bool:
+        """Ensure window is ready for input.
+
+        If minimized, attempts to restore. Then checks foreground status.
+        Returns True if ready for input, False otherwise.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        readiness = self.get_window_readiness()
+
+        # Already ready?
+        if readiness['ready_for_input']:
+            return True
+
+        # If minimized, try to restore
+        if readiness['is_minimized']:
+            logger.info("[INPUT_READINESS] Window minimized, attempting SW_RESTORE")
+            if user32 is not None:
+                try:
+                    # SW_RESTORE = 9
+                    user32.ShowWindow(wintypes.HWND(self._hwnd), 9)
+                    # Re-check status
+                    readiness = self.get_window_readiness()
+                except Exception as e:
+                    logger.warning("[INPUT_READINESS] ShowWindow failed: %s", e)
+
+        # Try to bring to foreground
+        if not readiness['is_foreground']:
+            success = self._ensure_focus_if_needed()
+            if not success:
+                logger.warning(
+                    "[INPUT_READINESS] Window not ready for input: hwnd=%d, minimized=%s, visible=%s, foreground=%s",
+                    readiness['hwnd'], readiness['is_minimized'], readiness['is_visible'], readiness['is_foreground']
+                )
+                return False
+
+        return True
+
     def press_key(self, key: str) -> None:
         # Certification invariant: never send keys to an invalid/invisible HWND.
         self.assert_bound()
 
         method = (os.environ.get('FRBOT_INPUT_METHOD', '') or '').strip().lower()
+
+        # Log selected method
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("[INPUT_METHOD] selected=%s, requires_foreground=%s", method, method in {'sendinput', 'sendinput_vk'})
+
         if method in {'sendinput', 'sendinput_vk'}:
             # Safety: SendInput is global; only allow when the intended window is foreground.
             hwnd_i = int(self._hwnd)

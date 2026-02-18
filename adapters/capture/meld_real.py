@@ -297,7 +297,7 @@ class MeldBoundWindowRealCapture(CaptureAdapter):
 
     def __init__(self, *, binding: WindowBindingAdapter) -> None:
         try:
-            import dxcam  # type: ignore
+            import dxcam
         except Exception as exc:  # pragma: no cover
             raise ImportError('missing dependency: dxcam') from exc
 
@@ -575,7 +575,7 @@ class MeldBoundMinimapRealCapture(CaptureAdapter):
 
     def __init__(self, minimap_roi: Roi, *, binding: WindowBindingAdapter) -> None:
         try:
-            import dxcam  # type: ignore
+            import dxcam
         except Exception as exc:  # pragma: no cover
             raise ImportError('missing dependency: dxcam') from exc
 

@@ -7,7 +7,7 @@ import time
 
 from adapters.windows.win32 import find_window_by_title_substring, get_client_rect_in_screen, get_window_text, is_window
 from contracts.verification import VerificationResult
-from contracts.window import WindowBindingAdapter, WindowBindingStatus, WindowRect
+from contracts.window import WindowBindingAdapter, WindowBindingStatus
 
 
 @dataclass

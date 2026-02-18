@@ -16,9 +16,9 @@ class Roi:
 
     def __post_init__(self) -> None:
         if self.width <= 0 or self.height <= 0:
-            raise ValueError('roi width/height must be > 0')
+            raise ValueError("roi width/height must be > 0")
         if self.x < 0 or self.y < 0:
-            raise ValueError('roi x/y must be >= 0')
+            raise ValueError("roi x/y must be >= 0")
 
 
 @dataclass(frozen=True, slots=True)

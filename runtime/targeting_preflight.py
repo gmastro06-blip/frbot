@@ -19,9 +19,10 @@ from contracts.capture import CaptureStatus, Frame
 from contracts.evidence import Roi
 from contracts.errors import PreflightFailed
 from contracts.input import InputStatus
-from contracts.runtime import RuntimeContext, RuntimeState
+from contracts.runtime import RuntimeContext, RuntimeState, Rect
 from diagnostics.frame_dump import dump_frame_ppm, dump_pair
 from runtime.battle_list_semantics import crop_roi_rgb, detect_battle_list
+from runtime.battle_list_ocr import check_battle_list_presence
 from runtime.config_loader import load_rois
 from runtime.startup_guards import enforce_prod_emergency_real_startup_guards
 from runtime.capture_source import capture_source, resolve_input_hwnd, resolve_obs_projector_hwnd
@@ -146,7 +147,11 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
     loaded = load_rois(ctx)
     ctx.rois = dict(loaded.rois)
 
-    battle_roi = ctx.rois.get(ctx.config.battle_list_roi)
+    battle_roi_key = ctx.config.battle_list_roi or 'battle_list'
+    battle_roi = ctx.rois.get(battle_roi_key)
+    if battle_roi is None:
+        # Try alternate keys
+        battle_roi = ctx.rois.get('battle_list') or ctx.rois.get('creature_list')
     if battle_roi is None:
         raise PreflightFailed('battle_list_not_detected')
 
@@ -234,9 +239,25 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
         before = capture_real.grab()
         validate_prod_emergency_real_rois_in_bounds(rois=ctx.rois, frame=before)
 
+        # Try OCR-based detection first
         obs = detect_battle_list(before, battle_roi)
         allow_no_ocr = _env_bool('FRBOT_BATTLE_LIST_ALLOW_NO_OCR', False)
+
+        # If OCR fails, try structure-based detection
+        has_structure = False
         if obs is None and not allow_no_ocr:
+            # Use the new structure-based detector
+            has_structure = check_battle_list_presence(before, battle_roi)
+            if has_structure:
+                # Battle list detected via structure
+                from runtime.battle_list_semantics import BattleListObservation
+                obs = BattleListObservation(
+                    container_bbox=Rect(x=0, y=0, width=int(battle_roi.width), height=int(battle_roi.height)),
+                    entries=tuple(),
+                )
+                print('[DEBUG] Battle list detected via structure')
+
+        if obs is None and not allow_no_ocr and not has_structure:
             _dump_battle_list_debug(gate='targeting_full_preflight', frame=before, roi=battle_roi, reason='battle_list_not_detected')
             raise PreflightFailed('battle_list_not_detected')
 
@@ -289,7 +310,19 @@ def targeting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapt
 
     obs = detect_battle_list(before, battle_roi)
     allow_no_ocr = _env_bool('FRBOT_BATTLE_LIST_ALLOW_NO_OCR', False)
+
+    # If OCR fails, try structure-based detection
+    has_structure = False
     if obs is None and not allow_no_ocr:
+        has_structure = check_battle_list_presence(before, battle_roi)
+        if has_structure:
+            from runtime.battle_list_semantics import BattleListObservation
+            obs = BattleListObservation(
+                container_bbox=Rect(x=0, y=0, width=int(battle_roi.width), height=int(battle_roi.height)),
+                entries=tuple(),
+            )
+
+    if obs is None and not allow_no_ocr and not has_structure:
         raise PreflightFailed('battle_list_not_detected')
 
     ctx.status.state = RuntimeState.READY

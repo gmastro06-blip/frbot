@@ -1,0 +1,52 @@
+=== OCR Battle List Reproduction Script ===
+Mock mode: False
+Debug: True
+Dump ROIs: False
+Dump preprocess: False
+UI Profile: default
+
+[OCR] Profile: tibia_hi_res (explicit override)
+Active profile: tibia_hi_res
+  - ocr_upscale: 4
+  - ocr_min_confidence: 0.55
+
+Creating test battle list image...
+Test image size: (200, 200)
+
+Running OCR pipeline...
+[OCR] Profile: tibia_hi_res (explicit override)
+[OCR] Profile: tibia_hi_res (explicit override)
+[OCR] Profile: tibia_hi_res (explicit override)
+[OCR] Extracted 5 texts in 273ms
+  - "Dragon" at y=89, conf=0.00
+  - "Bor" at y=168, conf=0.42
+  - "eS" at y=176, conf=0.00
+  - "Goblin" at y=248, conf=0.18
+  - "LI" at y=256, conf=0.24
+[OCR] OCR extraction failed: name 'fuzzy_match' is not defined
+[OCR] Profile: tibia_hi_res (explicit override)
+[OCR] Metrics: roi=(200, 200), profile=tibia_hi_res, time=363ms, raw_texts=0, entities=0
+[OCR] WARNING: No entities found. ROI=(200, 200), profile=tibia_hi_res, fallback_used=False
+
+=== RESULTS ===
+Entities found: 0
+Elapsed time: 363ms
+Profile: tibia_hi_res
+
+WARNING: No entities found!
+
+=== METRICS JSON ===
+{
+  "timestamp": 1771251143.898779,
+  "mock_mode": false,
+  "profile": "default",
+  "entities_count": 0,
+  "elapsed_ms": 363,
+  "roi_size": [
+    200,
+    200
+  ],
+  "entities": []
+}
+
+FAILURE: No entities found

@@ -5,6 +5,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import InventorySnapshot, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
@@ -68,7 +69,8 @@ def _load_json(path: Path) -> dict[str, object]:
     return data if isinstance(data, dict) else {}
 
 
-def _append_trace(*, gate: str, payload: dict) -> None:
+def _append_trace(*, gate: str, payload: dict[str, Any]) -> None:
+    
     try:
         out_dir = _frames_dir()
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -98,7 +100,7 @@ def _write_evidence_manifest(*, evidence_dir: Path, capture: object) -> None:
         return
 
 
-def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
+def _serialize_inventory(inv: InventorySnapshot | None) -> dict[str, object]:
     if inv is None:
         return {}
     out: dict[str, object] = {'slot_counts': dict(inv.slot_counts)}
@@ -166,7 +168,7 @@ def _write_last_result(
     chat_ok: bool | None = None,
     chat_latency_ms: float | None = None,
     chat_max_latency_ms: float | None = None,
-    event_correlation: dict | None = None,
+    event_correlation: dict[str, Any] | None = None,
 ) -> None:
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -176,11 +178,12 @@ def _write_last_result(
             'outcome_kind': str(outcome_kind),
             'reason': str(outcome_kind),
             'actions_sent': int(actions_sent),
+            'inputs_sent': int(actions_sent),
             'successes': int(successes),
             'before_ppm': before_ppm,
             'after_ppm': after_ppm,
             'evidence_reason': str(evidence_reason),
-            'evidence_kind': None if evidence_kind is None else str(evidence_kind),
+            'evidence_kind': str(evidence_kind or evidence_reason or 'none'),
             'chat_ok': None if chat_ok is None else bool(chat_ok),
             'chat_latency_ms': None if chat_latency_ms is None else float(chat_latency_ms),
             'chat_max_latency_ms': None if chat_max_latency_ms is None else float(chat_max_latency_ms),

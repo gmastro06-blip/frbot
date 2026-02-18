@@ -1,0 +1,144 @@
+.......F..............F................................................. [ 34%]
+........................F.F........................sF................... [ 69%]
+...............................................................          [100%]
+================================== FAILURES ===================================
+____________ test_audit_all_real_mode_without_frames_is_hard_stop _____________
+
+tmp_path = WindowsPath('C:/Users/gmast/AppData/Local/Temp/pytest-of-gmast/pytest-731/test_audit_all_real_mode_witho0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B7938BAC90>
+
+    def test_audit_all_real_mode_without_frames_is_hard_stop(tmp_path: Path, monkeypatch: object) -> None:
+    	# Run as a subprocess to validate the CLI contract.
+    	repo_root = Path(__file__).resolve().parents[1]
+    	audit_py = repo_root / 'tools' / 'audit_all.py'
+    
+    	env = dict(os.environ)
+    	env['FRBOT_MODE'] = 'real'
+    	env.pop('FRBOT_REAL_FRAMES_DIR', None)
+    	env.pop('FRBOT_CONFIG_PATH', None)
+    
+    	proc = subprocess.run(
+    		[sys.executable, str(audit_py)],
+    		cwd=str(repo_root),
+    		env=env,
+    		capture_output=True,
+    		text=True,
+    		timeout=20,
+    	)
+    
+    	assert proc.returncode != 0
+    	combined = (proc.stdout or '') + (proc.stderr or '')
+    	assert 'Preconditions: FAIL' in combined
+    	assert 'reason: real_evidence_missing' in combined
+    	assert 'FRBOT_REAL_FRAMES_DIR missing' in combined
+>   	assert 'FRBOT_CONFIG_PATH missing' in combined
+E    AssertionError: assert 'FRBOT_CONFIG_PATH missing' in 'FRBOT AUDIT - FINAL VERDICT\n--------------------------\nMode: real\n\nPreconditions: FAIL\n- reason: real_evidence_missing\n- FRBOT_REAL_FRAMES_DIR missing\n\nFINAL DECISION: NOT_OPERATIONAL_REAL\nExit code: 2\n'
+
+tests\test_audit_all_real_hard_stop.py:33: AssertionError
+______________________ test_ci_guardrails_no_violations _______________________
+
+    def test_ci_guardrails_no_violations() -> None:
+        violations = ci_guardrails.run_all_checks(root=Path(__file__).resolve().parents[1])
+>       assert not violations, "CI guardrails violations:\n" + ci_guardrails.format_violations(violations)
+E       AssertionError: CI guardrails violations:
+E         rule=preflight_before_runtime_logger file=prod_real_entrypoint.py detail=run_prod_real() calls configure_logger() without earlier preflight call
+E         rule=sleep_only_tick_pacing file=prod_real_entrypoint.py detail=time.sleep usage not allowed (line 186)
+E         rule=hash_digest_evidence_forbidden file=runtime/battle_list_ocr.py detail=contains 'hashlib'
+E         rule=hash_digest_evidence_forbidden file=runtime/battle_list_ocr.py detail=contains 'md5('
+E         rule=no_print_in_runtime file=prod_real_entrypoint.py detail=contains print(
+E         rule=no_print_in_runtime file=targeting_entrypoint.py detail=contains print(
+E         rule=no_print_in_runtime file=runtime/battle_list_ocr.py detail=contains print(
+E         rule=no_print_in_runtime file=runtime/targeting_preflight.py detail=contains print(
+E         rule=no_print_in_runtime file=runtime/targeting_runner.py detail=contains print(
+E       assert not [Violation(rule='preflight_before_runtime_logger', file='prod_real_entrypoint.py', detail='run_prod_real() calls confi...ontains print('), Violation(rule='no_print_in_runtime', file='targeting_entrypoint.py', detail='contains print('), ...]
+
+tests\test_ci_guardrails.py:10: AssertionError
+___________________ test_roi_guard_missing_env_is_hard_stop ___________________
+
+tmp_path = WindowsPath('C:/Users/gmast/AppData/Local/Temp/pytest-of-gmast/pytest-731/test_roi_guard_missing_env_is_0')
+
+    def test_roi_guard_missing_env_is_hard_stop(tmp_path: Path) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        env = dict(os.environ)
+        env.pop("FRBOT_CONFIG_PATH", None)
+    
+        proc = _run_guard(repo_root, env)
+        assert proc.returncode == 2
+        payload = json.loads(proc.stdout)
+        assert payload["reason"] == "roi_preconditions_failed"
+>       assert "env_missing:FRBOT_CONFIG_PATH" in payload["missing"]
+E       AssertionError: assert 'env_missing:FRBOT_CONFIG_PATH' in []
+
+tests\test_roi_guard.py:38: AssertionError
+____________________ test_roi_guard_complete_rois_is_ready ____________________
+
+tmp_path = WindowsPath('C:/Users/gmast/AppData/Local/Temp/pytest-of-gmast/pytest-731/test_roi_guard_complete_rois_i0')
+
+    def test_roi_guard_complete_rois_is_ready(tmp_path: Path) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+    
+        # Provide everything required by evidence_inventory defaults + semantic critical.
+        rois = {
+            # semantic critical
+            "minimap": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "battle_list": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "inventory_text": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "hp_bar": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "mp_bar": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "trade_npc": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "trade_inventory": {"x": 0, "y": 0, "width": 1, "height": 1},
+            # evidence_inventory defaults (extras)
+            "target_frame": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "hp_text": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "mp_text": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "heal_cooldown": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "target_hp_bar": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "combat_cooldown": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "combat_feedback": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "loot_container_open": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "loot_corpse": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "loot_take": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "depot_container": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "trade_action": {"x": 0, "y": 0, "width": 1, "height": 1},
+        }
+    
+        cfg = tmp_path / "rois.json"
+        _write_config(cfg, rois=rois)
+    
+        env = dict(os.environ)
+        env["FRBOT_CONFIG_PATH"] = str(cfg)
+    
+        proc = _run_guard(repo_root, env)
+>       assert proc.returncode == 0
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['C:\\Users\\gmast\\Documents\\GitHub\\frbot\\.venv\\Scripts\\python.exe', 'C:\\Users\\gmast\\Do... "missing": [\n    "missing_required_roi:healing:hp_mp"\n  ],\n  "reason": "roi_preconditions_failed"\n}\n', stderr='').returncode
+
+tests\test_roi_guard.py:92: AssertionError
+____ test_audit_prod_full_reports_missing_preconditions_without_gate_eval _____
+
+tmp_path = WindowsPath('C:/Users/gmast/AppData/Local/Temp/pytest-of-gmast/pytest-731/test_audit_prod_full_reports_m0')
+
+    def test_audit_prod_full_reports_missing_preconditions_without_gate_eval(tmp_path: Path) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        env = dict(os.environ)
+        env["FRBOT_PROFILE"] = "prod_full"
+        env.pop("FRBOT_REAL_FRAMES_DIR", None)
+        env.pop("FRBOT_CONFIG_PATH", None)
+    
+        proc = _run_audit(repo_root, env)
+        combined = (proc.stdout or "") + (proc.stderr or "")
+    
+        assert proc.returncode != 0
+        assert "FINAL DECISION: NOT_OPERATIONAL_REAL" in combined
+        assert "real_frames_dir_missing" in combined
+>       assert "config_missing" in combined
+E       AssertionError: assert 'config_missing' in 'AUDIT: prod_full\nEvidence dir: diagnostics\\frames_full\nConfig: rois_prod_emergency.json\nStatus: FAIL\n- real_frames_dir_missing\nFINAL DECISION: NOT_OPERATIONAL_REAL\n'
+
+tests\unit\test_audit_prod_full_preconditions.py:34: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_audit_all_real_hard_stop.py::test_audit_all_real_mode_without_frames_is_hard_stop
+FAILED tests/test_ci_guardrails.py::test_ci_guardrails_no_violations - Assert...
+FAILED tests/test_roi_guard.py::test_roi_guard_missing_env_is_hard_stop - Ass...
+FAILED tests/test_roi_guard.py::test_roi_guard_complete_rois_is_ready - asser...
+FAILED tests/unit/test_audit_prod_full_preconditions.py::test_audit_prod_full_reports_missing_preconditions_without_gate_eval
+5 failed, 201 passed, 2 skipped in 13.75s

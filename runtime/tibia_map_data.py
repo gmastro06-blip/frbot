@@ -5,7 +5,7 @@ import os
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 import numpy as np
 from PIL import Image
@@ -28,8 +28,8 @@ class TibiaMapBounds:
 
 @dataclass(frozen=True)
 class FloorImages:
-    map_rgb: np.ndarray
-    path_rgb: np.ndarray
+    map_rgb: np.ndarray[Any, Any]
+    path_rgb: np.ndarray[Any, Any]
 
 
 class TibiaMapDataset:

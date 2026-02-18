@@ -56,7 +56,7 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip() not in {'0', 'false', 'no', 'off'}
 
 
-def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
+def _serialize_inventory(inv: InventorySnapshot | None) -> dict[str, object]:
     if inv is None:
         return {}
     out: dict[str, object] = {

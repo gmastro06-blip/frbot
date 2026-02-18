@@ -80,12 +80,33 @@ def execute_looting_tick(
     - 1 intent -> 1 input -> 1 AFTER evidence check.
 
     Success requires semantic inventory delta (no hashes).
+
+    Integration with targeting:
+    - Looting requires a valid target to be locked (target_locked=True)
+    - If no target is locked, looting aborts early
     """
 
     try:
         binding.assert_bound()
     except Exception as exc:
         raise PreflightFailed('looting_window_binding_lost') from exc
+
+    # === TARGET INTEGRATION: Check if target is locked before looting ===
+    # Sync targeting state into looting state
+    targeting = getattr(ctx, 'targeting', None)
+    if targeting is not None:
+        target_state = getattr(targeting, 'target', None)
+        if target_state is not None:
+            ctx.looting.target_locked = getattr(target_state, 'locked', False)
+            ctx.looting.target_name = getattr(target_state, 'target_name', None)
+
+    # If targeting integration is enabled and no target is locked, abort
+    if targeting is not None and not ctx.looting.target_locked:
+        return LootingTickOutcome(
+            looted=False,
+            evidence=LootingTickEvidence(None, None, None, None, None, 'looting_no_target_locked'),
+            abort_reason='looting_no_target_locked',
+        )
 
     before = capture.grab()
     record_before('looting', before)

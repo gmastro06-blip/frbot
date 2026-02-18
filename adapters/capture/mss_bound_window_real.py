@@ -218,7 +218,7 @@ class MssBoundWindowRealCapture(CaptureAdapter):
 
     def __init__(self, *, binding: WindowBindingAdapter) -> None:
         try:
-            import mss  # type: ignore
+            import mss
         except Exception as exc:  # pragma: no cover
             raise ImportError('missing dependency: mss') from exc
 
@@ -439,7 +439,7 @@ class MssBoundMinimapRealCapture(CaptureAdapter):
 
     def __init__(self, minimap_roi: Roi, *, binding: WindowBindingAdapter) -> None:
         try:
-            import mss  # type: ignore
+            import mss
         except Exception as exc:  # pragma: no cover
             raise ImportError('missing dependency: mss') from exc
 

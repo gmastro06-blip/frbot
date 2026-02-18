@@ -146,6 +146,49 @@ def test_ui_cavebot_tick_shows_roi_sanity_reason_when_roi_invalid(tmp_path: Path
         w.close()
 
 
+def test_ui_cavebot_tick_hides_roi_sanity_reason_when_not_roi_invalid(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.chdir(tmp_path)
+    proc = _FakeProc()
+    monkeypatch.setattr("ui_main.subprocess.Popen", lambda *args, **kwargs: proc)
+
+    trace_dir = tmp_path / "diagnostics" / "frames"
+    trace_dir.mkdir(parents=True, exist_ok=True)
+    trace = trace_dir / "cavebot_trace.jsonl"
+    trace.write_text(
+        json.dumps(
+            {
+                "event": "abort",
+                "tick_index": 10,
+                "blocked_reason": "move_key_no_effect",
+                "roi_sanity_reason": "minimap_roi_black_or_static",
+                "pnf": False,
+                "last_keys_sent": ["RIGHT"],
+                "distance_after_px": 14.0,
+                "angle_deg": 270.0,
+                "waypoint": {"waypoint_id": "wp_no_roi"},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    w = MainWindow()
+    try:
+        w._script.waypoints = [Waypoint(type="walk", x=10, y=20, z=7)]
+        w._last_saved_state = canonical_json(w._script)
+
+        w._on_cavebot_start_clicked()
+        w._on_cavebot_tick()
+
+        txt = w.lbl_cavebot_runtime.text().lower()
+        assert "block:move_key_no_effect" in txt
+        assert "roi:minimap_roi_black_or_static" not in txt
+        assert "roi:" not in txt
+    finally:
+        w.close()
+
+
 def test_route_world_lock_status_label_toggles() -> None:
     app = QApplication.instance() or QApplication([])
     w = MainWindow()
@@ -268,6 +311,9 @@ def test_ui_cavebot_start_uses_waypoints_file_for_large_route(tmp_path: Path, mo
 
         w._on_cavebot_stop_clicked()
         app.processEvents()
+        # Clean up env var set by this test
+        if "FRBOT_CAVEBOT_WAYPOINTS_FILE" in os.environ:
+            del os.environ["FRBOT_CAVEBOT_WAYPOINTS_FILE"]
         assert "FRBOT_CAVEBOT_WAYPOINTS_FILE" not in os.environ
     finally:
         w._last_saved_state = canonical_json(w._script)

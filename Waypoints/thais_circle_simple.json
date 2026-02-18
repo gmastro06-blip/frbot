@@ -1,0 +1,23 @@
+[
+  {"waypoint_id": "start", "x": 32349, "y": 32178, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp1", "x": 32360, "y": 32178, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp2", "x": 32370, "y": 32178, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp3", "x": 32380, "y": 32178, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp4", "x": 32390, "y": 32178, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp5", "x": 32395, "y": 32180, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp6", "x": 32395, "y": 32190, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp7", "x": 32395, "y": 32200, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp8", "x": 32390, "y": 32210, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp9", "x": 32380, "y": 32215, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp10", "x": 32370, "y": 32220, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp11", "x": 32360, "y": 32220, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp12", "x": 32350, "y": 32220, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp13", "x": 32340, "y": 32220, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp14", "x": 32330, "y": 32215, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp15", "x": 32325, "y": 32205, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp16", "x": 32325, "y": 32195, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp17", "x": 32325, "y": 32185, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp18", "x": 32330, "y": 32178, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "wp19", "x": 32340, "y": 32178, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"},
+  {"waypoint_id": "loop", "x": 32349, "y": 32178, "z": 7, "radius_px": 2, "max_ticks": 30, "waypoint_type": "walk"}
+]

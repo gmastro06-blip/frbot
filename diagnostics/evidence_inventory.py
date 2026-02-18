@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import DefaultDict, Optional, TypedDict
+from typing import DefaultDict, Optional, TypedDict, Any
 
 
 def _verify_cavebot_trace(frames_dir: Path) -> Optional[str]:
@@ -22,7 +22,7 @@ def _verify_cavebot_trace(frames_dir: Path) -> Optional[str]:
     except Exception as exc:
         return f'cavebot_trace_unreadable:{type(exc).__name__}'
 
-    events: list[dict] = []
+    events: list[dict[str, Any]] = []
     for line in raw:
         s = (line or '').strip()
         if not s:
@@ -39,10 +39,10 @@ def _verify_cavebot_trace(frames_dir: Path) -> Optional[str]:
         return 'cavebot_trace_empty'
 
     # Validate per-waypoint segments: strict distance decreasing + reached event.
-    seg: list[dict] = []
+    seg: list[dict[str, Any]] = []
     current_wp: str | None = None
 
-    def _validate_segment(segment: list[dict]) -> Optional[str]:
+    def _validate_segment(segment: list[dict[str, Any]]) -> Optional[str]:
         if not segment:
             return 'cavebot_trace_no_ticks'
         # Must contain explicit WAYPOINT_REACHED.
@@ -312,7 +312,7 @@ def _combat_basic_locked_after_ok(*, frames_dir: Path) -> bool:
     return False
 
 
-def _load_rois_from_config(config_path: Path) -> tuple[Optional[dict], Optional[str]]:
+def _load_rois_from_config(config_path: Path) -> tuple[Optional[dict[str, Any]], Optional[str]]:
     try:
         data = json.loads(config_path.read_text(encoding='utf-8'))
     except Exception as exc:
@@ -349,7 +349,7 @@ def _scan_detailed(frames_dir: Path) -> tuple[dict[str, _GateScanDetail], int]:
         if side == 'after' and is_mini:
             pairs[k]['after_mini'] = True
 
-    per_gate: dict[str, dict] = {g: {'before_full': 0, 'after_full': 0, 'full_pairs': 0, 'minimap_pairs': 0, 'any_keys': 0, 'examples': []} for g in _GATES}
+    per_gate: dict[str, dict[str, Any]] = {g: {'before_full': 0, 'after_full': 0, 'full_pairs': 0, 'minimap_pairs': 0, 'any_keys': 0, 'examples': []} for g in _GATES}
 
     for (gate, stamp, reason), flags in pairs.items():
         if gate not in per_gate:

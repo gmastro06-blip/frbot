@@ -185,11 +185,14 @@ def _check_preconditions() -> tuple[_Preconditions | None, list[str]]:
                 canonical_reason = canonical_reason or 'real_evidence_missing'
                 reasons.append(f'No .ppm evidence found in: {frames_dir}')
 
+        # Check config in same block so both errors are reported
         if not config_raw:
-            canonical_reason = canonical_reason or 'config_invalid_schema'
+            if not canonical_reason:  # Only set if not already set
+                canonical_reason = 'config_missing'
             reasons.append('FRBOT_CONFIG_PATH missing')
         elif not config_path.exists():
-            canonical_reason = canonical_reason or 'config_invalid_schema'
+            if not canonical_reason:
+                canonical_reason = 'config_missing'
             reasons.append(f'FRBOT_CONFIG_PATH does not exist: {config_path}')
 
         if reasons:

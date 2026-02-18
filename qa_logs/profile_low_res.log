@@ -1,0 +1,108 @@
+=== OCR Battle List Reproduction Script ===
+Mock mode: False
+Debug: True
+Dump ROIs: False
+Dump preprocess: False
+UI Profile: default
+
+[OCR] Profile: tibia_low_res (explicit override)
+Active profile: tibia_low_res
+  - ocr_upscale: 2
+  - ocr_min_confidence: 0.4
+
+Creating test battle list image...
+Test image size: (200, 200)
+
+Running OCR pipeline...
+[OCR] Profile: tibia_low_res (explicit override)
+[OCR] Profile: tibia_low_res (explicit override)
+[OCR] Profile: tibia_low_res (explicit override)
+[OCR] Extracted 3 texts in 259ms
+  - "Dragon" at y=45, conf=0.00
+  - "oc" at y=84, conf=0.37
+  - "ASoblin" at y=124, conf=0.00
+[OCR] OCR extraction failed: name 'fuzzy_match' is not defined
+[OCR] Profile: tibia_low_res (explicit override)
+[OCR] Structure fallback: 3 rows detected
+[OCR] WARNING: OCR not available. To enable name extraction:
+[OCR]   - Install Tesseract: https://github.com/UB-Mannheim/tesseract/wiki
+[OCR]   - Or set FRBOT_TESSERACT_CMD=/path/to/tesseract.exe
+[OCR] Metrics: roi=(200, 200), profile=tibia_low_res, time=329ms, raw_texts=0, entities=3
+
+=== RESULTS ===
+Entities found: 3
+Elapsed time: 329ms
+Profile: tibia_low_res
+
+Entities:
+  - None (confidence: 0.50, type: structure)
+  - None (confidence: 0.50, type: structure)
+  - None (confidence: 0.50, type: structure)
+
+=== METRICS JSON ===
+{
+  "timestamp": 1771251180.5590768,
+  "mock_mode": false,
+  "profile": "default",
+  "entities_count": 3,
+  "elapsed_ms": 329,
+  "roi_size": [
+    200,
+    200
+  ],
+  "entities": [
+    {
+      "name": null,
+      "stable_id": "aecc180dccaa",
+      "row_index": 0,
+      "original": null,
+      "confidence": 0.5,
+      "bbox": [
+        12,
+        22,
+        178,
+        17
+      ],
+      "match_type": "structure",
+      "status": "name_unavailable_no_ocr",
+      "reason": "Tesseract not available or OCR failed",
+      "debug_artifacts": {}
+    },
+    {
+      "name": null,
+      "stable_id": "6bb2fff7223e",
+      "row_index": 1,
+      "original": null,
+      "confidence": 0.5,
+      "bbox": [
+        12,
+        42,
+        178,
+        17
+      ],
+      "match_type": "structure",
+      "status": "name_unavailable_no_ocr",
+      "reason": "Tesseract not available or OCR failed",
+      "debug_artifacts": {}
+    },
+    {
+      "name": null,
+      "stable_id": "8db09328745a",
+      "row_index": 2,
+      "original": null,
+      "confidence": 0.5,
+      "bbox": [
+        12,
+        62,
+        178,
+        17
+      ],
+      "match_type": "structure",
+      "status": "name_unavailable_no_ocr",
+      "reason": "Tesseract not available or OCR failed",
+      "debug_artifacts": {}
+    }
+  ]
+}
+
+SUCCESS: entities_count > 0

@@ -516,8 +516,8 @@ def read_inventory_binary(frame: Frame, roi: Roi) -> Optional[InventorySnapshot]
 
 def _try_import_cv2_np() -> tuple[Any | None, Any | None]:
     try:
-        import cv2  # type: ignore
-        import numpy as np  # type: ignore
+        import cv2
+        import numpy as np
 
         return cv2, np
     except Exception:

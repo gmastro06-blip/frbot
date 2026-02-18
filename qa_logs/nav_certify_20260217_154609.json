@@ -1,0 +1,59 @@
+{
+  "run_id": "20260217_154609",
+  "timestamp": "2026-02-17T15:46:10.144037",
+  "tests": [
+    {
+      "test": "marker_detection_config",
+      "run_id": "20260217_154609",
+      "timestamp": "2026-02-17T15:46:09.993118",
+      "marker_rgb": "0,255,0",
+      "marker_tol": 30,
+      "marker_min_pixels": 5,
+      "valid": true
+    },
+    {
+      "test": "stuck_window_config",
+      "run_id": "20260217_154609",
+      "timestamp": "2026-02-17T15:46:09.993118",
+      "configured": "5",
+      "parsed": 5,
+      "valid": true,
+      "note": "ticks (not ms)"
+    },
+    {
+      "test": "minimap_mode_config",
+      "run_id": "20260217_154609",
+      "timestamp": "2026-02-17T15:46:09.993118",
+      "mode": "marker",
+      "recovery_enabled": false,
+      "confidence_threshold": 0.5,
+      "valid": true
+    },
+    {
+      "test": "marker_detection_imports",
+      "run_id": "20260217_154609",
+      "timestamp": "2026-02-17T15:46:09.993118",
+      "detect_player_marker": true,
+      "select_player_marker": true,
+      "available": true
+    },
+    {
+      "test": "localization_available",
+      "run_id": "20260217_154609",
+      "timestamp": "2026-02-17T15:46:10.029104",
+      "localize_minimap": true,
+      "available": true
+    },
+    {
+      "test": "recovery_trigger_conditions",
+      "run_id": "20260217_154609",
+      "timestamp": "2026-02-17T15:46:10.143038",
+      "triggers": {
+        "stuck_detected": "cavebot_stuck_detected in abort_reason",
+        "low_confidence": "marker_confidence < threshold"
+      },
+      "note": "Recovery activa cuando stuck_detected o marker_confidence < FRBOT_MARKER_CONFIDENCE_THRESHOLD"
+    }
+  ],
+  "overall": "PASSED"
+}

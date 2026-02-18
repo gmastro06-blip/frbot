@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import os
 import time
+import numpy as np
 
 from contracts.capture import CaptureAdapter
-from contracts.errors import ContractViolation, PreflightFailed
+from contracts.errors import PreflightFailed
 from contracts.input import InputAdapter
-from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
+from contracts.runtime import BattleListEntry, Rect, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from contracts.targeting import IntentTarget
 from contracts.window import WindowBindingAdapter
 from diagnostics.fatal import write_fatal
@@ -14,8 +15,8 @@ from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import record_after, record_before
 from rules.targeting import select_targeting_intent
-from runtime.battle_list_semantics import crop_roi_rgb, detect_battle_list
-from runtime.config_loader import load_rois
+from runtime.battle_list_semantics import BattleListObservation, crop_roi_rgb, detect_battle_list
+from runtime.battle_list_ocr import check_battle_list_presence
 from runtime.env import parse_window_hwnd_env
 from runtime.event_correlation import attach_snapshot, new_event, validate
 from runtime.targeting_preflight import targeting_preflight
@@ -190,13 +191,91 @@ def execute_intent(
     before = capture.grab()
     record_before(str(gate), before)
     obs = detect_battle_list(before, battle_roi)
+
+    # Fallback: try OCR then structure-based detection
+    allow_no_ocr = os.environ.get('FRBOT_BATTLE_LIST_ALLOW_NO_OCR', '').strip().lower() in {'1', 'true', 'yes'}
+
+    if obs is None and not allow_no_ocr:
+        # Try real OCR
+        try:
+            from runtime.battle_list_ocr import detect_monsters_with_ocr
+            from PIL import Image
+
+            rgb = crop_roi_rgb(before, battle_roi)
+            if rgb:
+                w, h = int(battle_roi.width), int(battle_roi.height)
+                arr = np.frombuffer(rgb, dtype=np.uint8).reshape(h, w, 3)
+                img = Image.fromarray(arr, 'RGB')
+                monsters = detect_monsters_with_ocr(img)
+                if monsters:
+                    entries: list[BattleListEntry] = []
+                    for m in monsters:
+                        bbox = m['bbox']
+                        entry = BattleListEntry(
+                            name=m['name'],
+                            screen_bbox=Rect(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3]),
+                            is_attackable=True,
+                            hp_bar_visible=True,
+                            highlighted=False,
+                            row_index=len(entries),
+                        )
+                        entries.append(entry)
+                    obs = BattleListObservation(
+                        container_bbox=Rect(x=0, y=0, width=w, height=h),
+                        entries=tuple(entries),
+                    )
+        except Exception as exc:
+            print(f'[targeting_runner] OCR fallback error: {exc}')
+
+    # If OCR fails, try structure-based detection
+    has_structure = False
+    if obs is None and not allow_no_ocr:
+        # crop_roi_rgb already imported at top
+        rgb = crop_roi_rgb(before, battle_roi)
+        if rgb:
+            w, h = int(battle_roi.width), int(battle_roi.height)
+            arr = np.frombuffer(rgb, dtype=np.uint8).reshape(h, w, 3)
+            from PIL import Image
+            img = Image.fromarray(arr, 'RGB')
+
+            # Get monster rows from structure
+            from runtime.battle_list_ocr import detect_battle_list_rows
+            rows_result = detect_battle_list_rows(img)
+
+            if rows_result.monster_count > 0:
+                has_structure = True
+                # Create entries from structure
+                entries = []
+                for row in rows_result.monsters:
+                    entry = BattleListEntry(
+                        name=f'row_{row.row_index}',  # Fallback name
+                        screen_bbox=Rect(
+                            x=int(battle_roi.x + row.name_bbox[0]),
+                            y=int(battle_roi.y + row.name_bbox[1]),
+                            width=row.name_bbox[2],
+                            height=row.name_bbox[3],
+                        ),
+                        is_attackable=True,
+                        hp_bar_visible=row.has_hp_bar,
+                        highlighted=False,
+                        row_index=row.row_index,
+                    )
+                    entries.append(entry)
+                obs = BattleListObservation(
+                    container_bbox=Rect(x=0, y=0, width=w, height=h),
+                    entries=tuple(entries),
+                )
+                print(f'[targeting_runner] Structure detected: {len(entries)} monster rows')
+
+    if obs is None and not allow_no_ocr and not has_structure:
+        raise PreflightFailed('battle_list_not_detected')
     if obs is None:
         raise PreflightFailed('battle_list_not_detected')
 
     clicked_entry = None
-    for e in obs.entries:
-        if int(e.row_index) == int(intent.battle_list_row_index):
-            clicked_entry = e
+    for entry_item in obs.entries:
+        if int(entry_item.row_index) == int(intent.battle_list_row_index):
+            clicked_entry = entry_item
             break
     if clicked_entry is None:
         raise PreflightFailed('battle_list_not_detected')
@@ -231,6 +310,52 @@ def execute_intent(
     attach_snapshot(event, stage='after', ts_ns=after_ts_ns, status=binding.snapshot())
     record_after(str(gate), after)
     obs2 = detect_battle_list(after, battle_roi)
+
+    # Fallback for obs2: try OCR then structure-based detection
+    if obs2 is None and not allow_no_ocr:
+        # Try real OCR
+        try:
+            from runtime.battle_list_ocr import detect_monsters_with_ocr
+            from PIL import Image
+
+            rgb = crop_roi_rgb(after, battle_roi)
+            if rgb:
+                w, h = int(battle_roi.width), int(battle_roi.height)
+                arr = np.frombuffer(rgb, dtype=np.uint8).reshape(h, w, 3)
+                img = Image.fromarray(arr, 'RGB')
+                monsters = detect_monsters_with_ocr(img)
+                if monsters:
+                    entries = []
+                    for m in monsters:
+                        bbox = m['bbox']
+                        entry = BattleListEntry(
+                            name=m['name'],
+                            screen_bbox=Rect(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3]),
+                            is_attackable=True,
+                            hp_bar_visible=True,
+                            highlighted=False,
+                            row_index=len(entries),
+                        )
+                        entries.append(entry)
+                    obs2 = BattleListObservation(
+                        container_bbox=Rect(x=0, y=0, width=w, height=h),
+                        entries=tuple(entries),
+                    )
+        except Exception as exc:
+            print(f'[targeting_runner] OCR fallback error (obs2): {exc}')
+
+    # If OCR fails, try structure-based detection
+    has_structure2 = False
+    if obs2 is None and not allow_no_ocr:
+        has_structure2 = check_battle_list_presence(after, battle_roi)
+        if has_structure2:
+            obs2 = BattleListObservation(
+                container_bbox=Rect(x=0, y=0, width=int(battle_roi.width), height=int(battle_roi.height)),
+                entries=tuple(),
+            )
+
+    if obs2 is None and not allow_no_ocr and not has_structure2:
+        raise PreflightFailed('battle_list_not_detected')
     if obs2 is None:
         raise PreflightFailed('battle_list_not_detected')
 
@@ -249,9 +374,9 @@ def execute_intent(
         raise corr_exc
 
     after_row = None
-    for e in obs2.entries:
-        if int(e.row_index) == int(intent.battle_list_row_index):
-            after_row = e
+    for entry_item in obs2.entries:
+        if int(entry_item.row_index) == int(intent.battle_list_row_index):
+            after_row = entry_item
             break
 
     success = True
@@ -325,6 +450,42 @@ def targeting_tick(ctx: RuntimeContext, capture: CaptureAdapter, input_: InputAd
         raise PreflightFailed('targeting_window_binding_lost')
 
     obs = detect_battle_list(before, battle_roi)
+
+    # Fallback: try structure-based detection
+    if obs is None:
+        from runtime.battle_list_ocr import detect_battle_list_rows
+        # crop_roi_rgb already imported at top
+        from PIL import Image
+        import numpy as np
+        rgb = crop_roi_rgb(before, battle_roi)
+        if rgb:
+            w, h = int(battle_roi.width), int(battle_roi.height)
+            arr = np.frombuffer(rgb, dtype=np.uint8).reshape(h, w, 3)
+            img = Image.fromarray(arr, 'RGB')
+            rows_result = detect_battle_list_rows(img)
+            if rows_result.monster_count > 0:
+                entries: list[BattleListEntry] = []
+                for row in rows_result.monsters:
+                    entry = BattleListEntry(
+                        name=f'row_{row.row_index}',
+                        screen_bbox=Rect(
+                            x=int(battle_roi.x + row.name_bbox[0]),
+                            y=int(battle_roi.y + row.name_bbox[1]),
+                            width=row.name_bbox[2],
+                            height=row.name_bbox[3],
+                        ),
+                        is_attackable=True,
+                        hp_bar_visible=row.has_hp_bar,
+                        highlighted=False,
+                        row_index=row.row_index,
+                    )
+                    entries.append(entry)
+                obs = BattleListObservation(
+                    container_bbox=Rect(x=0, y=0, width=w, height=h),
+                    entries=tuple(entries),
+                )
+                print(f'[targeting_tick] Structure detected: {len(entries)} monster rows')
+
     if obs is None:
         raise PreflightFailed('battle_list_not_detected')
 

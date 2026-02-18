@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import TypeAlias
 
 from adapters.capture.mock_world_any import MockWorldAnyCapture

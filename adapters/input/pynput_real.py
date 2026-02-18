@@ -16,12 +16,16 @@ class PynputRealKeyboard(InputAdapter):
     def __init__(self) -> None:
         try:
             from pynput.keyboard import Controller, Key  # type: ignore
+            from pynput.mouse import Controller as MouseController, Button as MouseButton  # type: ignore
         except Exception as exc:  # pragma: no cover
             raise ImportError('missing dependency: pynput') from exc
 
         self._Controller = Controller
         self._Key = Key
+        self._MouseController = MouseController
+        self._MouseButton = MouseButton
         self._controller = self._Controller()
+        self._mouse = self._MouseController()
 
     def _noop_key(self) -> Key:
         raw = os.environ.get('FRBOT_REAL_NOOP_KEY', 'shift').strip().lower()
@@ -100,5 +104,11 @@ class PynputRealKeyboard(InputAdapter):
         raise ValueError(f'unsupported key: {key!r}')
 
     def click(self, x: int, y: int) -> None:
-        # Keyboard-only backend by contract.
-        raise NotImplementedError('real input backend is keyboard-only (no mouse)')
+        """Click at screen coordinates (x, y).
+
+        Note: This uses pynput's mouse controller which works globally.
+        For precise window-relative clicks, use Win32HwndKeyboard instead.
+        """
+        self._mouse.position = (x, y)
+        self._mouse.press(self._MouseButton.left)
+        self._mouse.release(self._MouseButton.left)

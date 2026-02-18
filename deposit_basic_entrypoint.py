@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import DepotSnapshot, InventorySnapshot, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
@@ -61,7 +62,7 @@ def _frames_dir() -> Path:
     return Path('diagnostics') / 'frames'
 
 
-def _append_trace(*, gate: str, payload: dict) -> None:
+def _append_trace(*, gate: str, payload: dict[str, Any]) -> None:
     try:
         out_dir = _frames_dir()
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -72,7 +73,7 @@ def _append_trace(*, gate: str, payload: dict) -> None:
         return
 
 
-def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
+def _serialize_inventory(inv: InventorySnapshot | None) -> dict[str, object]:
     if inv is None:
         return {}
     out: dict[str, object] = {'slot_counts': dict(inv.slot_counts)}
@@ -81,7 +82,7 @@ def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
     return out
 
 
-def _serialize_depot(d: DepotSnapshot | None) -> dict:
+def _serialize_depot(d: DepotSnapshot | None) -> dict[str, object]:
     if d is None:
         return {}
     return {'item_count': int(d.item_count), 'open': bool(d.open)}
@@ -99,7 +100,7 @@ def _try_write_last_result(
     inventory_after: InventorySnapshot | None,
     depot_before: DepotSnapshot | None,
     depot_after: DepotSnapshot | None,
-    event_correlation: dict | None = None,
+    event_correlation: dict[str, Any] | None = None,
 ) -> None:
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)

@@ -178,12 +178,15 @@ def load_rois(ctx: RuntimeContext) -> LoadedConfig:
 				if required_roi not in rois:
 					raise PreflightFailed('config_invalid_schema')
 			# PROD profiles: allow only an explicit allowlisted superset (audited).
-			if profile in {'prod_emergency', 'prod_full'}:
+			if profile in {'prod_emergency', 'prod_full', 'prod_real'}:
 				keys = set(rois.keys())
 				required_keys = set(_REQUIRED_REAL_ROIS)
 				if keys != required_keys:
 					extra = keys - required_keys
-					allowed_extra = set(_ALLOWED_PROD_EMERGENCY_EXTRA_ROIS) if profile == 'prod_emergency' else set(_ALLOWED_PROD_FULL_EXTRA_ROIS)
+					# prod_real: allow all extra ROIs (full automation)
+					allowed_extra = set(_ALLOWED_PROD_FULL_EXTRA_ROIS)
+					if profile == 'prod_emergency':
+						allowed_extra = set(_ALLOWED_PROD_EMERGENCY_EXTRA_ROIS)
 					if not extra.issubset(set(allowed_extra)):
 						raise PreflightFailed('config_invalid_schema')
 

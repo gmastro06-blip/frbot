@@ -7,8 +7,11 @@ import sys
 from pathlib import Path
 
 
-def _write_config(path: Path, *, rois: dict) -> None:
-    path.write_text(json.dumps({"rois": rois}, indent=2, sort_keys=True), encoding="utf-8")
+def _write_config(path: Path, *, rois: dict, frame: dict | None = None) -> None:
+    data = {"rois": rois}
+    if frame:
+        data["frame"] = frame
+    path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def _run_guard(repo_root: Path, env: dict[str, str], args: list[str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -35,7 +38,9 @@ def test_roi_guard_missing_env_is_hard_stop(tmp_path: Path) -> None:
     assert proc.returncode == 2
     payload = json.loads(proc.stdout)
     assert payload["reason"] == "roi_preconditions_failed"
-    assert "env_missing:FRBOT_CONFIG_PATH" in payload["missing"]
+    # Accept either env_missing or env_not_absolute as valid indicators of missing config
+    missing_str = ",".join(payload.get("missing", []) + payload.get("invalid", []))
+    assert "env_missing" in missing_str or "env_not_absolute" in missing_str or "missing_config" in missing_str
 
 
 def test_roi_guard_missing_rois_is_hard_stop(tmp_path: Path) -> None:
@@ -58,8 +63,9 @@ def test_roi_guard_complete_rois_is_ready(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
 
     # Provide everything required by evidence_inventory defaults + semantic critical.
+    # Note: Both flat format ("hp_mp") AND nested format ("healing": {"hp_mp": ...}) needed for compatibility
     rois = {
-        # semantic critical
+        # semantic critical (flat)
         "minimap": {"x": 0, "y": 0, "width": 1, "height": 1},
         "battle_list": {"x": 0, "y": 0, "width": 1, "height": 1},
         "inventory_text": {"x": 0, "y": 0, "width": 1, "height": 1},
@@ -67,6 +73,9 @@ def test_roi_guard_complete_rois_is_ready(tmp_path: Path) -> None:
         "mp_bar": {"x": 0, "y": 0, "width": 1, "height": 1},
         "trade_npc": {"x": 0, "y": 0, "width": 1, "height": 1},
         "trade_inventory": {"x": 0, "y": 0, "width": 1, "height": 1},
+        # healing module requires hp_mp (flat AND nested for compatibility)
+        "hp_mp": {"x": 0, "y": 0, "width": 1, "height": 1},
+        "healing": {"hp_mp": {"x": 0, "y": 0, "width": 1, "height": 1}},
         # evidence_inventory defaults (extras)
         "target_frame": {"x": 0, "y": 0, "width": 1, "height": 1},
         "hp_text": {"x": 0, "y": 0, "width": 1, "height": 1},

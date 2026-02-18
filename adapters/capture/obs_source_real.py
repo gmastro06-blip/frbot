@@ -39,7 +39,7 @@ def _env_float(name: str, default: float) -> float:
 
 def _to_rgb_bytes_from_png(png_bytes: bytes) -> tuple[bytes, int, int]:
     try:
-        from PIL import Image  # type: ignore
+        from PIL import Image
     except Exception as exc:  # pragma: no cover
         raise PreflightFailed('missing_dependency') from exc
 
@@ -137,7 +137,7 @@ class _ObsWsV5Client:
             return
 
         try:
-            import websocket  # type: ignore
+            import websocket
         except Exception as import_exc:  # pragma: no cover
             raise PreflightFailed('missing_dependency') from import_exc
 

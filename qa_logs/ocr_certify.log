@@ -1,0 +1,46 @@
+============================================================
+QA CERTIFICATION: Battle List OCR
+============================================================
+
+[1/5] Mock mode...
+[OCR] MOCK mode: returning 3 entities
+  OK: 3 entities
+
+[2/5] UI profiles...
+[OCR] Profile: tibia_low_res (resolution: 640x480)
+[OCR] Profile: tibia_hi_res (resolution: 1920x1080)
+  OK: auto-detect works
+
+[3/5] Pipeline...
+[OCR] Profile: tibia_low_res (resolution: 960x540)
+[OCR] Profile: default (fallback)
+[OCR] MOCK mode: returning 3 entities
+[OCR] Metrics: roi=(960, 540), profile=tibia_low_res, time=246ms, raw_texts=0, entities=3
+  OK: entities_count=3
+
+[4/5] Debug dumps...
+[OCR] Profile: tibia_low_res (resolution: 200x200)
+[OCR] Profile: default (fallback)
+[OCR] MOCK mode: returning 3 entities
+[OCR] Metrics: roi=(200, 200), profile=tibia_low_res, time=21ms, raw_texts=0, entities=3
+  OK: 216 files
+
+[5/5] Tesseract + Fallback...
+  OCR_AVAILABLE: True
+  RESOLVED_TESSERACT: C:\Program Files\Tesseract-OCR\tesseract.EXE
+  RESOLUTION_METHOD: WHICH
+[OCR] Profile: tibia_low_res (resolution: 200x200)
+[OCR] Profile: default (fallback)
+[OCR] Profile: default (fallback)
+[OCR] Extracted 0 texts in 207ms
+[OCR] Profile: default (fallback)
+[OCR] Structure fallback: 3 rows detected
+[OCR] WARNING: OCR not available. To enable name extraction:
+[OCR]   - Install Tesseract: https://github.com/UB-Mannheim/tesseract/wiki
+[OCR]   - Or set FRBOT_TESSERACT_CMD=/path/to/tesseract.exe
+[OCR] Metrics: roi=(200, 200), profile=tibia_low_res, time=236ms, raw_texts=0, entities=3
+  OK: 3 entities with stable_id+status
+
+============================================================
+RESULT: 5 passed, 0 failed
+============================================================

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Any
 
 import math
 
@@ -18,7 +18,7 @@ class SuggestedClick:
     kind: str
 
 
-def _frame_rgb_to_array(frame: Frame) -> np.ndarray | None:
+def _frame_rgb_to_array(frame: Frame) -> np.ndarray[Any, Any] | None:
     rgb = getattr(frame, 'rgb', b'')
     w = int(getattr(frame, 'width', 0) or 0)
     h = int(getattr(frame, 'height', 0) or 0)

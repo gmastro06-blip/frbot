@@ -12,6 +12,7 @@ from contracts.window import WindowBindingAdapter
 from diagnostics.last_frames import record_after, record_before
 from runtime.healing_semantics import (
     PercentRead,
+    _crop_rgb,
     detect_cooldown_marker,
     parse_rgb_triplet,
     read_bar_percent,
@@ -194,8 +195,6 @@ def execute_heal_intent(
     allow_delta = str(os.environ.get('FRBOT_HEAL_ALLOW_COOLDOWN_ROI_DELTA', '1') or '1').strip().lower() not in {'', '0', 'false', 'no', 'off'}
     if allow_delta:
         try:
-            from runtime.healing_semantics import _crop_rgb  # type: ignore
-
             before_cd_rgb = _crop_rgb(before, cooldown_roi)
             if feedback_roi is not None:
                 before_fb_rgb = _crop_rgb(before, feedback_roi)
@@ -232,8 +231,7 @@ def execute_heal_intent(
         fb_delta = False
         if allow_delta:
             try:
-                from runtime.healing_semantics import _crop_rgb  # type: ignore
-
+                # Use _crop_rgb already imported at module level
                 if before_cd_rgb:
                     cand_cd = _crop_rgb(cand, cooldown_roi)
                     cd_delta = _delta_ratio_ok(before_cd_rgb, cand_cd)
@@ -334,7 +332,6 @@ def execute_heal_intent(
 
                 # Best-effort ROI deltas for quicker diagnosis.
                 try:
-                    from runtime.healing_semantics import _crop_rgb  # type: ignore
 
                     def _mad(a: bytes, b: bytes) -> float | None:
                         if not a or not b or len(a) != len(b):

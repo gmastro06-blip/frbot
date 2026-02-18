@@ -20,7 +20,7 @@ from contracts.input import InputStatus
 from typing import Literal
 
 from contracts.runtime import RuntimeContext, RuntimeState, Waypoint
-from runtime.cavebot_semantics import detect_player_marker, select_player_marker
+from runtime.cavebot_semantics import select_player_marker
 from runtime.config_loader import load_rois
 from runtime.roi_contract import validate_prod_emergency_real_rois_in_bounds
 from runtime.startup_guards import enforce_prod_emergency_real_startup_guards

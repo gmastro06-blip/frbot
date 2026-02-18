@@ -299,7 +299,6 @@ def execute_combat_intent(
     saw_locked = False
     evidence_ok_any = False
 
-    locked_name_after_last: str | None = None
 
     while True:
         after = capture.grab()
@@ -308,7 +307,6 @@ def execute_combat_intent(
         # Must still be locked.
         try:
             locked_name_after = _get_locked_target_name(ctx, after)
-            locked_name_after_last = str(locked_name_after)
 
             # For next-target keys: OCR names may be generic (row_1). Accept a highlight-row move.
             if is_next_target_key:

@@ -1,0 +1,38 @@
+{
+  "run_id": "20260217_154604",
+  "timestamp": "2026-02-17T15:46:04.684902",
+  "tests": [
+    {
+      "test": "input_method_selection",
+      "run_id": "20260217_154604",
+      "timestamp": "2026-02-17T15:46:04.648390",
+      "configured": "(default)",
+      "requires_foreground": false,
+      "valid": true,
+      "selected_backend": "Win32HwndKeyboard (PostMessage)"
+    },
+    {
+      "test": "focus_throttle_config",
+      "run_id": "20260217_154604",
+      "timestamp": "2026-02-17T15:46:04.648390",
+      "configured_ms": 500,
+      "valid": true
+    },
+    {
+      "test": "input_backend_available",
+      "run_id": "20260217_154604",
+      "timestamp": "2026-02-17T15:46:04.648390",
+      "backend": "Win32HwndKeyboard",
+      "available": true
+    },
+    {
+      "test": "focus_helper_signature",
+      "run_id": "20260217_154604",
+      "timestamp": "2026-02-17T15:46:04.684902",
+      "method_exists": true,
+      "method": "_ensure_focus_if_needed",
+      "signature": "(self) -> 'bool'"
+    }
+  ],
+  "overall": "PASSED"
+}

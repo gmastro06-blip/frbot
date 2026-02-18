@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QFrame,
@@ -547,11 +548,13 @@ class MainWindow(QMainWindow):
         self.btn_screen_waypoints = QPushButton("Waypoints")
         self.btn_screen_healing = QPushButton("Configurar Healing")
         self.btn_screen_cavebot = QPushButton("Configurar Cavebot")
+        self.btn_screen_autos = QPushButton("Autos")
         self.btn_screen_settings = QPushButton("Configuración")
 
         nav_layout.addWidget(self.btn_screen_home)
         nav_layout.addWidget(self.btn_screen_healing)
         nav_layout.addWidget(self.btn_screen_cavebot)
+        nav_layout.addWidget(self.btn_screen_autos)
         nav_layout.addWidget(self.btn_screen_waypoints)
         nav_layout.addWidget(self.btn_screen_settings)
         outer.addWidget(nav)
@@ -864,6 +867,110 @@ class MainWindow(QMainWindow):
         cavebot_layout.addLayout(cavebot_shell)
         self.screens.addWidget(cavebot_screen)
 
+        # Autos screen (Fish, Ring, Hunger)
+        autos_screen = QWidget()
+        autos_layout = QVBoxLayout(autos_screen)
+        autos_layout.setContentsMargins(10, 10, 10, 10)
+        autos_layout.setSpacing(10)
+
+        autos_header = QLabel("Autos")
+        autos_header.setObjectName("header")
+        autos_layout.addWidget(autos_header)
+
+        # Auto Fish
+        fish_box = QGroupBox("Auto Fish")
+        fish_form = QFormLayout(fish_box)
+        fish_form.setContentsMargins(10, 10, 10, 10)
+
+        self.chk_fish_enabled = QCheckBox("Habilitar auto fish")
+        self.input_fish_key = QLineEdit("F10")
+        self.spin_fish_interval = QSpinBox()
+        self.spin_fish_interval.setRange(1000, 30000)
+        self.spin_fish_interval.setValue(2000)
+        self.spin_fish_interval.setSuffix(" ms")
+
+        fish_form.addRow("Estado", self.chk_fish_enabled)
+        fish_form.addRow("Tecla fish", self.input_fish_key)
+        fish_form.addRow("Intervalo", self.spin_fish_interval)
+        autos_layout.addWidget(fish_box)
+
+        # Auto Ring
+        ring_box = QGroupBox("Auto Ring")
+        ring_form = QFormLayout(ring_box)
+        ring_form.setContentsMargins(10, 10, 10, 10)
+
+        self.chk_ring_enabled = QCheckBox("Habilitar auto ring")
+        self.input_ring_key = QLineEdit("F11")
+        self.spin_ring_interval = QSpinBox()
+        self.spin_ring_interval.setRange(1000, 60000)
+        self.spin_ring_interval.setValue(5000)
+        self.spin_ring_interval.setSuffix(" ms")
+        self.combo_ring_type = QComboBox()
+        self.combo_ring_type.addItems([
+            "power_ring", "might_ring", "time_ring",
+            "stealth_ring", "energy_ring", "ring_of_healing"
+        ])
+
+        ring_form.addRow("Estado", self.chk_ring_enabled)
+        ring_form.addRow("Tecla equipar", self.input_ring_key)
+        ring_form.addRow("Intervalo", self.spin_ring_interval)
+        ring_form.addRow("Ring", self.combo_ring_type)
+        autos_layout.addWidget(ring_box)
+
+        # Auto Eat (Hunger)
+        hunger_box = QGroupBox("Auto Eat (Hunger)")
+        hunger_form = QFormLayout(hunger_box)
+        hunger_form.setContentsMargins(10, 10, 10, 10)
+
+        self.chk_hunger_enabled = QCheckBox("Habilitar auto eat")
+        self.input_eat_key = QLineEdit("F9")
+        self.spin_eat_interval = QSpinBox()
+        self.spin_eat_interval.setRange(500, 10000)
+        self.spin_eat_interval.setValue(1200)
+        self.spin_eat_interval.setSuffix(" ms")
+
+        hunger_form.addRow("Estado", self.chk_hunger_enabled)
+        hunger_form.addRow("Tecla eat", self.input_eat_key)
+        hunger_form.addRow("Intervalo", self.spin_eat_interval)
+        autos_layout.addWidget(hunger_box)
+
+        # Auto Supply (Potions)
+        supply_box = QGroupBox("Auto Potion (Refill)")
+        supply_form = QFormLayout(supply_box)
+        supply_form.setContentsMargins(10, 10, 10, 10)
+
+        self.chk_supply_enabled = QCheckBox("Habilitar auto potion")
+        self.spin_hp_threshold = QSpinBox()
+        self.spin_hp_threshold.setRange(1, 100)
+        self.spin_hp_threshold.setValue(50)
+        self.spin_hp_threshold.setSuffix(" %")
+        self.spin_mp_threshold = QSpinBox()
+        self.spin_mp_threshold.setRange(1, 100)
+        self.spin_mp_threshold.setValue(30)
+        self.spin_mp_threshold.setSuffix(" %")
+        self.input_health_key = QLineEdit("F1")
+        self.input_mana_key = QLineEdit("F2")
+        self.spin_drink_interval = QSpinBox()
+        self.spin_drink_interval.setRange(500, 10000)
+        self.spin_drink_interval.setValue(1000)
+        self.spin_drink_interval.setSuffix(" ms")
+
+        supply_form.addRow("Estado", self.chk_supply_enabled)
+        supply_form.addRow("HP umbral", self.spin_hp_threshold)
+        supply_form.addRow("MP umbral", self.spin_mp_threshold)
+        supply_form.addRow("Tecla HP", self.input_health_key)
+        supply_form.addRow("Tecla MP", self.input_mana_key)
+        supply_form.addRow("Intervalo", self.spin_drink_interval)
+        autos_layout.addWidget(supply_box)
+
+        autos_layout.addStretch(1)
+
+        self.btn_autos_back = QPushButton("Volver")
+        autos_layout.addWidget(self.btn_autos_back)
+        self.screens.addWidget(autos_screen)
+
+        self.btn_autos_back.clicked.connect(lambda: self.screens.setCurrentIndex(0))
+
         # Generic settings screen
         settings_screen = QWidget()
         settings_layout = QVBoxLayout(settings_screen)
@@ -924,8 +1031,9 @@ class MainWindow(QMainWindow):
         self.btn_screen_home.clicked.connect(lambda: self.screens.setCurrentIndex(0))
         self.btn_screen_healing.clicked.connect(lambda: self.screens.setCurrentIndex(1))
         self.btn_screen_cavebot.clicked.connect(lambda: self.screens.setCurrentIndex(2))
-        self.btn_screen_waypoints.clicked.connect(lambda: self.screens.setCurrentIndex(2))
-        self.btn_screen_settings.clicked.connect(lambda: self.screens.setCurrentIndex(3))
+        self.btn_screen_autos.clicked.connect(lambda: self.screens.setCurrentIndex(3))
+        self.btn_screen_waypoints.clicked.connect(lambda: self.screens.setCurrentIndex(4))
+        self.btn_screen_settings.clicked.connect(lambda: self.screens.setCurrentIndex(5))
         self.btn_home_cavebot.clicked.connect(lambda: self.screens.setCurrentIndex(2))
         self.btn_home_healing.clicked.connect(lambda: self.screens.setCurrentIndex(1))
         self.btn_home_waypoints.clicked.connect(lambda: self.screens.setCurrentIndex(2))

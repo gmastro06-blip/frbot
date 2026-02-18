@@ -19,11 +19,15 @@ def tick(inp: EngineInput, *, enable_cavebot: bool) -> EngineOutput:
     )
 
     if not telemetry.last_tick_valid:
-        return EngineOutput(intents=(), telemetry=telemetry, abort_reason='capture stale')
+        return EngineOutput(
+            intents=(), telemetry=telemetry, abort_reason="capture stale"
+        )
 
     res = select_cavebot_intent(inp, enable_cavebot=enable_cavebot)
     if res.abort_reason:
-        return EngineOutput(intents=(), telemetry=telemetry, abort_reason=res.abort_reason)
+        return EngineOutput(
+            intents=(), telemetry=telemetry, abort_reason=res.abort_reason
+        )
     if res.intent is not None:
         return EngineOutput(intents=(res.intent,), telemetry=telemetry)
 

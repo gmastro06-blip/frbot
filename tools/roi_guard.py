@@ -156,7 +156,19 @@ def main(argv: list[str] | None = None) -> int:
 
     missing_by_gate: dict[str, list[str]] = {}
     for gate, required_names in required_by_gate.items():
-        miss = [name for name in required_names if name not in rois_node]
+        miss = []
+        for name in required_names:
+            # Check both flat format (e.g., "healing:hp_mp") and nested format
+            if name in rois_node:
+                continue
+            # Try nested format: "healing:hp_mp" -> rois_node["healing"]["hp_mp"]
+            if ':' in name:
+                parts = name.split(':', 1)
+                if (parts[0] in rois_node and
+                    isinstance(rois_node[parts[0]], dict) and
+                    parts[1] in rois_node[parts[0]]):
+                    continue
+            miss.append(name)
         if miss:
             missing_by_gate[gate] = miss
 

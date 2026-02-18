@@ -87,7 +87,7 @@ def _ensure_shift_rmb_click_point(ctx: RuntimeContext) -> None:
     os.environ['FRBOT_LOOTING_BASIC_LOOT_Y'] = str(int(y))
 
 
-def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
+def _serialize_inventory(inv: InventorySnapshot | None) -> dict[str, object]:
     if inv is None:
         return {}
     out: dict[str, object] = {'slot_counts': dict(inv.slot_counts)}

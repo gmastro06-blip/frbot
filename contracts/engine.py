@@ -27,8 +27,8 @@ class EngineTelemetry:
 
 @dataclass(frozen=True, slots=True)
 class IntentMove:
-    direction: Literal['up', 'down', 'left', 'right']
-    reason: Literal['cavebot']
+    direction: Literal["up", "down", "left", "right"]
+    reason: Literal["cavebot"]
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import TypeAlias
 
 from runtime.looting_basic_preflight import (
     CaptureAdapter,

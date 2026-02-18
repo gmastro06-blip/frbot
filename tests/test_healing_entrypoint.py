@@ -81,10 +81,12 @@ def test_healing_entrypoint_abort_unstable_heal_unverified(tmp_path: Path, monke
     monkeypatch.setenv('FRBOT_MOCK_MP_CURRENT', '80')
     monkeypatch.setenv('FRBOT_MOCK_MP_MAX', '100')
     # Deterministic flags:
-    # - No evidence after cast.
-    # - Cooldown is clear/observable.
+    # - No evidence after cast (behavior=no_effect, no cooldown visible).
     monkeypatch.setenv('MOCK_HEAL_EVIDENCE', 'none')
-    monkeypatch.setenv('MOCK_HEAL_COOLDOWN', 'clear')
+    monkeypatch.setenv('MOCK_HEAL_COOLDOWN', 'none')
+    monkeypatch.setenv('FRBOT_MOCK_HEAL_BEHAVIOR', 'no_effect')  # Heal has no effect
+    # Explicitly disable allow_no_evidence to ensure test fails when no evidence
+    monkeypatch.setenv('FRBOT_HEAL_ALLOW_NO_EVIDENCE', '0')
 
     assert run_healing_only() == 1
 

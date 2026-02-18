@@ -131,8 +131,18 @@ def _strip_healing_keys(env: Mapping[str, str]) -> dict[str, str]:
     return {k: v for (k, v) in dict(env).items() if not str(k).startswith("FRBOT_HEALING_")}
 
 
+def _strip_frbot_for_pytest(env: Mapping[str, str]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for k, v in dict(env).items():
+        key = str(k)
+        if key.startswith("FRBOT_") and key not in {"FRBOT_REAL_FRAMES_DIR"}:
+            continue
+        out[key] = str(v)
+    return out
+
+
 def _build_step_envs(base_env: Mapping[str, str]) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
-    pytest_env = _strip_healing_keys(base_env)
+    pytest_env = _strip_frbot_for_pytest(base_env)
     runtime_env = dict(_strip_healing_keys(base_env))
     runtime_env["FRBOT_INPUT_METHOD"] = "postmessage"
     runtime_env.update(_RUNTIME_HEALING_TUNING)
@@ -325,9 +335,9 @@ def run_release(argv: list[str] | None = None) -> int:
     if str(env.get("FRBOT_TRY_FOCUS", "")).strip() == "":
         env["FRBOT_TRY_FOCUS"] = "1"
     if str(env.get("FRBOT_FOREGROUND_RETRIES", "")).strip() == "":
-        env["FRBOT_FOREGROUND_RETRIES"] = "0"
+        env["FRBOT_FOREGROUND_RETRIES"] = "12"
     if str(env.get("FRBOT_FOREGROUND_DELAY_MS", "")).strip() == "":
-        env["FRBOT_FOREGROUND_DELAY_MS"] = "0"
+        env["FRBOT_FOREGROUND_DELAY_MS"] = "180"
     if not str(env.get("FRBOT_CONFIG_PATH", "") or "").strip():
         env["FRBOT_CONFIG_PATH"] = str((repo_root / "config" / "rois_prod_full.json").resolve())
     if obs_source_name:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 
 import cv2
 import numpy as np
@@ -22,11 +22,11 @@ class LocalizationResult:
     ambiguous: bool
 
 
-def _as_gray(img_rgb: np.ndarray) -> np.ndarray:
+def _as_gray(img_rgb: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
     return cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 
 
-def _mask_player_marker(minimap_rgb: np.ndarray, *, marker_rgb: tuple[int, int, int], marker_tol: int) -> np.ndarray:
+def _mask_player_marker(minimap_rgb: np.ndarray[Any, Any], *, marker_rgb: tuple[int, int, int], marker_tol: int) -> np.ndarray[Any, Any]:
     marker = np.array([int(marker_rgb[0]), int(marker_rgb[1]), int(marker_rgb[2])], dtype=np.int16)
     src = minimap_rgb.astype(np.int16)
     dist = np.abs(src - marker)

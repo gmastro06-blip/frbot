@@ -82,7 +82,7 @@ def _try_write_looting_basic_last_result(
     ok: bool,
     outcome_kind: str,
     evidence_kind: str,
-    loot_action: dict | None,
+    loot_action: dict[str, Any] | None,
     verify_attempts: int,
     inventory_after_readable: bool,
     inventory_delta_ok: bool,
@@ -335,7 +335,7 @@ def execute_looting_basic_once(
             for yy in range(y0, y0 + rh, step):
                 row_luma: list[int] = []
                 base = yy * row_stride
-                prev_l = None
+                prev_lum = None
                 for xx in range(x0, x0 + rw, step):
                     i = base + (xx * 3)
                     if i + 2 >= len(rgb):
@@ -343,20 +343,20 @@ def execute_looting_basic_once(
                     r = int(rgb[i + 0])
                     g = int(rgb[i + 1])
                     b = int(rgb[i + 2])
-                    l = (r * 30 + g * 59 + b * 11) // 100
-                    lumas.append(l)
-                    row_luma.append(l)
+                    lum = (r * 30 + g * 59 + b * 11) // 100
+                    lumas.append(lum)
+                    row_luma.append(lum)
 
-                    mid = (l >= 25) and (l <= 210)
+                    mid = (lum >= 25) and (lum <= 210)
                     brownish = (r >= g) and (g >= b) and ((r - b) >= 12)
                     if mid and brownish:
                         corpse_like += 1
                     total += 1
 
-                    if prev_l is not None:
-                        edge_sum += abs(l - prev_l)
+                    if prev_lum is not None:
+                        edge_sum += abs(lum - prev_lum)
                         edge_count += 1
-                    prev_l = l
+                    prev_lum = lum
 
                 if prev_row_luma is not None:
                     m = min(len(prev_row_luma), len(row_luma))
@@ -569,7 +569,7 @@ def execute_looting_basic_once(
             _try_dump_looting_pair(gate=gate_name, reason='looting_no_corpse_present', before=before, after=None)
             raise PreflightFailed('looting_no_corpse_present')
 
-    loot_action: dict | None = None
+    loot_action: dict[str, Any] | None = None
     action_ts_ns: int | None = None
     click_x: int | None = None
     click_y: int | None = None

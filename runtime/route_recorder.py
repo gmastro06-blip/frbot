@@ -36,7 +36,7 @@ class RouteRecordingSession:
     _last_dir: Optional[tuple[int, int]] = None
     _same_dir_steps: int = 0
 
-    def _add_waypoint(self, *, waypoint_type: str, x: int, y: int, z: int, options: Optional[dict] = None) -> Waypoint:
+    def _add_waypoint(self, *, waypoint_type: str, x: int, y: int, z: int, options: Optional[dict[str, Any]] = None) -> Waypoint:
         wp = Waypoint(
             type=str(waypoint_type),
             x=int(x),

@@ -49,7 +49,7 @@ def _env_float(name: str, default: float) -> float:
         return float(default)
 
 
-def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
+def _serialize_inventory(inv: InventorySnapshot | None) -> dict[str, object]:
     if inv is None:
         return {}
     out: dict[str, object] = {
@@ -60,7 +60,7 @@ def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
     return out
 
 
-def _serialize_depot(d: DepotSnapshot | None) -> dict:
+def _serialize_depot(d: DepotSnapshot | None) -> dict[str, object]:
     if d is None:
         return {}
     return {'item_count': int(d.item_count), 'open': bool(d.open)}

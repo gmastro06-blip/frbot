@@ -92,3 +92,31 @@ def should_press_eat(*, hungry: bool, now_ms: int, last_eat_ts_ms: int | None, e
     if last_eat_ts_ms is None:
         return True
     return int(now_ms) >= (int(last_eat_ts_ms) + max(0, int(eat_interval_ms)))
+
+
+def auto_eat_tick(
+    frame: Frame,
+    roi: Roi,
+    settings: HungerSettings,
+    now_ms: int,
+    last_eat_ts_ms: int | None,
+) -> tuple[bool, int | None, float]:
+    """Execute auto-eat tick for integration with healing/combat.
+
+    Returns:
+        (ate: bool, new_last_eat_ts_ms: int | None, hunger_ratio: float)
+
+    Usage:
+        ate, new_ts, ratio = auto_eat_tick(frame, roi, settings, now_ms, last_eat_ts_ms)
+    """
+    hungry, ratio = is_hungry(frame, roi, settings)
+
+    if should_press_eat(
+        hungry=hungry,
+        now_ms=now_ms,
+        last_eat_ts_ms=last_eat_ts_ms,
+        eat_interval_ms=settings.eat_interval_ms,
+    ):
+        return (True, now_ms, ratio)
+
+    return (False, last_eat_ts_ms, ratio)

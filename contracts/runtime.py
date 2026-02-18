@@ -23,7 +23,7 @@ class PositionState:
     x: int
     y: int
     z: int
-    source: Literal['minimap', 'minimap_track']
+    source: Literal["minimap", "minimap_track"]
     confidence: float
 
     def tile(self) -> Tile:
@@ -40,7 +40,7 @@ class CavebotState:
     stuck_started_ts_ms: int = 0
 
     # Gate Cavebot state (minimap + marker tracking).
-    gate_waypoints: tuple['Waypoint', ...] = ()
+    gate_waypoints: tuple["Waypoint", ...] = ()
     gate_waypoint_index: int = 0
     gate_attempts_used: int = 0
     gate_ticks_in_waypoint: int = 0
@@ -54,10 +54,12 @@ class CavebotState:
             return None
         return self.waypoints[self.current_index]
 
-    def current_gate_waypoint(self) -> Optional['Waypoint']:
+    def current_gate_waypoint(self) -> Optional["Waypoint"]:
         if not self.gate_waypoints:
             return None
-        if self.gate_waypoint_index < 0 or self.gate_waypoint_index >= len(self.gate_waypoints):
+        if self.gate_waypoint_index < 0 or self.gate_waypoint_index >= len(
+            self.gate_waypoints
+        ):
             return None
         return self.gate_waypoints[self.gate_waypoint_index]
 
@@ -83,13 +85,13 @@ class Waypoint:
     z: int
     radius_px: int
     max_ticks: int
-    waypoint_type: str = 'walk'
+    waypoint_type: str = "walk"
     options: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
 class CavebotTelemetry:
-    waypoint_id: str = ''
+    waypoint_id: str = ""
     # Marker RGB used for semantic minimap tracking. When None, runner falls back
     # to RuntimeConfig.player_marker_rgb.
     marker_rgb: tuple[int, int, int] | None = None
@@ -119,11 +121,11 @@ class CavebotGateState:
 
 
 class RuntimeState(str, Enum):
-    INIT = 'INIT'
-    PREFLIGHT = 'PREFLIGHT'
-    READY = 'READY'
-    RUNNING = 'RUNNING'
-    ABORTED = 'ABORTED'
+    INIT = "INIT"
+    PREFLIGHT = "PREFLIGHT"
+    READY = "READY"
+    RUNNING = "RUNNING"
+    ABORTED = "ABORTED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,10 +135,10 @@ class RuntimeConfig:
     mode: str
     tick_hz: float = 20.0
     # ROI config used for minimap detection/cropping.
-    config_path: str = ''
+    config_path: str = ""
 
     # Waypoints (legacy Waypoints/file.json) path.
-    bot_config_path: str = ''
+    bot_config_path: str = ""
 
     enable_cavebot: bool = True
 
@@ -150,13 +152,13 @@ class RuntimeConfig:
     enable_combat: bool = False
 
     # Healing evidence ROI names.
-    hp_mp_roi: str = 'hp_mp'
-    hp_bar_roi: str = 'hp_bar'
-    mp_bar_roi: str = 'mp_bar'
-    hp_text_roi: str = 'hp_text'
-    mp_text_roi: str = 'mp_text'
-    heal_cooldown_roi: str = 'heal_cooldown'
-    heal_feedback_roi: str = 'heal_feedback'
+    hp_mp_roi: str = "hp_mp"
+    hp_bar_roi: str = "hp_bar"
+    mp_bar_roi: str = "mp_bar"
+    hp_text_roi: str = "hp_text"
+    mp_text_roi: str = "mp_text"
+    heal_cooldown_roi: str = "heal_cooldown"
+    heal_feedback_roi: str = "heal_feedback"
 
     # Healing thresholds (percent in [0,1]).
     heal_hp_threshold: float = 0.5
@@ -166,41 +168,41 @@ class RuntimeConfig:
     heal_consistency_tol: float = 0.05
 
     # Healing input.
-    heal_key: str = 'F1'
+    heal_key: str = "F1"
 
     # Anti-loop guardrails (healing).
     max_attempts_per_heal: int = 2
     max_time_ms_per_heal: int = 2500
 
     # Battle List evidence ROI name.
-    battle_list_roi: str = 'battle_list'
+    battle_list_roi: str = "battle_list"
     # Optional: target frame/target bar evidence ROI name.
-    target_frame_roi: str = 'target_frame'
+    target_frame_roi: str = "target_frame"
 
     # Combat evidence ROI names.
-    target_hp_bar_roi: str = 'target_hp_bar'
-    combat_cooldown_roi: str = 'combat_cooldown'
-    combat_feedback_roi: str = 'combat_feedback'
+    target_hp_bar_roi: str = "target_hp_bar"
+    combat_cooldown_roi: str = "combat_cooldown"
+    combat_feedback_roi: str = "combat_feedback"
 
     # Combat thresholds.
     combat_target_hp_decrease_min: float = 0.02
 
     # Combat input.
-    attack_key: str = 'SPACE'
+    attack_key: str = "SPACE"
 
     # Anti-loop guardrails (targeting).
     max_attempts_per_target: int = 2
     max_time_ms_per_target: int = 2500
 
     # Movement evidence ROI name.
-    minimap_roi: str = 'minimap'
+    minimap_roi: str = "minimap"
 
     # Strong window binding (Windows).
     window_hwnd: int = 0
-    window_title_substring: str = ''
+    window_title_substring: str = ""
 
     # Semantic minimap tracking.
-    player_marker_rgb: str = '255,0,255'
+    player_marker_rgb: str = "255,0,255"
     player_marker_tol: int = 30
     player_marker_min_pixels: int = 5
     player_marker_max_pixels: int = 0
@@ -222,101 +224,151 @@ class RuntimeConfig:
     looting_max_attempts_per_corpse: int = 3
     looting_max_ticks: int = 20
     looting_require_inventory_delta: bool = True
-    looting_mode: Literal['premium', 'free'] = 'premium'
-    quick_loot_key: str = 'R'
+    looting_mode: Literal["premium", "free"] = "premium"
+    quick_loot_key: str = "R"
 
     # Looting ROI names.
-    inventory_text_roi: str = 'inventory_text'
-    loot_container_open_roi: str = 'loot_container_open'
-    loot_corpse_roi: str = 'loot_corpse'
-    loot_take_roi: str = 'loot_take'
+    inventory_text_roi: str = "inventory_text"
+    loot_container_open_roi: str = "loot_container_open"
+    loot_corpse_roi: str = "loot_corpse"
+    loot_take_roi: str = "loot_take"
 
     # Deposit gate config.
     deposit_max_attempts: int = 3
     deposit_max_ticks: int = 20
-    deposit_key: str = 'D'
+    deposit_key: str = "D"
 
     # Deposit ROI names.
-    depot_container_roi: str = 'depot_container'
+    depot_container_roi: str = "depot_container"
 
     # Trade gate config.
     trade_max_attempts: int = 3
     trade_max_ticks: int = 20
-    trade_action: Literal['buy', 'sell', 'deposit'] = 'buy'
+    trade_action: Literal["buy", "sell", "deposit"] = "buy"
     trade_expected_npc_id: int = 1
 
     # Trade ROI names.
-    trade_inventory_roi: str = 'trade_inventory'
-    trade_npc_roi: str = 'trade_npc'
-    trade_action_roi: str = 'trade_action'
+    trade_inventory_roi: str = "trade_inventory"
+    trade_npc_roi: str = "trade_npc"
+    trade_action_roi: str = "trade_action"
+
+    # Hunger/Auto-eat gate config.
+    enable_hunger: bool = False
+    hunger_roi: str = "hunger_status"
+    eat_key: str = "F9"
+    hungry_rgb: tuple[int, int, int] = (255, 170, 0)
+    hunger_color_tol: int = 28
+    hunger_match_ratio_min: float = 0.08
+    eat_interval_ms: int = 1200
+
+    # Auto-fish gate config.
+    enable_fish: bool = False
+    fish_roi: str = "fishing_indicator"
+    fish_key: str = "F10"
+    fish_bite_rgb: tuple[int, int, int] = (0, 255, 0)
+    fish_color_tol: int = 30
+    fish_match_ratio_min: float = 0.05
+    fish_interval_ms: int = 2000
+
+    # Auto-ring gate config.
+    enable_ring: bool = False
+    ring_slot_roi: str = "ring_slot"
+    ring_equip_key: str = "F11"
+    ring_switch_interval_ms: int = 5000
+
+    # Auto-supply (potion refill/buy) config.
+    enable_supply: bool = False
+    supply_hp_threshold: float = 0.5
+    supply_mp_threshold: float = 0.3
+    health_potion_key: str = "F1"
+    mana_potion_key: str = "F2"
+    supply_drink_interval_ms: int = 1000
 
     def __post_init__(self) -> None:
         mode = self.mode.strip().lower()
-        if mode not in {'real', 'mock'}:
-            raise ContractViolation(f'Unsupported mode: {self.mode!r}')
+        if mode not in {"real", "mock"}:
+            raise ContractViolation(f"Unsupported mode: {self.mode!r}")
         if self.tick_hz <= 0 or self.tick_hz > 200:
-            raise ContractViolation('tick_hz must be in (0, 200]')
+            raise ContractViolation("tick_hz must be in (0, 200]")
         if self.max_attempts_per_waypoint <= 0 or self.max_attempts_per_waypoint > 20:
-            raise ContractViolation('max_attempts_per_waypoint must be in [1, 20]')
-        if self.max_time_ms_per_waypoint <= 0 or self.max_time_ms_per_waypoint > 120_000:
-            raise ContractViolation('max_time_ms_per_waypoint must be in (0, 120000]')
+            raise ContractViolation("max_attempts_per_waypoint must be in [1, 20]")
+        if (
+            self.max_time_ms_per_waypoint <= 0
+            or self.max_time_ms_per_waypoint > 120_000
+        ):
+            raise ContractViolation("max_time_ms_per_waypoint must be in (0, 120000]")
 
-        if self.cavebot_max_attempts_per_waypoint <= 0 or self.cavebot_max_attempts_per_waypoint > 20:
-            raise ContractViolation('cavebot_max_attempts_per_waypoint must be in [1, 20]')
-        if self.cavebot_max_ticks_per_waypoint <= 0 or self.cavebot_max_ticks_per_waypoint > 10_000:
-            raise ContractViolation('cavebot_max_ticks_per_waypoint must be in [1, 10000]')
+        if (
+            self.cavebot_max_attempts_per_waypoint <= 0
+            or self.cavebot_max_attempts_per_waypoint > 20
+        ):
+            raise ContractViolation(
+                "cavebot_max_attempts_per_waypoint must be in [1, 20]"
+            )
+        if (
+            self.cavebot_max_ticks_per_waypoint <= 0
+            or self.cavebot_max_ticks_per_waypoint > 10_000
+        ):
+            raise ContractViolation(
+                "cavebot_max_ticks_per_waypoint must be in [1, 10000]"
+            )
         if self.cavebot_min_pixel_delta <= 0 or self.cavebot_min_pixel_delta > 50:
-            raise ContractViolation('cavebot_min_pixel_delta must be in [1, 50]')
+            raise ContractViolation("cavebot_min_pixel_delta must be in [1, 50]")
 
-        if self.looting_max_attempts_per_corpse <= 0 or self.looting_max_attempts_per_corpse > 20:
-            raise ContractViolation('looting_max_attempts_per_corpse must be in [1, 20]')
+        if (
+            self.looting_max_attempts_per_corpse <= 0
+            or self.looting_max_attempts_per_corpse > 20
+        ):
+            raise ContractViolation(
+                "looting_max_attempts_per_corpse must be in [1, 20]"
+            )
         if self.looting_max_ticks <= 0 or self.looting_max_ticks > 10_000:
-            raise ContractViolation('looting_max_ticks must be in [1, 10000]')
-        if str(self.quick_loot_key).strip() == '':
-            raise ContractViolation('quick_loot_key must be non-empty')
+            raise ContractViolation("looting_max_ticks must be in [1, 10000]")
+        if str(self.quick_loot_key).strip() == "":
+            raise ContractViolation("quick_loot_key must be non-empty")
 
         if self.deposit_max_attempts <= 0 or self.deposit_max_attempts > 20:
-            raise ContractViolation('deposit_max_attempts must be in [1, 20]')
+            raise ContractViolation("deposit_max_attempts must be in [1, 20]")
         if self.deposit_max_ticks <= 0 or self.deposit_max_ticks > 10_000:
-            raise ContractViolation('deposit_max_ticks must be in [1, 10000]')
-        if str(self.deposit_key).strip() == '':
-            raise ContractViolation('deposit_key must be non-empty')
+            raise ContractViolation("deposit_max_ticks must be in [1, 10000]")
+        if str(self.deposit_key).strip() == "":
+            raise ContractViolation("deposit_key must be non-empty")
 
         if self.trade_max_attempts <= 0 or self.trade_max_attempts > 20:
-            raise ContractViolation('trade_max_attempts must be in [1, 20]')
+            raise ContractViolation("trade_max_attempts must be in [1, 20]")
         if self.trade_max_ticks <= 0 or self.trade_max_ticks > 10_000:
-            raise ContractViolation('trade_max_ticks must be in [1, 10000]')
+            raise ContractViolation("trade_max_ticks must be in [1, 10000]")
         if int(self.trade_expected_npc_id) <= 0:
-            raise ContractViolation('trade_expected_npc_id must be > 0')
+            raise ContractViolation("trade_expected_npc_id must be > 0")
 
         if self.max_attempts_per_target <= 0 or self.max_attempts_per_target > 5:
-            raise ContractViolation('max_attempts_per_target must be in [1, 5]')
+            raise ContractViolation("max_attempts_per_target must be in [1, 5]")
         if self.max_time_ms_per_target <= 0 or self.max_time_ms_per_target > 60_000:
-            raise ContractViolation('max_time_ms_per_target must be in (0, 60000]')
+            raise ContractViolation("max_time_ms_per_target must be in (0, 60000]")
 
         if not (0.0 <= float(self.heal_hp_threshold) <= 1.0):
-            raise ContractViolation('heal_hp_threshold must be in [0, 1]')
+            raise ContractViolation("heal_hp_threshold must be in [0, 1]")
         if not (0.0 <= float(self.heal_mp_min) <= 1.0):
-            raise ContractViolation('heal_mp_min must be in [0, 1]')
+            raise ContractViolation("heal_mp_min must be in [0, 1]")
         if not (0.0 <= float(self.heal_mp_cost) <= 1.0):
-            raise ContractViolation('heal_mp_cost must be in [0, 1]')
+            raise ContractViolation("heal_mp_cost must be in [0, 1]")
         if not (0.0 <= float(self.heal_hp_increase_min) <= 1.0):
-            raise ContractViolation('heal_hp_increase_min must be in [0, 1]')
+            raise ContractViolation("heal_hp_increase_min must be in [0, 1]")
         if not (0.0 <= float(self.heal_consistency_tol) <= 1.0):
-            raise ContractViolation('heal_consistency_tol must be in [0, 1]')
+            raise ContractViolation("heal_consistency_tol must be in [0, 1]")
 
         if self.max_attempts_per_heal <= 0 or self.max_attempts_per_heal > 5:
-            raise ContractViolation('max_attempts_per_heal must be in [1, 5]')
+            raise ContractViolation("max_attempts_per_heal must be in [1, 5]")
         if self.max_time_ms_per_heal <= 0 or self.max_time_ms_per_heal > 60_000:
-            raise ContractViolation('max_time_ms_per_heal must be in (0, 60000]')
+            raise ContractViolation("max_time_ms_per_heal must be in (0, 60000]")
 
         if not str(self.heal_key).strip():
-            raise ContractViolation('heal_key must be non-empty')
+            raise ContractViolation("heal_key must be non-empty")
 
         if not (0.0 <= float(self.combat_target_hp_decrease_min) <= 1.0):
-            raise ContractViolation('combat_target_hp_decrease_min must be in [0, 1]')
+            raise ContractViolation("combat_target_hp_decrease_min must be in [0, 1]")
         if not str(self.attack_key).strip():
-            raise ContractViolation('attack_key must be non-empty')
+            raise ContractViolation("attack_key must be non-empty")
 
 
 @dataclass(frozen=True, slots=True)
@@ -334,7 +386,7 @@ class Rect:
     def bottom(self) -> int:
         return int(self.y) + int(self.height)
 
-    def contains_rect(self, other: 'Rect') -> bool:
+    def contains_rect(self, other: "Rect") -> bool:
         return (
             int(other.x) >= int(self.x)
             and int(other.y) >= int(self.y)
@@ -359,7 +411,7 @@ class TargetState:
     target_name: Optional[str] = None
     target_position: Optional[tuple[int, int, int]] = None
     target_rect: Optional[Rect] = None
-    source: Literal['battle_list'] = 'battle_list'
+    source: Literal["battle_list"] = "battle_list"
     confidence: float = 0.0
     locked: bool = False
 
@@ -379,7 +431,7 @@ class RuntimeTelemetry:
     last_frame_ts_ns: int = 0
     last_capture_age_ms: int = 0
     last_tick_valid: bool = False
-    last_intent: str = ''
+    last_intent: str = ""
 
     # Additive: per-intent correlation snapshot used for audit-grade evidence.
     last_event_correlation: dict[str, Any] = field(default_factory=dict)
@@ -388,7 +440,7 @@ class RuntimeTelemetry:
 @dataclass(slots=True)
 class RuntimeStatus:
     state: RuntimeState = RuntimeState.INIT
-    reason: str = ''
+    reason: str = ""
 
 
 @dataclass(slots=True)
@@ -403,28 +455,30 @@ class RuntimeContext:
 
     # Cavebot-only typed state.
     position: PositionState = field(
-        default_factory=lambda: PositionState(x=0, y=0, z=0, source='minimap', confidence=0.0)
+        default_factory=lambda: PositionState(
+            x=0, y=0, z=0, source="minimap", confidence=0.0
+        )
     )
     cavebot: CavebotState = field(default_factory=CavebotState)
     cavebot_gate: CavebotGateState = field(default_factory=CavebotGateState)
 
     # Looting state.
-    looting: 'LootingState' = field(default_factory=lambda: LootingState())
+    looting: "LootingState" = field(default_factory=lambda: LootingState())
 
     # Deposit state.
-    deposit: 'DepositState' = field(default_factory=lambda: DepositState())
+    deposit: "DepositState" = field(default_factory=lambda: DepositState())
 
     # Trade state.
-    trade: 'TradeState' = field(default_factory=lambda: TradeState())
+    trade: "TradeState" = field(default_factory=lambda: TradeState())
 
     # Targeting state.
     targeting: TargetingState = field(default_factory=TargetingState)
 
     # Healing state.
-    healing: 'HealingState' = field(default_factory=lambda: HealingState())
+    healing: "HealingState" = field(default_factory=lambda: HealingState())
 
     # Combat state.
-    combat: 'CombatState' = field(default_factory=lambda: CombatState())
+    combat: "CombatState" = field(default_factory=lambda: CombatState())
 
     # Loaded ROI map (must include minimap in operational modes).
     rois: dict[str, Roi] = field(default_factory=dict)
@@ -439,7 +493,7 @@ class RuntimeContext:
 class HealState:
     hp_percent: Optional[float] = None
     mp_percent: Optional[float] = None
-    source: Literal['bar', 'text', 'bar+text'] = 'bar'
+    source: Literal["bar", "text", "bar+text"] = "bar"
     confidence: float = 0.0
 
 
@@ -448,6 +502,9 @@ class HealingState:
     last: HealState = field(default_factory=HealState)
     attempt_count: int = 0
     attempt_started_ts_ms: int = 0
+    # Hunger integration: track eating state
+    last_eat_ts_ms: int = 0
+    eat_count: int = 0
 
 
 @dataclass(slots=True)
@@ -458,8 +515,8 @@ class CombatState:
     inputs_sent: int = 0
     last_target_hp: Optional[float] = None
     last_click_xy: Optional[tuple[int, int]] = None
-    last_action_type: str = ''
-    last_action_value: str = ''
+    last_action_type: str = ""
+    last_action_value: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -499,11 +556,16 @@ class TradeState:
 
 @dataclass(slots=True)
 class LootingState:
-    mode: Literal['premium', 'free'] = 'premium'
+    mode: Literal["premium", "free"] = "premium"
     attempts_used: int = 0
     items_looted: int = 0
     last_inventory: Optional[InventorySnapshot] = None
     container_open: bool = False
+    # Targeting integration: require valid target before looting
+    target_locked: bool = False
+    target_name: Optional[str] = None
+    # Targeting integration: require a target to be selected before looting
+    target_required: bool = True
 
 
 @dataclass(slots=True)
@@ -512,8 +574,8 @@ class DepositState:
     inputs_sent: int = 0
     last_inventory_before: Optional[InventorySnapshot] = None
     last_inventory_after: Optional[InventorySnapshot] = None
-    last_depot_before: Optional['DepotSnapshot'] = None
-    last_depot_after: Optional['DepotSnapshot'] = None
+    last_depot_before: Optional["DepotSnapshot"] = None
+    last_depot_after: Optional["DepotSnapshot"] = None
 
 
 @dataclass(frozen=True, slots=True)

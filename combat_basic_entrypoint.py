@@ -5,6 +5,7 @@ import sys
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
@@ -96,7 +97,7 @@ def _try_write_last_result(
     inputs_sent: int,
     before_ppm: str | None,
     after_ppm: str | None,
-    event_correlation: dict | None = None,
+    event_correlation: dict[str, Any] | None = None,
 ) -> None:
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)

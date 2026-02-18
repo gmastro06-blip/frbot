@@ -1,0 +1,110 @@
+=== OCR Battle List Reproduction Script ===
+Mock mode: False
+Debug: True
+Dump ROIs: False
+Dump preprocess: False
+UI Profile: default
+
+[OCR] Profile: tibia_standard (explicit override)
+Active profile: tibia_standard
+  - ocr_upscale: 3
+  - ocr_min_confidence: 0.6
+
+Creating test battle list image...
+Test image size: (200, 200)
+
+Running OCR pipeline...
+[OCR] Profile: tibia_standard (explicit override)
+[OCR] Profile: tibia_standard (explicit override)
+[OCR] Profile: tibia_standard (explicit override)
+[OCR] Extracted 5 texts in 249ms
+  - "Dragon" at y=67, conf=0.30
+  - "yy" at y=72, conf=0.73
+  - "or" at y=126, conf=0.35
+  - "Goblin" at y=186, conf=0.01
+  - "Sy" at y=192, conf=0.32
+[OCR] OCR extraction failed: name 'fuzzy_match' is not defined
+[OCR] Profile: tibia_standard (explicit override)
+[OCR] Structure fallback: 3 rows detected
+[OCR] WARNING: OCR not available. To enable name extraction:
+[OCR]   - Install Tesseract: https://github.com/UB-Mannheim/tesseract/wiki
+[OCR]   - Or set FRBOT_TESSERACT_CMD=/path/to/tesseract.exe
+[OCR] Metrics: roi=(200, 200), profile=tibia_standard, time=320ms, raw_texts=0, entities=3
+
+=== RESULTS ===
+Entities found: 3
+Elapsed time: 320ms
+Profile: tibia_standard
+
+Entities:
+  - None (confidence: 0.50, type: structure)
+  - None (confidence: 0.50, type: structure)
+  - None (confidence: 0.50, type: structure)
+
+=== METRICS JSON ===
+{
+  "timestamp": 1771251078.158415,
+  "mock_mode": false,
+  "profile": "default",
+  "entities_count": 3,
+  "elapsed_ms": 320,
+  "roi_size": [
+    200,
+    200
+  ],
+  "entities": [
+    {
+      "name": null,
+      "stable_id": "56a44c34c86a",
+      "row_index": 0,
+      "original": null,
+      "confidence": 0.5,
+      "bbox": [
+        18,
+        24,
+        172,
+        13
+      ],
+      "match_type": "structure",
+      "status": "name_unavailable_no_ocr",
+      "reason": "Tesseract not available or OCR failed",
+      "debug_artifacts": {}
+    },
+    {
+      "name": null,
+      "stable_id": "a8fc85dc9592",
+      "row_index": 1,
+      "original": null,
+      "confidence": 0.5,
+      "bbox": [
+        18,
+        44,
+        172,
+        13
+      ],
+      "match_type": "structure",
+      "status": "name_unavailable_no_ocr",
+      "reason": "Tesseract not available or OCR failed",
+      "debug_artifacts": {}
+    },
+    {
+      "name": null,
+      "stable_id": "8c32c578ee2d",
+      "row_index": 2,
+      "original": null,
+      "confidence": 0.5,
+      "bbox": [
+        18,
+        64,
+        172,
+        13
+      ],
+      "match_type": "structure",
+      "status": "name_unavailable_no_ocr",
+      "reason": "Tesseract not available or OCR failed",
+      "debug_artifacts": {}
+    }
+  ]
+}
+
+SUCCESS: entities_count > 0

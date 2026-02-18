@@ -1,0 +1,93 @@
+=== OCR Battle List Reproduction Script ===
+Mock mode: False
+Debug: False
+Dump ROIs: False
+Dump preprocess: False
+UI Profile: default
+
+Active profile: default
+  - ocr_upscale: 3
+  - ocr_min_confidence: 0.5
+
+Creating test battle list image...
+Test image size: (200, 200)
+
+Running OCR pipeline...
+
+=== RESULTS ===
+Entities found: 3
+Elapsed time: 302ms
+Profile: tibia_low_res
+
+Entities:
+  - None (confidence: 0.50, type: structure)
+  - None (confidence: 0.50, type: structure)
+  - None (confidence: 0.50, type: structure)
+
+=== METRICS JSON ===
+{
+  "timestamp": 1771250941.138363,
+  "mock_mode": false,
+  "profile": "default",
+  "entities_count": 3,
+  "elapsed_ms": 302,
+  "roi_size": [
+    200,
+    200
+  ],
+  "entities": [
+    {
+      "name": null,
+      "stable_id": "f4999fd27b57",
+      "row_index": 0,
+      "original": null,
+      "confidence": 0.5,
+      "bbox": [
+        15,
+        24,
+        175,
+        13
+      ],
+      "match_type": "structure",
+      "status": "name_unavailable_no_ocr",
+      "reason": "Tesseract not available or OCR failed",
+      "debug_artifacts": {}
+    },
+    {
+      "name": null,
+      "stable_id": "7ec872306cbb",
+      "row_index": 1,
+      "original": null,
+      "confidence": 0.5,
+      "bbox": [
+        15,
+        44,
+        175,
+        13
+      ],
+      "match_type": "structure",
+      "status": "name_unavailable_no_ocr",
+      "reason": "Tesseract not available or OCR failed",
+      "debug_artifacts": {}
+    },
+    {
+      "name": null,
+      "stable_id": "6856036d305a",
+      "row_index": 2,
+      "original": null,
+      "confidence": 0.5,
+      "bbox": [
+        15,
+        64,
+        175,
+        13
+      ],
+      "match_type": "structure",
+      "status": "name_unavailable_no_ocr",
+      "reason": "Tesseract not available or OCR failed",
+      "debug_artifacts": {}
+    }
+  ]
+}
+
+SUCCESS: entities_count > 0

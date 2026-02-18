@@ -1,0 +1,48 @@
+{
+  "run_id": "20260217_161436",
+  "timestamp": "2026-02-17T16:14:36.154264",
+  "tests": [
+    {
+      "test": "input_method_selection",
+      "run_id": "20260217_161436",
+      "timestamp": "2026-02-17T16:14:36.123991",
+      "configured": "(default)",
+      "requires_foreground": false,
+      "valid": true,
+      "selected_backend": "Win32HwndKeyboard (PostMessage)"
+    },
+    {
+      "test": "focus_throttle_config",
+      "run_id": "20260217_161436",
+      "timestamp": "2026-02-17T16:14:36.123991",
+      "configured_ms": 500,
+      "valid": true
+    },
+    {
+      "test": "input_backend_available",
+      "run_id": "20260217_161436",
+      "timestamp": "2026-02-17T16:14:36.123991",
+      "backend": "Win32HwndKeyboard",
+      "available": true
+    },
+    {
+      "test": "focus_helper_signature",
+      "run_id": "20260217_161436",
+      "timestamp": "2026-02-17T16:14:36.152744",
+      "method_exists": true,
+      "method": "_ensure_focus_if_needed",
+      "signature": "(self) -> 'bool'",
+      "get_window_readiness": true,
+      "ensure_window_ready_for_input": true
+    },
+    {
+      "test": "readiness_struct",
+      "run_id": "20260217_161436",
+      "timestamp": "2026-02-17T16:14:36.152744",
+      "method_exists": true,
+      "signature": "(self) -> 'dict'",
+      "returns": "dict with hwnd, is_minimized, is_visible, is_foreground, ready_for_input"
+    }
+  ],
+  "overall": "PASSED"
+}

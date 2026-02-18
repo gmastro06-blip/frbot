@@ -37,7 +37,7 @@ def _dump_preflight_failure_frames(*, reason: str, before: Frame | None) -> None
             return
         dump_pair(
             gate='combat_basic_preflight',
-            before=cast(Frame, before),
+                before=before,
             after=None,
             reason=str(reason),
             out_dir=str(os.path.join('diagnostics', 'frames')),

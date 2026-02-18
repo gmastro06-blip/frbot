@@ -13,7 +13,7 @@ def _ts() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')
 
 
-def write_fatal(message: str, exc: Optional[BaseException] = None, *, details: Optional[dict] = None) -> None:
+def write_fatal(message: str, exc: Optional[BaseException] = None, *, details: Optional[dict[str, Any]] = None) -> None:
     """Always persist abort/crash evidence.
 
     Format contract:

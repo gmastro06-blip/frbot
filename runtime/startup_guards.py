@@ -50,12 +50,12 @@ def _env_int_opt(name: str) -> int | None:
         return None
 
 
-def _profile() -> str:
-    return (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
-
-
 def _mode() -> str:
     return (os.environ.get('FRBOT_MODE', '') or '').strip().lower()
+
+
+def current_profile() -> str:
+    return (os.environ.get('FRBOT_PROFILE', '') or '').strip().lower()
 
 
 def _capture_source() -> str:
@@ -121,9 +121,9 @@ def _write_window_diagnostics_json(*, expected_title: str, resolved_hwnd: int, r
 def _ensure_trace_initialized() -> None:
     # PROD profiles REAL requires trace to exist even if we hard-stop in startup guards.
     try:
-        if _profile() not in {'prod_emergency', 'prod_full'} or _mode() != 'real':
+        if current_profile() not in {'prod_emergency', 'prod_full', 'prod_real'} or _mode() != 'real':
             return
-        frames_dir = Path('diagnostics') / ('frames_emergency' if _profile() == 'prod_emergency' else 'frames_full')
+        frames_dir = Path('diagnostics') / ('frames_emergency' if current_profile() == 'prod_emergency' else 'frames_full')
         frames_dir.mkdir(parents=True, exist_ok=True)
         p = frames_dir / 'cavebot_trace.jsonl'
         if not p.exists():
@@ -205,7 +205,7 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
 
     _ensure_trace_initialized()
 
-    if _profile() not in {'prod_emergency', 'prod_full'}:
+    if current_profile() not in {'prod_emergency', 'prod_full', 'prod_real'}:
         return
 
     # Contract: foreground is verified at startup only (never during runtime).
@@ -220,9 +220,12 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         raise exc
 
     # Allow running independent gates via main.py routing.
-    if _mode() not in {
+    # prod_real and prod_full also allow mock mode for testing
+    allowed_modes = {
         'real',
+        'mock',
         'prod_full',
+        'prod_real',
         'combat_basic',
         'looting_basic',
         'looting_full',
@@ -237,13 +240,21 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         'healing_full',
         'combat_full',
         'cavebot_full',
-    }:
+    }
+    # For prod_emergency, only allow real modes (no mock)
+    # For prod_emergency, only allow real modes (no mock)
+    if current_profile() == 'prod_emergency' and _mode() not in {'real', 'targeting', 'healing', 'cavebot', 'targeting_full', 'healing_full', 'combat_full', 'cavebot_full'}:
+        exc = PreflightFailed('invalid_mode')
+        raise exc
+
+    if _mode() not in allowed_modes:
         exc = PreflightFailed('invalid_mode')
         details: dict[str, object] = {
             'mode': _mode(),
             'required': [
                 'real',
                 'prod_full',
+                'prod_real',
                 'combat_basic',
                 'looting_basic',
                 'looting_full',
@@ -266,6 +277,11 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         raise exc
 
     # InputAuthority: ALWAYS Tibia HWND/title (strict foreground).
+    # For mock mode, skip this check
+    if _mode() == 'mock' and current_profile() in {'prod_real', 'prod_full'}:
+        # Mock mode - skip window validation
+        return
+
     raw_hwnd = _env_str('FRBOT_WINDOW_HWND')
     title_substring = _env_str('FRBOT_WINDOW_TITLE')
     if not raw_hwnd and not title_substring:
@@ -362,7 +378,7 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
             write_fatal('window_minimized', pf, details=d)
         raise pf
 
-    allow_bg_input = _env_bool('FRBOT_ALLOW_BACKGROUND_INPUT', False)
+    allow_bg_input = False
 
     if int(info.foreground_hwnd) != int(hwnd) and not bool(allow_bg_input):
         # Optional operator-wait for foreground (still no focus stealing).

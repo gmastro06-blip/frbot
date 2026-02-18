@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Optional
+from typing import Optional
 
 from contracts.capture import Frame
 from contracts.runtime import Tile

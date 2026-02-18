@@ -4,7 +4,7 @@ import ctypes
 import os
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from contracts.window import WindowRect
 
@@ -168,7 +168,8 @@ if _IS_WINDOWS and user32 is not None and wintypes is not None and hasattr(ctype
     user32.EnumWindows.argtypes = [EnumWindowsProc, wintypes.LPARAM]
     user32.EnumWindows.restype = wintypes.BOOL
 else:  # pragma: no cover
-    EnumWindowsProc = lambda cb: cb
+    def EnumWindowsProc(cb: Any) -> Any:
+        return cb
 
 
 def _require_windows() -> ctypes.WinDLL:

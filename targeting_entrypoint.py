@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 import sys
 import time
+import numpy as np
 
 from contracts.errors import ContractViolation, PreflightFailed
-from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
+from contracts.runtime import BattleListEntry, Rect, RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
 from diagnostics.fatal import write_fatal
 from diagnostics.frame_dump import dump_enabled, dump_pair
 from diagnostics.emergency_capture import try_dump_window_frame
@@ -15,6 +16,7 @@ from diagnostics.last_frames import snapshot
 from rules.targeting import select_targeting_intent
 from runtime.env_bootstrap import load_repo_env
 from runtime.battle_list_semantics import detect_battle_list
+from runtime.battle_list_ocr import check_battle_list_presence
 from runtime.targeting_preflight import run as targeting_preflight_run
 from runtime.targeting_runner import execute_intent
 from runtime.profile import cap_ticks
@@ -144,22 +146,75 @@ def run_targeting_only() -> int:
             if battle_roi is None:
                 raise PreflightFailed('battle_list_not_detected')
 
+            # Try semantic (mock) OCR first
             obs = detect_battle_list(frame, battle_roi)
             allow_no_ocr = _env_bool('FRBOT_BATTLE_LIST_ALLOW_NO_OCR', False)
-            if obs is None and not allow_no_ocr:
-                raise PreflightFailed('battle_list_not_detected')
 
-            if obs is None and allow_no_ocr:
+            # If semantic OCR fails, try real OCR
+            if obs is None and not allow_no_ocr:
+                try:
+                    from runtime.battle_list_semantics import crop_roi_rgb
+                    from runtime.battle_list_ocr import detect_monsters_with_ocr
+                    from runtime.battle_list_semantics import BattleListObservation
+                    from PIL import Image
+
+                    # Crop ROI
+                    rgb = crop_roi_rgb(frame, battle_roi)
+                    if rgb:
+                        w, h = int(battle_roi.width), int(battle_roi.height)
+                        arr = np.frombuffer(rgb, dtype=np.uint8).reshape(h, w, 3)
+                        img = Image.fromarray(arr, 'RGB')
+
+                        # Run OCR
+                        monsters = detect_monsters_with_ocr(img)
+                        if monsters:
+                            # Convert OCR results to BattleListEntry format
+                            entries: list[BattleListEntry] = []
+                            for m in monsters:
+                                bbox = m['bbox']
+                                entry = BattleListEntry(
+                                    name=m['name'],
+                                    screen_bbox=Rect(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3]),
+                                    is_attackable=True,
+                                    hp_bar_visible=True,
+                                    highlighted=False,
+                                    row_index=len(entries),
+                                )
+                                entries.append(entry)
+
+                            obs = BattleListObservation(
+                                container_bbox=Rect(x=0, y=0, width=w, height=h),
+                                entries=tuple(entries),
+                            )
+                            print(f'[OCR] Detected monsters: {[e.name for e in obs.entries]}')
+                except Exception as e:
+                    print(f'[OCR] Error: {e}')
+
+            # If OCR fails, try structure-based detection
+            has_structure = False
+            if obs is None and not allow_no_ocr:
+                has_structure = check_battle_list_presence(frame, battle_roi)
+                if has_structure:
+                    from runtime.battle_list_semantics import BattleListObservation
+                    obs = BattleListObservation(
+                        container_bbox=Rect(x=0, y=0, width=0, height=0),
+                        entries=tuple(),
+                    )
+
+            if obs is None and not allow_no_ocr and not has_structure:
+                raise PreflightFailed('battle_list_not_detected')
+            if obs is None:
+                log_json(logger, event='skip', gate='targeting', reason='no_battle_list')
                 continue
 
-            if obs is None:
-                raise PreflightFailed('battle_list_not_detected')
-
             # Candidates defined by the invariant filter.
+            # For structure-based detection (names like "row_X"), accept without HP bar check
             candidates = tuple(
                 e
                 for e in obs.entries
-                if bool(e.name) and e.is_attackable is True and e.hp_bar_visible is True
+                if bool(e.name) and e.is_attackable is True and (
+                    e.hp_bar_visible is True or e.name.startswith('row_')
+                )
             )
 
             res = select_targeting_intent(ctx.targeting.target, obs.entries)

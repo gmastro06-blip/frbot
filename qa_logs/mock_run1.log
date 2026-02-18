@@ -1,0 +1,78 @@
+=== OCR Battle List Reproduction Script ===
+Mock mode: True
+Debug: False
+Dump ROIs: False
+Dump preprocess: False
+UI Profile: default
+
+Active profile: default
+  - ocr_upscale: 3
+  - ocr_min_confidence: 0.5
+
+Creating test battle list image...
+Test image size: (200, 200)
+
+Running OCR pipeline...
+
+=== RESULTS ===
+Entities found: 3
+Elapsed time: 33ms
+Profile: tibia_low_res
+
+Entities:
+  - Dragon (confidence: 0.95, type: mock)
+  - Orc (confidence: 0.90, type: mock)
+  - Goblin (confidence: 0.85, type: mock)
+
+=== METRICS JSON ===
+{
+  "timestamp": 1771250617.7726834,
+  "mock_mode": true,
+  "profile": "default",
+  "entities_count": 3,
+  "elapsed_ms": 33,
+  "roi_size": [
+    200,
+    200
+  ],
+  "entities": [
+    {
+      "name": "Dragon",
+      "original": "Dragon",
+      "confidence": 0.95,
+      "bbox": [
+        20,
+        10,
+        80,
+        16
+      ],
+      "match_type": "mock"
+    },
+    {
+      "name": "Orc",
+      "original": "Orc",
+      "confidence": 0.9,
+      "bbox": [
+        20,
+        30,
+        60,
+        16
+      ],
+      "match_type": "mock"
+    },
+    {
+      "name": "Goblin",
+      "original": "Goblin",
+      "confidence": 0.85,
+      "bbox": [
+        20,
+        50,
+        70,
+        16
+      ],
+      "match_type": "mock"
+    }
+  ]
+}
+
+SUCCESS: entities_count > 0

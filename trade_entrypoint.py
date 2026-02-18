@@ -60,7 +60,7 @@ def _env_trade_action(name: str, default: TradeAction) -> TradeAction:
     return default
 
 
-def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
+def _serialize_inventory(inv: InventorySnapshot | None) -> dict[str, object]:
     if inv is None:
         return {}
     out: dict[str, object] = {'slot_counts': dict(inv.slot_counts)}
@@ -69,7 +69,7 @@ def _serialize_inventory(inv: InventorySnapshot | None) -> dict:
     return out
 
 
-def _serialize_npc(npc: NpcIdentity | None) -> dict:
+def _serialize_npc(npc: NpcIdentity | None) -> dict[str, object]:
     if npc is None:
         return {}
     return {'npc_id': int(npc.npc_id), 'open': bool(npc.open)}

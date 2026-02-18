@@ -1,0 +1,15 @@
+[
+  {"waypoint_id": "start", "x": 32347, "y": 32222, "z": 7, "radius_px": 5, "max_ticks": 50, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "wp1", "x": 32300, "y": 32225, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "wp2", "x": 32250, "y": 32228, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "wp3", "x": 32200, "y": 32225, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "wp4", "x": 32150, "y": 32228, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "wp5", "x": 32100, "y": 32225, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "shop", "x": 32068, "y": 32228, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "return_wp1", "x": 32100, "y": 32225, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "return_wp2", "x": 32150, "y": 32228, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "return_wp3", "x": 32200, "y": 32225, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "return_wp4", "x": 32250, "y": 32228, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "return_wp5", "x": 32300, "y": 32225, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}},
+  {"waypoint_id": "return_depot", "x": 32347, "y": 32222, "z": 7, "radius_px": 5, "max_ticks": 100, "waypoint_type": "walk", "options": {"try_focus": true}}
+]

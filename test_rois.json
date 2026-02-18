@@ -1,0 +1,1 @@
+{"rois": {"hp_bar": {"x": 0, "y": 0, "width": 10, "height": 10}, "mp_bar": {"x": 0, "y": 10, "width": 10, "height": 10}, "hp_text": {"x": 0, "y": 20, "width": 10, "height": 10}, "mp_text": {"x": 0, "y": 30, "width": 10, "height": 10}, "heal_cooldown": {"x": 0, "y": 40, "width": 10, "height": 10}}}
