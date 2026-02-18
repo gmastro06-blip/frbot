@@ -13,6 +13,7 @@ import math
 from pathlib import Path
 
 from contracts.errors import ContractViolation, PreflightFailed
+from typing import Any
 from contracts.engine import EngineInput, IntentMove
 from contracts.capture import Frame
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry, Tile
@@ -26,6 +27,8 @@ from core.engine import tick as engine_tick
 from runtime.bot_config_loader import load_bot_config
 from runtime.env import parse_window_hwnd_env
 from runtime.preflight import preflight
+from runtime.trace_utils import serialize_for_trace
+from runtime.cavebot_trace_helpers import make_waypoint_payload
 from runtime.minimap_semantics import (
     MarkerConfig,
     MarkerDetection,
@@ -124,14 +127,14 @@ def _assert_centroid_in_minimap_bounds(*, frame: Frame, cx: float, cy: float) ->
         raise exc
 
 
-def _append_cavebot_trace(*, frames_dir: Path, payload: dict) -> None:
+def _append_cavebot_trace(*, frames_dir: Path, payload: dict[str, Any]) -> None:
     if not dump_enabled() and not _trace_required():
         return
     try:
         frames_dir.mkdir(parents=True, exist_ok=True)
         p = frames_dir / 'cavebot_trace.jsonl'
         with p.open('a', encoding='utf-8') as f:
-            f.write(json.dumps(payload, sort_keys=True) + '\n')
+            f.write(json.dumps(serialize_for_trace(payload), sort_keys=True) + '\n')
     except Exception:
         return
 
@@ -502,7 +505,7 @@ def run() -> int:
         if wp0 is not None:
             z0 = int(wp0.z)
         tracker = SemanticTracker(pixels_per_tile=float(ctx.config.pixels_per_tile), z=z0)
-        last_positions: list = []
+        last_positions: list[Any] = []
 
         max_ticks = cap_ticks(int(os.environ.get('FRBOT_MAX_TICKS', '0') or '0'))
 
@@ -582,7 +585,7 @@ def run() -> int:
 
                 if is_prod_emergency() and is_real_mode:
                     # Emit stable reach evidence: two consecutive "within radius" events.
-                    wp_obj = {'waypoint_id': f"{cur_wp.x},{cur_wp.y},{cur_wp.z}", 'x': int(cur_wp.x), 'y': int(cur_wp.y), 'z': int(cur_wp.z), 'radius_px': 0}
+                    wp_obj = make_waypoint_payload(cur_wp)
                     _append_cavebot_trace(
                         frames_dir=frames_dir,
                         payload={

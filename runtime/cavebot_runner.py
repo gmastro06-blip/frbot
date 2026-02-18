@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import time
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 from contracts.capture import CaptureAdapter, Frame
 from contracts.errors import PreflightFailed
@@ -22,6 +23,8 @@ from runtime.pacing import wait_until_ns
 from runtime.profile import is_prod_emergency
 from runtime.tibia_map_data import TibiaMapDataset, load_tibia_map_dataset
 from runtime.event_correlation import attach_snapshot, new_event, validate
+from runtime.trace_utils import serialize_for_trace
+from runtime.cavebot_trace_helpers import make_waypoint_payload
 
 
 _DATASET_CACHE: dict[str, TibiaMapDataset] = {}
@@ -313,16 +316,50 @@ def _dead_reckon_step_px(*, real_mode: bool) -> int:
     return max(1, min(int(val), 4))
 
 
+_LOGGER = logging.getLogger(__name__)
+
+
+def generate_run_id() -> str:
+    """Generate unique run ID from timestamp + short random."""
+    import datetime
+    import uuid
+    return f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+
+
+# Default RUN_ID generated at module load - can be overridden at runtime
+_RUN_ID = generate_run_id()
+
+
 def _stuck_window(*, real_mode: bool) -> int:
     raw = str(os.environ.get('FRBOT_CAVEBOT_STUCK_WINDOW') or '').strip()
-    if not raw:
-        return 5
-    try:
-        val = int(raw)
-    except Exception:
-        return 5
+    requested = None
+    if raw:
+        try:
+            requested = int(raw)
+        except Exception:
+            pass
+
+    # Unit: number of distance samples (ticks) to analyze
+    # Clamped: real_mode max=30, non-real max=15
     max_w = 30 if bool(real_mode) else 15
-    return max(3, min(int(val), int(max_w)))
+    if requested is None:
+        applied = 5
+        reason = "env_not_set_default"
+    elif requested > max_w:
+        applied = max_w
+        reason = f"clamped_to_max_{max_w}"
+    elif requested < 3:
+        applied = 3
+        reason = "clamped_to_min_3"
+    else:
+        applied = requested
+        reason = "applied_as_configured"
+
+    _LOGGER.info(
+        "[%s] stuck_window: requested=%s, applied=%d, unit=ticks, max_allowed=%d, reason=%s",
+        _RUN_ID, requested, applied, max_w, reason
+    )
+    return applied
 
 
 def _select_key_toward_waypoint(marker_before: object, waypoint: Waypoint) -> str:
@@ -349,7 +386,7 @@ def _frames_dir() -> Path:
     return Path('diagnostics') / 'frames'
 
 
-def _append_trace(*, gate: str, payload: dict) -> None:
+def _append_trace(*, gate: str, payload: dict[str, Any]) -> None:
     try:
         # Required audit trace (generated artifact; must not be committed).
         out_dir = _frames_dir()
@@ -362,7 +399,7 @@ def _append_trace(*, gate: str, payload: dict) -> None:
         else:
             path = out_dir / f'{g}_trace.jsonl'
         with path.open('a', encoding='utf-8') as f:
-            f.write(json.dumps(payload, sort_keys=True) + '\n')
+            f.write(json.dumps(serialize_for_trace(payload), sort_keys=True) + '\n')
     except Exception:
         return
 
@@ -789,14 +826,7 @@ def execute_cavebot_tick(
                 'selected_marker_id': sel_before.selected_candidate_id,
                 'marker_candidates': sel_before.details.get('marker_candidates', []),
                 'roi_sanity_reason': ('minimap_roi_black_or_static' if str(out.abort_reason) == 'cavebot_marker_roi_black' else ''),
-                'waypoint': {
-                    'waypoint_id': str(waypoint.waypoint_id),
-                    'x': int(waypoint.x),
-                    'y': int(waypoint.y),
-                    'z': int(waypoint.z),
-                    'radius_px': int(waypoint.radius_px),
-                    'max_ticks': int(waypoint.max_ticks),
-                },
+                'waypoint': make_waypoint_payload(waypoint),
             },
         )
         # Attach structured details for fatal.log.
@@ -846,14 +876,7 @@ def execute_cavebot_tick(
                 'selected_marker_confidence': float(sel_before.confidence),
                 'selected_marker_id': sel_before.selected_candidate_id,
                 'marker_candidates': sel_before.details.get('marker_candidates', []),
-                'waypoint': {
-                    'waypoint_id': str(waypoint.waypoint_id),
-                    'x': int(waypoint.x),
-                    'y': int(waypoint.y),
-                    'z': int(waypoint.z),
-                    'radius_px': int(waypoint.radius_px),
-                    'max_ticks': int(waypoint.max_ticks),
-                },
+                'waypoint': make_waypoint_payload(waypoint),
             },
         )
         return out
@@ -935,16 +958,7 @@ def execute_cavebot_tick(
                 'pnf': False,
                 'phrase': str(dialog_phrase),
                 'abort_reason': 'none',
-                'waypoint': {
-                    'waypoint_id': str(waypoint.waypoint_id),
-                    'x': int(waypoint.x),
-                    'y': int(waypoint.y),
-                    'z': int(waypoint.z),
-                    'radius_px': int(waypoint.radius_px),
-                    'max_ticks': int(waypoint.max_ticks),
-                    'waypoint_type': str(getattr(waypoint, 'waypoint_type', 'walk') or 'walk'),
-                    'options': dict(getattr(waypoint, 'options', {}) or {}),
-                },
+                'waypoint': make_waypoint_payload(waypoint),
             },
         )
         return CavebotTickOutcome(reached_waypoint=True, evidence=evidence, abort_reason=None, event='WAYPOINT_ACTION')
@@ -970,16 +984,7 @@ def execute_cavebot_tick(
                     'distance_before_px': float(_waypoint_distance_px(marker_before, waypoint_eff)),
                     'distance_after_px': float(_waypoint_distance_px(None, waypoint_eff)),
                     'angle_deg': 0.0,
-                    'waypoint': {
-                        'waypoint_id': str(waypoint.waypoint_id),
-                        'x': int(waypoint.x),
-                        'y': int(waypoint.y),
-                        'z': int(waypoint.z),
-                        'radius_px': int(waypoint.radius_px),
-                        'max_ticks': int(waypoint.max_ticks),
-                        'waypoint_type': str(getattr(waypoint, 'waypoint_type', 'walk') or 'walk'),
-                        'options': dict(getattr(waypoint, 'options', {}) or {}),
-                    },
+                    'waypoint': make_waypoint_payload(waypoint),
                 },
             )
             return out
@@ -1051,16 +1056,7 @@ def execute_cavebot_tick(
                     'distance_before_px': float(dist_before),
                     'distance_after_px': float(dist_after),
                     'angle_deg': 0.0,
-                    'waypoint': {
-                        'waypoint_id': str(waypoint.waypoint_id),
-                        'x': int(waypoint.x),
-                        'y': int(waypoint.y),
-                        'z': int(waypoint.z),
-                        'radius_px': int(waypoint.radius_px),
-                        'max_ticks': int(waypoint.max_ticks),
-                        'waypoint_type': str(getattr(waypoint, 'waypoint_type', 'walk') or 'walk'),
-                        'options': dict(getattr(waypoint, 'options', {}) or {}),
-                    },
+                    'waypoint': make_waypoint_payload(waypoint),
                 },
             )
             return out
@@ -1084,16 +1080,7 @@ def execute_cavebot_tick(
                 'blocked_reason': 'none',
                 'pnf': False,
                 'abort_reason': 'none',
-                'waypoint': {
-                    'waypoint_id': str(waypoint.waypoint_id),
-                    'x': int(waypoint.x),
-                    'y': int(waypoint.y),
-                    'z': int(waypoint.z),
-                    'radius_px': int(waypoint.radius_px),
-                    'max_ticks': int(waypoint.max_ticks),
-                    'waypoint_type': str(getattr(waypoint, 'waypoint_type', 'walk') or 'walk'),
-                    'options': dict(getattr(waypoint, 'options', {}) or {}),
-                },
+                'waypoint': make_waypoint_payload(waypoint),
             },
         )
         return CavebotTickOutcome(reached_waypoint=True, evidence=evidence, abort_reason=None, event='WAYPOINT_ACTION')
@@ -1122,14 +1109,7 @@ def execute_cavebot_tick(
                 'distance_before_px': float(_waypoint_distance_px(marker_before, waypoint_eff)),
                 'distance_after_px': float(_waypoint_distance_px(None, waypoint_eff)),
                 'angle_deg': 0.0,
-                'waypoint': {
-                    'waypoint_id': str(waypoint.waypoint_id),
-                    'x': int(waypoint.x),
-                    'y': int(waypoint.y),
-                    'z': int(waypoint.z),
-                    'radius_px': int(waypoint.radius_px),
-                    'max_ticks': int(waypoint.max_ticks),
-                },
+                'waypoint': make_waypoint_payload(waypoint),
             },
         )
         return out
@@ -1193,14 +1173,7 @@ def execute_cavebot_tick(
                 'abort_reason': 'none',
                 'blocked_reason': 'none',
                 'pnf': False,
-                'waypoint': {
-                    'waypoint_id': str(waypoint.waypoint_id),
-                    'x': int(waypoint.x),
-                    'y': int(waypoint.y),
-                    'z': int(waypoint.z),
-                    'radius_px': int(waypoint.radius_px),
-                    'max_ticks': int(waypoint.max_ticks),
-                },
+                'waypoint': make_waypoint_payload(waypoint),
                 'waypoint_effective': {
                     'x': int(waypoint_eff.x),
                     'y': int(waypoint_eff.y),
@@ -1364,14 +1337,7 @@ def execute_cavebot_tick(
             'abort_reason': 'none',
             'blocked_reason': 'none',
             'pnf': False,
-            'waypoint': {
-                'waypoint_id': str(waypoint.waypoint_id),
-                'x': int(waypoint.x),
-                'y': int(waypoint.y),
-                'z': int(waypoint.z),
-                'radius_px': int(waypoint.radius_px),
-                'max_ticks': int(waypoint.max_ticks),
-            },
+            'waypoint': make_waypoint_payload(waypoint),
             'waypoint_effective': {
                 'x': int(waypoint_eff.x),
                 'y': int(waypoint_eff.y),
@@ -1408,14 +1374,7 @@ def execute_cavebot_tick(
                 'selected_marker_confidence': float(eval_.sel_after_confidence),
                 'selected_marker_id': eval_.sel_after_candidate_id,
                 'marker_candidates': eval_.sel_after_details.get('marker_candidates', []),
-                'waypoint': {
-                    'waypoint_id': str(waypoint.waypoint_id),
-                    'x': int(waypoint.x),
-                    'y': int(waypoint.y),
-                    'z': int(waypoint.z),
-                    'radius_px': int(waypoint.radius_px),
-                    'max_ticks': int(waypoint.max_ticks),
-                },
+                'waypoint': make_waypoint_payload(waypoint),
             },
         )
         return out
@@ -1447,14 +1406,7 @@ def execute_cavebot_tick(
                 'selected_marker_id': eval_.sel_after_candidate_id,
                 'marker_candidates': eval_.sel_after_details.get('marker_candidates', []),
                 'roi_sanity_reason': ('minimap_roi_black_or_static' if str(out.abort_reason) == 'cavebot_marker_roi_black' else ''),
-                'waypoint': {
-                    'waypoint_id': str(waypoint.waypoint_id),
-                    'x': int(waypoint.x),
-                    'y': int(waypoint.y),
-                    'z': int(waypoint.z),
-                    'radius_px': int(waypoint.radius_px),
-                    'max_ticks': int(waypoint.max_ticks),
-                },
+                'waypoint': make_waypoint_payload(waypoint),
             },
         )
         return out
@@ -1494,14 +1446,7 @@ def execute_cavebot_tick(
                 'distance_before_px': float(dist_b),
                 'distance_after_px': float(dist_a),
                 'angle_deg': float(progress.angle_deg) if progress is not None else 0.0,
-                'waypoint': {
-                    'waypoint_id': str(waypoint.waypoint_id),
-                    'x': int(waypoint.x),
-                    'y': int(waypoint.y),
-                    'z': int(waypoint.z),
-                    'radius_px': int(waypoint.radius_px),
-                    'max_ticks': int(waypoint.max_ticks),
-                },
+                'waypoint': make_waypoint_payload(waypoint),
             },
         )
         return out
@@ -1544,14 +1489,7 @@ def execute_cavebot_tick(
                         'distance_before_px': float(dist_b),
                         'distance_after_px': float(dist_a),
                         'angle_deg': float(progress.angle_deg) if progress is not None else 0.0,
-                        'waypoint': {
-                            'waypoint_id': str(waypoint.waypoint_id),
-                            'x': int(waypoint.x),
-                            'y': int(waypoint.y),
-                            'z': int(waypoint.z),
-                            'radius_px': int(waypoint.radius_px),
-                            'max_ticks': int(waypoint.max_ticks),
-                        },
+                        'waypoint': make_waypoint_payload(waypoint),
                     },
                 )
                 return out
