@@ -359,8 +359,13 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
 
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
     found_windows = _list_found_windows()
     info = _collect_details(hwnd=int(hwnd), title_substring=str(title_substring))
     d = asdict(info)
@@ -434,7 +439,13 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
                         if should_reraise():
                             raise
                     except Exception:
-                        pass
+                        try:
+                            from runtime.error_policy import should_reraise
+
+                            if should_reraise():
+                                raise
+                        except Exception:
+                            pass
             try:
                 fg_now = int(w32.get_foreground_window())
             except Exception:

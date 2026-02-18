@@ -386,7 +386,13 @@ def execute_intent(
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         raise corr_exc
 
     after_row = None

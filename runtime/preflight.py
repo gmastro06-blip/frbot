@@ -48,7 +48,13 @@ def _dump_preflight_failure_frames(*, reason: str, before: Frame) -> None:
             if should_reraise():
                 raise
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         return
 
 CaptureAdapter: TypeAlias = MssBoundMinimapRealCapture | MeldBoundMinimapRealCapture | ObsSourceRealCapture | MockWorldCapture

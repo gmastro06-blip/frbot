@@ -227,7 +227,13 @@ def execute_trade_tick(
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         raise corr_exc
 
     if pixel_fallback_ok:
