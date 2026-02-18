@@ -348,7 +348,13 @@ def _stuck_window(*, real_mode: bool) -> int:
         try:
             requested = int(raw)
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
 
     # Unit: number of distance samples (ticks) to analyze
     # Clamped: real_mode max=30, non-real max=15
@@ -380,9 +386,23 @@ def _select_key_toward_waypoint(marker_before: object, waypoint: Waypoint) -> st
     dy = int(waypoint.y) - int(my)
 
     # Prefer dominant axis deterministically.
+    horiz = 'RIGHT' if dx > 0 else 'LEFT'
+    vert = 'DOWN' if dy > 0 else 'UP'
+
+    # Allow environment-gated inversion for horizontal axis when minimap
+    # orientation or input mapping differs on some machines.
+    try:
+        raw_inv = str(os.environ.get('FRBOT_CAVEBOT_INVERT_HORIZONTAL') or '').strip().lower()
+        invert_h = raw_inv in {'1', 'true', 'yes', 'on'}
+    except Exception:
+        invert_h = False
+
+    if invert_h:
+        horiz = 'LEFT' if horiz == 'RIGHT' else 'RIGHT'
+
     if abs(dx) >= abs(dy):
-        return 'RIGHT' if dx > 0 else 'LEFT'
-    return 'DOWN' if dy > 0 else 'UP'
+        return horiz
+    return vert
 
 
 def _frames_dir() -> Path:
@@ -650,7 +670,13 @@ def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, 
                 tel.virtual_x_px = int(getattr(marker_after, 'x_px', 0))
                 tel.virtual_y_px = int(getattr(marker_after, 'y_px', 0))
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         progress = compute_progress(marker_before, marker_after, waypoint)
         status = 'ok'
         if float(progress.angle_deg) > float(wrong_dir_threshold_deg):
@@ -679,7 +705,13 @@ def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, 
                 tel.virtual_x_px = int(getattr(marker_after, 'x_px', 0))
                 tel.virtual_y_px = int(getattr(marker_after, 'y_px', 0))
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
     else:
         # Fallback: infer minimap scroll and accumulate virtual position.
         dx_s, dy_s, sad_best, sad_0 = _estimate_minimap_translation_px(before_f, after_f)
@@ -700,7 +732,13 @@ def _progress_from_frames(ctx: RuntimeContext, before_f: Frame, after_f: Frame, 
                     tel.virtual_x_px = int(new_x)
                     tel.virtual_y_px = int(new_y)
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         else:
             # No evidence of movement: keep virtual marker unchanged.
             virt_after = virt_before
@@ -1260,7 +1298,13 @@ def execute_cavebot_tick(
         try:
             setattr(corr_exc, 'details', {'event_correlation': event})
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         raise corr_exc
 
     eval_ = _progress_from_frames(ctx, before, after, waypoint_eff)
@@ -1322,7 +1366,13 @@ def execute_cavebot_tick(
             ctx.cavebot_gate.telemetry.virtual_x_px = int(vx)
             ctx.cavebot_gate.telemetry.virtual_y_px = int(vy)
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
 
     _append_trace(
         gate=str(gate),
@@ -1433,7 +1483,13 @@ def execute_cavebot_tick(
         try:
             ctx.cavebot_gate.telemetry.wrong_direction_streak = int(current_streak)
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         if int(current_streak) < int(abort_streak_target):
             ctx.cavebot.gate_ticks_in_waypoint += 1
             ctx.cavebot.gate_attempts_used += 1

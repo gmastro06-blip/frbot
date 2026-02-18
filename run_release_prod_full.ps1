@@ -11,6 +11,11 @@ param(
 
   ,[Parameter(Mandatory = $false)]
   [string]$InputMethod
+
+  ,[Parameter(Mandatory = $false)]
+  [int]$AbortStreak
+  ,[Parameter(Mandatory = $false)]
+  [switch]$InvertHorizontal
 )
 
 Set-StrictMode -Version Latest
@@ -27,6 +32,9 @@ try {
   if ($WindowTitle) { $env:FRBOT_WINDOW_TITLE = $WindowTitle }
   if ($WindowHwnd) { $env:FRBOT_WINDOW_HWND = $WindowHwnd }
   if ($InputMethod) { $env:FRBOT_INPUT_METHOD = $InputMethod }
+
+  if ($AbortStreak) { $env:FRBOT_CAVEBOT_WRONG_DIRECTION_ABORT_STREAK = [string]$AbortStreak }
+  if ($InvertHorizontal) { $env:FRBOT_CAVEBOT_INVERT_HORIZONTAL = '1' }
 
   if (-not $env:FRBOT_PROFILE) { $env:FRBOT_PROFILE = "prod_full" }
   if (-not $env:FRBOT_MODE) { $env:FRBOT_MODE = "prod_full" }
