@@ -57,6 +57,7 @@ class GateResult:
     inputs_sent: int
     before_ppm: str | None
     after_ppm: str | None
+    locked_preexisting: bool
     ts: str
     capture_source: str
     window_hwnd: int
@@ -183,6 +184,7 @@ def _write_canonical_last_result(
     after_ppm: str | None,
     capture_source: str,
     window_hwnd: int,
+    locked_preexisting: bool = False,
 ) -> GateResult:
     ts = _now_iso()
     payload: dict[str, object] = {
@@ -194,6 +196,7 @@ def _write_canonical_last_result(
         "inputs_sent": int(inputs_sent),
         "before_ppm": before_ppm,
         "after_ppm": after_ppm,
+        "locked_preexisting": bool(locked_preexisting),
         "ts": str(ts),
         "capture_source": str(capture_source),
         "window_hwnd": int(window_hwnd),
@@ -208,6 +211,7 @@ def _write_canonical_last_result(
         inputs_sent=int(inputs_sent),
         before_ppm=before_ppm,
         after_ppm=after_ppm,
+        locked_preexisting=bool(locked_preexisting),
         ts=str(ts),
         capture_source=str(capture_source),
         window_hwnd=int(window_hwnd),
@@ -246,6 +250,11 @@ def _run_full_gate(
     reason = str(raw.get("reason") or raw.get("outcome_kind") or raw.get("evidence_reason") or ("ok" if ok else "failed"))
     evidence_kind = str(raw.get("evidence_kind") or raw.get("evidence_reason") or reason)
     inputs_sent = int(raw.get("inputs_sent", raw.get("actions_sent", 0)) or 0)
+    locked_preexisting_raw = raw.get("locked_preexisting", False)
+    if isinstance(locked_preexisting_raw, str):
+        locked_preexisting = str(locked_preexisting_raw).strip().lower() in ("1", "true", "yes")
+    else:
+        locked_preexisting = bool(locked_preexisting_raw)
 
     before_ppm = _resolve_ppm(artifact_dir, raw.get("before_ppm") if isinstance(raw.get("before_ppm"), str) else None)
     after_ppm = _resolve_ppm(artifact_dir, raw.get("after_ppm") if isinstance(raw.get("after_ppm"), str) else None)
@@ -258,7 +267,11 @@ def _run_full_gate(
     if strict_inputs_eq is not None and int(inputs_sent) != int(strict_inputs_eq):
         raise RuntimeError(f"invalid_inputs_sent:{gate}:{inputs_sent}")
     if int(inputs_sent) < int(min_inputs):
-        raise RuntimeError(f"invalid_inputs_sent:{gate}:{inputs_sent}")
+        if locked_preexisting:
+            reason = "locked_preexisting"
+            evidence_kind = str(raw.get("evidence_kind") or "locked_preexisting")
+        else:
+            raise RuntimeError(f"invalid_inputs_sent:{gate}:{inputs_sent}")
 
     return _write_canonical_last_result(
         artifact_dir=artifact_dir,
@@ -272,6 +285,7 @@ def _run_full_gate(
         after_ppm=after_ppm,
         capture_source=str(env.get("FRBOT_CAPTURE_SOURCE", "client")),
         window_hwnd=_parse_hwnd(str(env.get("FRBOT_WINDOW_HWND", "0"))),
+        locked_preexisting=bool(locked_preexisting),
     )
 
 
@@ -592,6 +606,7 @@ def _write_summary(artifact_dir: Path, mode: str, profile: str, final_decision: 
                 "reason": g.reason,
                 "evidence_kind": g.evidence_kind,
                 "inputs_sent": g.inputs_sent,
+                "locked_preexisting": g.locked_preexisting,
                 "before_ppm": g.before_ppm,
                 "after_ppm": g.after_ppm,
                 "last_result_path": g.last_result_path,
@@ -962,9 +977,33 @@ def _run_gate_real_projector(
     if gate_name == "cavebot_basic":
         inputs_sent = 1 if int(rc) == 0 else 0
 
+    # try to read an existing last_result written by the runtime to detect locked_preexisting
+    locked_preexisting = False
+    try:
+        candidate = frames_dir / f"{gate_name}_last_result.json"
+        if candidate.exists():
+            _raw = json.loads(candidate.read_text(encoding="utf-8", errors="replace"))
+            lp = _raw.get("locked_preexisting", False)
+            if isinstance(lp, str):
+                locked_preexisting = str(lp).strip().lower() in ("1", "true", "yes")
+            else:
+                locked_preexisting = bool(lp)
+    except Exception:
+        locked_preexisting = False
+
     if int(rc) == 0 and strict_inputs_eq is not None and int(inputs_sent) != int(strict_inputs_eq):
-        reason = "invalid_inputs_sent"
-        rc = 1
+        if locked_preexisting:
+            # require evidence ppm frames for a locked_preexisting claim
+            if before_ppm is None or after_ppm is None:
+                reason = "invalid_inputs_sent"
+                rc = 1
+            else:
+                reason = "locked_preexisting"
+        else:
+            # inputs_sent=0 sin lock preexistente: el gate no tomó ninguna acción.
+            # Se usa un reason descriptivo por gate para facilitar diagnóstico.
+            reason = f"{gate_name}_no_action_taken" if int(inputs_sent) == 0 else "invalid_inputs_sent"
+            rc = 1
 
     if int(rc) != 0 and (before_ppm is None or after_ppm is None):
         bname, aname = _ensure_fallback_pair()
@@ -987,6 +1026,7 @@ def _run_gate_real_projector(
         after_ppm=after_ppm,
         capture_source="obs_projector",
         window_hwnd=int(tibia_hwnd),
+        locked_preexisting=bool(locked_preexisting),
     )
     return result
 
