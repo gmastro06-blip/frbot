@@ -2079,7 +2079,7 @@ class MainWindow(QMainWindow):
                 window_title = ""
 
         cfg = RuntimeConfig(
-            mode=str(os.environ.get("FRBOT_MODE", "real") or "real").strip().lower(),
+            mode="real",  # El recorder siempre usa modo real; FRBOT_MODE del entorno no aplica aquí.
             tick_hz=float(self.spin_tick_hz.value()),
             config_path=str(self.input_config_path.text() or "").strip(),
             enable_cavebot=False,
@@ -2108,6 +2108,26 @@ class MainWindow(QMainWindow):
         try:
             log_json(_LOG, event="ui_action", gate="ui", action="route_record_start", phase="begin")
             self._force_obs_projector_capture_env()
+
+            # Validación proactiva de config_path antes de intentar el preflight.
+            # Si está vacío o apunta a un archivo inexistente, intentamos fallback
+            # automático; si tampoco existe, mostramos error accionable y abortamos.
+            _raw_cfg = str(self.input_config_path.text() or "").strip()
+            if not _raw_cfg or not Path(_raw_cfg).exists():
+                _fallback_cfg = self._resolve_valid_roi_config_path(_raw_cfg, profile="prod_full")
+                if Path(_fallback_cfg).exists():
+                    self.input_config_path.setText(_fallback_cfg)
+                else:
+                    _desc = f"'{_raw_cfg}'" if _raw_cfg else "(vacío)"
+                    self._show_error(
+                        "Route Recorder — config_path inválido",
+                        f"config_path {_desc} no existe.\n\n"
+                        "Opciones:\n"
+                        "  • Selecciona un archivo JSON de ROIs válido (p.ej. config/rois_prod_full.json).\n"
+                        "  • Usa el botón de configuración para elegir la ruta.",
+                    )
+                    return
+
             ctx, capture = self._route_capture_with_obs_fallback()
 
             marker_cfg = marker_config_from_env(
