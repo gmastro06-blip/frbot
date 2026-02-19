@@ -105,6 +105,8 @@ def _target_frame_hp_bar_present(rgb: bytes) -> bool:
     try:
         luma_range_min = int(os.environ.get('FRBOT_TARGET_HP_LUMA_RANGE_MIN', '28') or '28')
     except Exception:
+        if should_reraise():
+            raise
         luma_range_min = 28
 
     for i in range(0, len(rgb) - 2, 3):
@@ -172,10 +174,15 @@ def execute_intent(
         raise PreflightFailed('targeting_unstable_or_ambiguous')
 
     # Hard gate before sending input.
-    try:
-        binding.assert_bound()
-    except Exception:
-        raise PreflightFailed('targeting_window_binding_lost')
+        try:
+            binding.assert_bound()
+        except Exception as exc:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+
+            raise PreflightFailed('targeting_window_binding_lost') from exc
 
     event = new_event(
         gate=str(gate),
@@ -300,6 +307,11 @@ def execute_intent(
             input_.click(click_x, click_y)
         ctx.targeting.inputs_sent += 1
     except Exception as exc:
+        from runtime.error_policy import should_reraise
+
+        if should_reraise():
+            raise
+
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
 
     # Real UI may take a moment to reflect selection; OBS screenshots can also lag.
@@ -460,8 +472,13 @@ def targeting_tick(ctx: RuntimeContext, capture: CaptureAdapter, input_: InputAd
 
     try:
         binding.assert_bound()
-    except Exception:
-        raise PreflightFailed('targeting_window_binding_lost')
+    except Exception as exc:
+        from runtime.error_policy import should_reraise
+
+        if should_reraise():
+            raise
+
+        raise PreflightFailed('targeting_window_binding_lost') from exc
 
     before = capture.grab()
 

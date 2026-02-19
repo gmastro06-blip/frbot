@@ -1,0 +1,14 @@
+[
+  {
+    "node_id": "n1",
+    "spawn_id": "s1"
+  },
+  {
+    "node_id": "n2",
+    "spawn_id": "s2"
+  },
+  {
+    "node_id": "n3",
+    "spawn_id": "s3"
+  }
+]

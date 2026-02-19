@@ -111,6 +111,8 @@ class CavebotTelemetry:
     inputs_sent: int = 0
     wrong_direction_streak: int = 0
     last_n_distances: list[float] = field(default_factory=list)
+    # Key currently held down in sendinput hold-walk mode. None = no key held.
+    held_key: str | None = None
 
 
 @dataclass(slots=True)

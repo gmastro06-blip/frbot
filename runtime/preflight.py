@@ -172,8 +172,13 @@ def preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter, Window
         # Must be able to see minimap evidence + player marker in real mode.
         try:
             binding_real.assert_bound()
-        except Exception:
-            raise PreflightFailed('window_binding_lost')
+        except Exception as exc:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+
+            raise PreflightFailed('window_binding_lost') from exc
         before = capture_real.grab()
 
         # PROD-EMERGENCY: strict ROI contract must be in-bounds against the real capture.

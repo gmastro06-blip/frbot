@@ -52,6 +52,7 @@ from runtime.minimap_semantics import MarkerConfig, detect_player_marker as dete
 from runtime.minimap_localization import localize_minimap
 from runtime.route_recorder import MinimapRouteSampler, RouteRecordingSession, WaypointRecorder
 from runtime.route_preflight import run_capture_only as route_capture_only_preflight
+from runtime.cavebot_script_loader import ScriptLoaderParams, script_to_runtime_waypoints
 from runtime.tibia_map_data import TibiaMapDataset, load_tibia_map_dataset
 from runtime.env_bootstrap import load_repo_env
 from adapters.capture.obs_source_real import list_obs_input_names
@@ -1159,68 +1160,27 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-        recorder_md = (getattr(script, "metadata", {}) or {}).get("recorder", {})
-        is_recorder_route = isinstance(recorder_md, dict) and bool(recorder_md)
-
-        enabled_waypoints: list[Waypoint] = [wp for wp in script.waypoints if bool(getattr(wp, "enabled", True))]
-        if enabled_waypoints and (not is_recorder_route):
-            small_coord_count = 0
-            for wp in enabled_waypoints:
-                try:
-                    xx = abs(int(getattr(wp, "x", 0)))
-                    yy = abs(int(getattr(wp, "y", 0)))
-                except Exception:
-                    continue
-                if xx <= 2048 and yy <= 2048:
-                    small_coord_count += 1
-            if small_coord_count >= max(1, int(len(enabled_waypoints) * 0.8)):
-                is_recorder_route = True
-
-        base_x = 0
-        base_y = 0
-        base_z = 0
-        if is_recorder_route:
-            for wp in enabled_waypoints:
-                try:
-                    base_x = int(getattr(wp, "x", 0))
-                    base_y = int(getattr(wp, "y", 0))
-                    base_z = int(getattr(wp, "z", 0))
-                except Exception:
-                    base_x, base_y, base_z = 0, 0, 0
-                break
+        params = ScriptLoaderParams(
+            anchor_x=int(anchor_x),
+            anchor_y=int(anchor_y),
+            anchor_z=int(anchor_z),
+            default_radius_px=int(default_radius_px),
+            default_max_ticks=int(default_max_ticks),
+        )
+        runtime_waypoints = script_to_runtime_waypoints(script, params)
 
         route: list[dict[str, object]] = []
-        for idx, wp in enumerate(script.waypoints):
-            if not bool(getattr(wp, "enabled", True)):
-                continue
-            opts = dict(getattr(wp, "options", {}) or {})
-            try:
-                radius_px = max(0, int(opts.get("radius_px", default_radius_px)))
-            except Exception:
-                radius_px = int(default_radius_px)
-            try:
-                max_ticks = max(1, int(opts.get("max_ticks", default_max_ticks)))
-            except Exception:
-                max_ticks = int(default_max_ticks)
-
-            x_val = int(wp.x)
-            y_val = int(wp.y)
-            z_val = int(wp.z)
-            if is_recorder_route:
-                x_val = int(anchor_x) + (int(x_val) - int(base_x))
-                y_val = int(anchor_y) + (int(y_val) - int(base_y))
-                z_val = int(anchor_z) + (int(z_val) - int(base_z))
-
+        for idx, rwp in enumerate(runtime_waypoints):
             route.append(
                 {
                     "waypoint_id": f"ui_wp_{int(idx)}",
-                    "x": int(x_val),
-                    "y": int(y_val),
-                    "z": int(z_val),
-                    "radius_px": int(radius_px),
-                    "max_ticks": int(max_ticks),
-                    "waypoint_type": str(getattr(wp, "type", "walk") or "walk"),
-                    "options": opts,
+                    "x": int(rwp.x),
+                    "y": int(rwp.y),
+                    "z": int(rwp.z),
+                    "radius_px": int(rwp.radius_px),
+                    "max_ticks": int(rwp.max_ticks),
+                    "waypoint_type": str(rwp.waypoint_type),
+                    "options": dict(rwp.options),
                 }
             )
         return route

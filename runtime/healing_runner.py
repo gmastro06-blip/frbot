@@ -122,8 +122,13 @@ def execute_heal_intent(
 
     try:
         binding.assert_bound()
-    except Exception:
-        raise PreflightFailed('healing_window_binding_lost')
+    except Exception as exc:
+        from runtime.error_policy import should_reraise
+
+        if should_reraise():
+            raise
+
+        raise PreflightFailed('healing_window_binding_lost') from exc
 
     event = new_event(
         gate=str(gate),
@@ -296,13 +301,13 @@ def execute_heal_intent(
         event['correlation_details'] = dict(corr_details)
     ctx.telemetry.last_event_correlation = serialize_for_trace(event)
     if not corr_ok:
-        exc = PreflightFailed('binding_correlation_failed')
+        corr_exc = PreflightFailed('binding_correlation_failed')
         try:
-            setattr(exc, 'details', {'event_correlation': event})
+            setattr(corr_exc, 'details', {'event_correlation': event})
         except Exception:
             if should_reraise():
                 raise
-        raise exc
+        raise corr_exc
 
     hp_up = (float(after_hp) - float(before_hp)) >= float(intent.expected.hp_increase_min)
 

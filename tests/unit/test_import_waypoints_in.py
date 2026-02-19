@@ -43,7 +43,7 @@ def test_import_waypoints_in_maps_supported_and_warns_unknown(tmp_path: Path) ->
         "use_right_click",
         "travel",
         "walk_ignore",
-        "walk_ignore",
+        "call_npc",
         "walk_ignore",
         "walk_ignore",
     ]
@@ -52,7 +52,7 @@ def test_import_waypoints_in_maps_supported_and_warns_unknown(tmp_path: Path) ->
     assert script.waypoints[5].options.get("action_kind") == "pick"
     assert script.waypoints[6].options.get("action_kind") == "travel_carlin"
     assert script.waypoints[7].options.get("action_kind") == "wait"
-    assert script.waypoints[8].options.get("legacy_call") == "talk_npc"
+    assert script.waypoints[8].options.get("call") == "talk_npc"
     assert script.waypoints[9].options.get("action_kind") == "custom_unknown"
     assert script.waypoints[10].options.get("legacy_call") == "totally_unknown"
 
@@ -117,15 +117,15 @@ def test_import_waypoints_in_maps_load_and_conditional_calls(tmp_path: Path) -> 
     assert [wp.type for wp in script.waypoints] == [
         "walk",
         "walk_ignore",
-        "walk_ignore",
-        "walk_ignore",
-        "walk_ignore",
+        "conditional_jump",
+        "conditional_jump",
+        "call_npc",
     ]
 
     assert script.waypoints[1].options.get("action_kind") == "load"
-    assert script.waypoints[2].options.get("legacy_call") == "conditional_jump_script_options"
-    assert script.waypoints[3].options.get("legacy_call") == "check_kill_count"
-    assert script.waypoints[4].options.get("legacy_call") == "say"
+    assert script.waypoints[2].options.get("call") == "conditional_jump_script_options"
+    assert script.waypoints[3].options.get("call") == "check_kill_count"
+    assert script.waypoints[4].options.get("call") == "say"
 
 
 def test_import_waypoints_in_maps_legacy_quest_actions(tmp_path: Path) -> None:

@@ -121,7 +121,13 @@ def _beef_candidate_u16(raw6_hex: str) -> dict[str, int]:
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                        try:
+                            from runtime.error_policy import should_reraise
+
+                            if should_reraise():
+                                raise
+                        except Exception:
+                            pass
         b = b''
     if len(b) < 6:
         return {'magic': 0, 'gold': 0, 'cap_used': 0}
@@ -309,7 +315,13 @@ def rank_beef_candidates_by_temporal_stability(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                            try:
+                                from runtime.error_policy import should_reraise
+
+                                if should_reraise():
+                                    raise
+                            except Exception:
+                                pass
             s = 0
         try:
             xx = int(cast(Any, o.get('x') or 0))
@@ -326,7 +338,13 @@ def rank_beef_candidates_by_temporal_stability(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                            try:
+                                from runtime.error_policy import should_reraise
+
+                                if should_reraise():
+                                    raise
+                            except Exception:
+                                pass
             xx = 0
         try:
             yy = int(cast(Any, o.get('y') or 0))
@@ -343,7 +361,13 @@ def rank_beef_candidates_by_temporal_stability(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                            try:
+                                from runtime.error_policy import should_reraise
+
+                                if should_reraise():
+                                    raise
+                            except Exception:
+                                pass
             yy = 0
         return (-int(s), int(xx), int(yy))
 
@@ -585,7 +609,13 @@ def _try_import_cv2_np() -> tuple[Any | None, Any | None]:
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         return None, None
 
 
@@ -634,7 +664,13 @@ def _load_digit_templates(path: Path) -> dict[str, list[list[int]]]:
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         return {}
 
 
@@ -748,7 +784,13 @@ def _binarize_roi_rgb(rgb: bytes, *, w: int, h: int) -> Optional[tuple[bytes, in
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         return None
 
 
@@ -806,7 +848,13 @@ def _extract_digit_glyphs_from_binary(binary: bytes, *, w: int, h: int) -> list[
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         return []
 
 
@@ -857,7 +905,13 @@ def _match_glyph_to_digit(glyph: bytes, templates: dict[str, list[list[int]]]) -
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         return None
 
 
@@ -895,7 +949,13 @@ def _read_line_number_from_roi(frame: Frame, roi: Roi, *, y0: int, y1: int, temp
                 if should_reraise():
                     raise
             except Exception:
-                pass
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
         return None
 
 

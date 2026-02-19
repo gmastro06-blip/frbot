@@ -111,6 +111,13 @@ def trade_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAda
         try:
             input_real = Win32HwndKeyboard(hwnd=int(input_hwnd))
         except Exception as exc:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             raise PreflightFailed(f'failed to initialize win32 input: {type(exc).__name__}: {exc}') from exc
 
         cap_v = capture_real.verify()
@@ -125,8 +132,13 @@ def trade_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAda
 
         try:
             binding_real.assert_bound()
-        except Exception:
-            raise PreflightFailed('trade_window_binding_lost')
+        except Exception as exc:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+
+            raise PreflightFailed('trade_window_binding_lost') from exc
 
         f = capture_real.grab()
         validate_prod_emergency_real_rois_in_bounds(rois=ctx.rois, frame=f)

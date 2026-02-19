@@ -136,6 +136,11 @@ def healing_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
                 raise PreflightFailed('healing_window_binding_lost')
             input_real = Win32HwndKeyboard(hwnd=int(input_hwnd))
         except Exception as exc:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+
             raise PreflightFailed(f'failed to initialize win32 input: {type(exc).__name__}: {exc}') from exc
 
         cap_v = capture_real.verify()
@@ -156,8 +161,13 @@ def healing_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
 
         try:
             binding_real.assert_bound()
-        except Exception:
-            raise PreflightFailed('healing_window_binding_lost')
+        except Exception as exc:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+
+            raise PreflightFailed('healing_window_binding_lost') from exc
 
         # Verify we can read HP/MP and cooldown semantically.
         f = capture_real.grab()

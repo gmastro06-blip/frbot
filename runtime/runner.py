@@ -1076,7 +1076,13 @@ def run() -> int:
                         if should_reraise():
                             raise
                     except Exception:
-                        pass
+                        try:
+                            from runtime.error_policy import should_reraise
+
+                            if should_reraise():
+                                raise
+                        except Exception:
+                            pass
         # PROD-EMERGENCY: dump BEFORE/AFTER evidence when available.
         if dump_enabled():
             try:
@@ -1100,10 +1106,29 @@ def run() -> int:
                         if should_reraise():
                             raise
                     except Exception:
-                        pass
+                        try:
+                            from runtime.error_policy import should_reraise
+
+                            if should_reraise():
+                                raise
+                        except Exception:
+                            pass
         write_fatal(str(exc), exc)
         return 1
     except Exception as exc:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         write_fatal('runtime crashed', exc)
         return 1
 

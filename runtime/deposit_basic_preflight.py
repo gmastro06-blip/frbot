@@ -124,8 +124,13 @@ def deposit_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
 
         try:
             binding_real.assert_bound()
-        except Exception:
-            raise PreflightFailed('deposit_window_binding_lost')
+        except Exception as exc:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+
+            raise PreflightFailed('deposit_window_binding_lost') from exc
 
         f = capture_real.grab()
         validate_prod_emergency_real_rois_in_bounds(rois=ctx.rois, frame=f)

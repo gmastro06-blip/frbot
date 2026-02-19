@@ -20,6 +20,9 @@ class WaypointType(str, Enum):
     TRAVEL = "travel"
     DEPOSIT = "deposit"
     TRADE = "trade"
+    # Action waypoints: anchored to the nearest tile, not movement.
+    CALL_NPC = "call_npc"           # talk_npc / say / NPC dialogue sequences
+    CONDITIONAL_JUMP = "conditional_jump"  # conditional_jump_* / check_kill_count
 
     @classmethod
     def values(cls) -> list[str]:

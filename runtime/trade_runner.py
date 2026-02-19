@@ -109,6 +109,11 @@ def execute_trade_tick(
     try:
         binding.assert_bound()
     except Exception as exc:
+        from runtime.error_policy import should_reraise
+
+        if should_reraise():
+            raise
+
         raise PreflightFailed('trade_window_binding_lost') from exc
 
     inv_roi = ctx.rois.get(ctx.config.trade_inventory_roi)
@@ -201,6 +206,11 @@ def execute_trade_tick(
             _try_dump_click_overlay(reason='trade_action_click', frame=before, x=int(cx), y=int(cy))
             input_.click(cx, cy)
     except Exception as exc:
+        from runtime.error_policy import should_reraise
+
+        if should_reraise():
+            raise
+
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
 
     ctx.trade.inputs_sent += 1
@@ -233,7 +243,13 @@ def execute_trade_tick(
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                    try:
+                        from runtime.error_policy import should_reraise
+
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
         raise corr_exc
 
     if pixel_fallback_ok:

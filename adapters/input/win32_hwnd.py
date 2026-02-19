@@ -798,6 +798,10 @@ class Win32HwndKeyboard(InputAdapter):
         if not user32.PostMessageW(hwnd, WM_KEYUP, wintypes.WPARAM(vk), lparam_up):
             raise RuntimeError('window_binding_lost')
 
+    def auto_walk_tick(self, key: str) -> None:
+        # Key is physically held via sendinput; the game already auto-walks. No-op.
+        return
+
     def press_combo(self, keys: list[str]) -> None:
         """Press a key combo as a single logical action.
 

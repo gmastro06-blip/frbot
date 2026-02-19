@@ -152,6 +152,11 @@ def combat_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter,
                 raise PreflightFailed('combat_ambiguous_result')
             input_real = Win32HwndKeyboard(hwnd=int(input_hwnd))
         except Exception as input_exc:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+
             raise PreflightFailed(f'failed to initialize win32 input: {type(input_exc).__name__}: {input_exc}') from input_exc
 
         cap_v = capture_real.verify()
@@ -167,8 +172,13 @@ def combat_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter,
 
         try:
             binding_real.assert_bound()
-        except Exception:
-            raise PreflightFailed('combat_ambiguous_result')
+        except Exception as exc:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+
+            raise PreflightFailed('combat_ambiguous_result') from exc
 
         f = capture_real.grab()
 

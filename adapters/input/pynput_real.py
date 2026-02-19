@@ -54,11 +54,10 @@ class PynputRealKeyboard(InputAdapter):
         self._controller.press(key)
         self._controller.release(key)
 
-    def press_key(self, key: str) -> None:
+    def _resolve_key(self, key: str) -> object:
         raw = key.strip().lower()
         if not raw:
             raise ValueError('key must be non-empty')
-
         special_map = {
             'shift': self._Key.shift,
             'shift_l': self._Key.shift_l,
@@ -81,27 +80,32 @@ class PynputRealKeyboard(InputAdapter):
             'right': self._Key.right,
         }
         if raw in special_map:
-            resolved = special_map[raw]
-            self._controller.press(resolved)
-            self._controller.release(resolved)
-            return
-
+            return special_map[raw]
         if raw.startswith('f') and raw[1:].isdigit():
             n = int(raw[1:])
             if 1 <= n <= 12:
-                resolved = getattr(self._Key, f'f{n}')
-                self._controller.press(resolved)
-                self._controller.release(resolved)
-                return
+                return getattr(self._Key, f'f{n}')
             raise ValueError('only F1..F12 supported')
-
         if len(raw) == 1:
-            # controller accepts chars for alnum and punctuation.
-            self._controller.press(raw)
-            self._controller.release(raw)
-            return
-
+            return raw
         raise ValueError(f'unsupported key: {key!r}')
+
+    def press_key(self, key: str) -> None:
+        resolved = self._resolve_key(key)
+        self._controller.press(resolved)
+        self._controller.release(resolved)
+
+    def key_down(self, key: str) -> None:
+        resolved = self._resolve_key(key)
+        self._controller.press(resolved)
+
+    def key_up(self, key: str) -> None:
+        resolved = self._resolve_key(key)
+        self._controller.release(resolved)
+
+    def auto_walk_tick(self, key: str) -> None:
+        # Key is physically held; the OS already auto-walks. No-op.
+        return
 
     def click(self, x: int, y: int) -> None:
         """Click at screen coordinates (x, y).

@@ -12,7 +12,7 @@
       "simplify_straight_every": 3
     },
     "settings": {
-      "config_path": "config/rois_prod_full.json",
+      "config_path": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\config\\rois_prod_full.json",
       "route_localize_min_score": 0.73,
       "tick_hz": 20,
       "try_focus": true

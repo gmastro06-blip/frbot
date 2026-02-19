@@ -95,6 +95,13 @@ def _read_required_int(data: dict[str, object], key: str) -> int:
     try:
         return int(value)
     except Exception as exc:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         raise PreflightFailed(f"tibia_map_bounds_invalid:{key}") from exc
 
 
@@ -104,6 +111,13 @@ def _load_bounds(path: Path) -> TibiaMapBounds:
     try:
         raw = json.loads(path.read_text(encoding="utf-8", errors="replace") or "{}")
     except Exception as exc:
+        try:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+        except Exception:
+            pass
         raise PreflightFailed("tibia_map_bounds_invalid_json") from exc
 
     if not isinstance(raw, dict):

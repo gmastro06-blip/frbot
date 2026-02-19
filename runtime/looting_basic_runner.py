@@ -306,6 +306,8 @@ def execute_looting_basic_once(
     try:
         binding.assert_bound()
     except Exception as exc:
+        if should_reraise():
+            raise
         raise PreflightFailed('looting_window_binding_lost') from exc
 
     inv_roi = ctx.rois.get(ctx.config.inventory_text_roi)
@@ -860,6 +862,8 @@ def execute_looting_basic_once(
             loot_action = {'kind': 'press_key', 'key': str(ctx.config.quick_loot_key), 'ts_ns': int(action_ts_ns)}
             input_.press_key(str(ctx.config.quick_loot_key))
     except Exception as exc:
+        if should_reraise():
+            raise
         _try_dump_looting_pair(gate=gate_name, reason='looting_input_emit_failed', before=before, after=None)
         raise PreflightFailed(f'input emit failed: {type(exc).__name__}: {exc}') from exc
 

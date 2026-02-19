@@ -200,7 +200,13 @@ def execute_deposit_tick(
         try:
             setattr(corr_exc, 'details', {'event_correlation': event})
         except Exception:
-            pass
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
         raise corr_exc
 
     depot_rgb_after = b''

@@ -27,6 +27,20 @@ class MockWorldInput(InputAdapter):
 	def press_key(self, key: str) -> None:
 		self._world.on_key(key)
 
+	def key_down(self, key: str) -> None:
+		# key_down without a paired key_up has no special meaning in the mock world;
+		# treat as a regular key press so held-key and press-key behave identically here.
+		self._world.on_key(key)
+
+	def key_up(self, key: str) -> None:
+		# Releasing a held key stops movement; no further on_key calls needed.
+		return
+
+	def auto_walk_tick(self, key: str) -> None:
+		# Called each same-direction tick while key is held (Tibia auto-walks).
+		# Mock world simulates this by executing one explicit movement step.
+		self._world.on_key(key)
+
 	def click(self, x: int, y: int) -> None:
 		self._world.on_click(int(x), int(y))
 

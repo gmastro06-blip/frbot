@@ -95,18 +95,20 @@ def _append_anchored_marker(
     last_tile: tuple[int, int, int] | None,
     stats: ImportStats,
     warnings: list[ImportWarning],
-    pending_markers: list[dict[str, Any]],
+    pending_markers: list[tuple[str, dict[str, Any]]],
     line_no: int,
     line_raw: str,
     options: dict[str, Any],
+    wp_type: str = '',
 ) -> bool:
+    resolved_type = str(wp_type or WaypointType.WALK_IGNORE.value)
     if last_tile is None:
-        pending_markers.append(dict(options))
+        pending_markers.append((resolved_type, dict(options)))
         return True
 
     _append_wp(
         waypoints,
-        WaypointType.WALK_IGNORE.value,
+        resolved_type,
         last_tile[0],
         last_tile[1],
         last_tile[2],
@@ -120,16 +122,16 @@ def _flush_pending_markers(
     *,
     waypoints: list[Waypoint],
     stats: ImportStats,
-    pending_markers: list[dict[str, Any]],
+    pending_markers: list[tuple[str, dict[str, Any]]],
     anchor_tile: tuple[int, int, int],
 ) -> None:
     if not pending_markers:
         return
     x, y, z = anchor_tile
-    for opts in pending_markers:
+    for ptype, opts in pending_markers:
         _append_wp(
             waypoints,
-            WaypointType.WALK_IGNORE.value,
+            str(ptype or WaypointType.WALK_IGNORE.value),
             x,
             y,
             z,
@@ -147,7 +149,7 @@ def import_waypoints_in(*, input_path: Path, script_name: str, default_z: int = 
     warnings: list[ImportWarning] = []
     waypoints: list[Waypoint] = []
     labels: dict[str, int] = {}
-    pending_markers: list[dict[str, Any]] = []
+    pending_markers: list[tuple[str, dict[str, Any]]] = []
 
     last_tile: tuple[int, int, int] | None = None
 
@@ -349,7 +351,7 @@ def import_waypoints_in(*, input_path: Path, script_name: str, default_z: int = 
                 call_name = str(m.group(1) or "").strip().lower()
                 call_payload = str(m.group(2) or "").strip()
 
-            if call_name in {"talk_npc", "say", "conditional_jump_script_options", "check_kill_count"}:
+            if call_name in {"talk_npc", "say"}:
                 _append_anchored_marker(
                     waypoints=waypoints,
                     last_tile=last_tile,
@@ -358,10 +360,29 @@ def import_waypoints_in(*, input_path: Path, script_name: str, default_z: int = 
                     pending_markers=pending_markers,
                     line_no=idx,
                     line_raw=line,
+                    wp_type=WaypointType.CALL_NPC.value,
                     options={
-                        "action_kind": "call",
-                        "legacy_call": call_name,
-                        "legacy_payload": call_payload,
+                        "action_kind": "call_npc",
+                        "call": call_name,
+                        "payload": call_payload,
+                    },
+                )
+                continue
+
+            if call_name.startswith("conditional_jump") or call_name == "check_kill_count":
+                _append_anchored_marker(
+                    waypoints=waypoints,
+                    last_tile=last_tile,
+                    stats=stats,
+                    warnings=warnings,
+                    pending_markers=pending_markers,
+                    line_no=idx,
+                    line_raw=line,
+                    wp_type=WaypointType.CONDITIONAL_JUMP.value,
+                    options={
+                        "action_kind": "conditional_jump",
+                        "call": call_name,
+                        "payload": call_payload,
                     },
                 )
                 continue

@@ -1,0 +1,25 @@
+{
+  "map": {
+    "nodes": [
+      {"id": "n1", "x": 0, "y": 0},
+      {"id": "n2", "x": 10, "y": 0},
+      {"id": "n3", "x": 0, "y": 10}
+    ]
+  },
+  "spawns": [
+    {"id": "s1", "node_id": "n1", "xp_per_kill": 100, "kills_per_min": 6, "respawn_s_mean": 60},
+    {"id": "s2", "node_id": "n2", "xp_per_kill": 80, "kills_per_min": 4, "respawn_s_mean": 45},
+    {"id": "s3", "node_id": "n3", "xp_per_kill": 50, "kills_per_min": 3, "respawn_s_mean": 30}
+  ],
+  "player": {
+    "speed_tiles_per_s": 2.0,
+    "constraints": {"max_route_minutes": 60, "max_waypoints": 3, "allow_waiting": false}
+  },
+  "objective": {"maximize_xp_per_hour": true},
+  "seed": 42,
+  "logs": {
+    "s1": [12, 15, 10, 13, 11, 14, 12, 13, 16, 12],
+    "s2": [40, 38, 45, 42, 39, 41, 44, 43, 40, 46],
+    "s3": [25, 30, 28, 27, 26, 29, 31, 24, 28, 30]
+  }
+}

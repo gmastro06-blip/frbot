@@ -150,7 +150,7 @@ def test_release_step_env_isolated_for_pytest_and_runtime_tuning() -> None:
     assert runtime_env.get("FRBOT_CAVEBOT_MIN_PIXEL_DELTA") == "1"
     assert runtime_env.get("FRBOT_CAVEBOT_STUCK_WINDOW") == "10"
     assert runtime_env.get("FRBOT_CAVEBOT_WRONG_DIRECTION_ANGLE_DEG") == "130"
-    assert runtime_env.get("FRBOT_CAVEBOT_WRONG_DIRECTION_ABORT_STREAK") == "3"
+    assert runtime_env.get("FRBOT_CAVEBOT_WRONG_DIRECTION_ABORT_STREAK") == "6"
     assert runtime_env.get("FRBOT_CAVEBOT_DEAD_RECKON_ON_STATIC") == "1"
     assert runtime_env.get("FRBOT_CAVEBOT_DEAD_RECKON_STEP_PX") == "1"
     assert runtime_env.get("FRBOT_LOOTING_FULL_MAX_ACTIONS") == "30"

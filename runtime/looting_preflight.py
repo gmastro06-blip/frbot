@@ -132,8 +132,13 @@ def looting_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputAdapter
 
         try:
             binding_real.assert_bound()
-        except Exception:
-            raise PreflightFailed('looting_window_binding_lost')
+        except Exception as exc:
+            from runtime.error_policy import should_reraise
+
+            if should_reraise():
+                raise
+
+            raise PreflightFailed('looting_window_binding_lost') from exc
 
         f = capture_real.grab()
 

@@ -26,6 +26,15 @@ class MockInput(InputAdapter):
         # should use the mock-world adapters.
         return
 
+    def key_down(self, key: str) -> None:
+        return
+
+    def key_up(self, key: str) -> None:
+        return
+
+    def auto_walk_tick(self, key: str) -> None:
+        return
+
     def click(self, x: int, y: int) -> None:
         # Deterministic no-op.
         return

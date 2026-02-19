@@ -193,8 +193,13 @@ def execute_combat_intent(
 
     try:
         binding.assert_bound()
-    except Exception:
-        raise PreflightFailed('combat_ambiguous_result')
+    except Exception as exc:
+        from runtime.error_policy import should_reraise
+
+        if should_reraise():
+            raise
+
+        raise PreflightFailed('combat_ambiguous_result') from exc
 
     event = new_event(
         gate=str(gate),

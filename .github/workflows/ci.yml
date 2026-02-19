@@ -7,6 +7,8 @@ on:
 jobs:
   test-windows:
     runs-on: windows-latest
+    env:
+      FRBOT_STRICT_ERRORS: '1'
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +51,8 @@ jobs:
 
   test-linux:
     runs-on: ubuntu-latest
+    env:
+      FRBOT_STRICT_ERRORS: '1'
     steps:
       - uses: actions/checkout@v4
 
@@ -90,6 +94,8 @@ jobs:
   audit-mock:
     runs-on: ubuntu-latest
     needs: [test-windows, test-linux]
+    env:
+      FRBOT_STRICT_ERRORS: '1'
     steps:
       - uses: actions/checkout@v4
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
 from contracts.errors import ContractViolation, PreflightFailed
 from contracts.runtime import RuntimeConfig, RuntimeContext, RuntimeState, RuntimeStatus, RuntimeTelemetry
@@ -12,8 +13,13 @@ from diagnostics.logger import configure_logger
 from diagnostics.jsonlog import log as log_json
 from diagnostics.last_frames import snapshot
 from runtime.env_bootstrap import load_repo_env
+from runtime.pacing import sleep_ms
 from runtime.cavebot_preflight import run as cavebot_preflight_run
-from runtime.cavebot_runner import CavebotTickEvidence, execute_cavebot_tick
+from runtime.cavebot_runner import (
+    CavebotTickEvidence,
+    execute_cavebot_tick,
+    _select_key_toward_waypoint,
+)
 from runtime.profile import cap_ticks, is_prod_emergency
 
 
@@ -54,6 +60,24 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None:
         return bool(default)
     return raw.strip() not in {'0', 'false', 'no', 'off'}
+
+
+class Limiter:
+    """Simple fixed-interval limiter (prevents busy-wait and caps loop Hz)."""
+    def __init__(self, hz: float) -> None:
+        self.period = 1.0 / max(float(hz) if hz is not None else 1.0, 0.001)
+        self.next_t = time.perf_counter()
+
+    def ready(self) -> bool:
+        now = time.perf_counter()
+        if now >= self.next_t:
+            # Advance by a single period to avoid drift accumulation.
+            self.next_t += self.period
+            if now > self.next_t:
+                # If we lagged far behind, reset next_t to now+period.
+                self.next_t = now + self.period
+            return True
+        return False
 
 
 def _load_cavebot_config_from_env() -> RuntimeConfig:
@@ -139,7 +163,21 @@ def run_cavebot_only() -> int:
         logger = configure_logger()
         ctx.status.state = RuntimeState.RUNNING
 
-        for tick_index in range(int(max_total_ticks)):
+        # Configure separate rates for vision (capture+detection) and input.
+        # Use conservative defaults for the REAL backend; keep original behavior
+        # for mock/test backends to avoid breaking unit tests.
+        if (cfg.mode or '').strip().lower() == 'real':
+            input_hz = _env_float('FRBOT_INPUT_HZ', 20.0)
+            vision_hz = _env_float('FRBOT_VISION_HZ', 8.0)
+        else:
+            input_hz = _env_float('FRBOT_INPUT_HZ', float(cfg.tick_hz))
+            vision_hz = _env_float('FRBOT_VISION_HZ', float(cfg.tick_hz))
+
+        input_limiter = Limiter(input_hz)
+        vision_limiter = Limiter(vision_hz)
+
+        tick_index = 0
+        while int(tick_index) < int(max_total_ticks):
             wp = ctx.cavebot.current_gate_waypoint()
             if wp is None:
                 # Nothing left to do.
@@ -152,56 +190,134 @@ def run_cavebot_only() -> int:
                     inputs_sent=int(ctx.cavebot.gate_inputs_sent),
                 )
                 return 0
+            # Check timers: vision gets full tick (capture+detect+input),
+            # input-only ticks send lightweight inputs based on cached telemetry.
+            now_vision = vision_limiter.ready()
+            now_input = input_limiter.ready()
 
-            outcome = execute_cavebot_tick(
-                ctx,
-                capture=capture,
-                input_=input_,
-                binding=binding,
-                waypoint=wp,
-                tick_index=int(tick_index),
-            )
+            if not now_vision and not now_input:
+                sleep_ms(1.0)
+                continue
 
-            evidence = outcome.evidence
+            if now_vision:
+                outcome = execute_cavebot_tick(
+                    ctx,
+                    capture=capture,
+                    input_=input_,
+                    binding=binding,
+                    waypoint=wp,
+                    tick_index=int(tick_index),
+                )
 
-            progress_mag = 'none'
-            if evidence.progress is not None:
-                progress_mag = f"{evidence.progress.distance_before_px:.2f}->{evidence.progress.distance_after_px:.2f}"
+                evidence = outcome.evidence
 
-            log_json(
-                logger,
-                event='tick',
-                gate='cavebot',
-                tick_index=int(tick_index),
-                waypoint_id=str(wp.waypoint_id),
-                marker_before=_fmt_marker(evidence.marker_before),
-                marker_after=_fmt_marker(evidence.marker_after),
-                progress_px=progress_mag,
-                attempts_used=int(ctx.cavebot.gate_attempts_used),
-                inputs_sent=int(ctx.cavebot.gate_inputs_sent),
-                abort_reason=str(outcome.abort_reason or 'none'),
-            )
+                progress_mag = 'none'
+                if evidence.progress is not None:
+                    progress_mag = f"{evidence.progress.distance_before_px:.2f}->{evidence.progress.distance_after_px:.2f}"
 
-            ctx.telemetry.tick_count += 1
-
-            if outcome.abort_reason is not None:
-                raise PreflightFailed(str(outcome.abort_reason))
-
-            if outcome.reached_waypoint:
                 log_json(
                     logger,
-                    event='WAYPOINT_REACHED',
+                    event='tick',
                     gate='cavebot',
                     tick_index=int(tick_index),
                     waypoint_id=str(wp.waypoint_id),
+                    marker_before=_fmt_marker(evidence.marker_before),
+                    marker_after=_fmt_marker(evidence.marker_after),
+                    progress_px=progress_mag,
+                    attempts_used=int(ctx.cavebot.gate_attempts_used),
                     inputs_sent=int(ctx.cavebot.gate_inputs_sent),
+                    abort_reason=str(outcome.abort_reason or 'none'),
                 )
-                ctx.cavebot.gate_waypoint_index += 1
-                ctx.cavebot.gate_attempts_used = 0
-                ctx.cavebot.gate_ticks_in_waypoint = 0
-                ctx.cavebot.gate_reach_streak = 0
-                ctx.cavebot_gate.telemetry.last_n_distances = []
-                # Next tick continues to next waypoint.
+
+                ctx.telemetry.tick_count += 1
+
+                if outcome.abort_reason is not None:
+                    raise PreflightFailed(str(outcome.abort_reason))
+
+                if outcome.reached_waypoint:
+                    log_json(
+                        logger,
+                        event='WAYPOINT_REACHED',
+                        gate='cavebot',
+                        tick_index=int(tick_index),
+                        waypoint_id=str(wp.waypoint_id),
+                        inputs_sent=int(ctx.cavebot.gate_inputs_sent),
+                    )
+                    ctx.cavebot.gate_waypoint_index += 1
+                    ctx.cavebot.gate_attempts_used = 0
+                    ctx.cavebot.gate_ticks_in_waypoint = 0
+                    ctx.cavebot.gate_reach_streak = 0
+                    ctx.cavebot_gate.telemetry.last_n_distances = []
+                    # Next tick continues to next waypoint.
+
+            else:
+                # Input-only lightweight tick: ensure binding and send input based
+                # on last known telemetry (avoid expensive capture/detection).
+                try:
+                    binding.assert_bound()
+                except Exception as exc:
+                    raise PreflightFailed('cavebot_window_binding_lost') from exc
+
+                # Use last-known marker telemetry if available.
+                marker = getattr(getattr(ctx, 'cavebot_gate', None), 'telemetry', None)
+                last_marker = None
+                try:
+                    last_marker = getattr(getattr(ctx, 'cavebot_gate', None), 'telemetry', None)
+                except Exception:
+                    last_marker = None
+                # Prefer `marker_after` telemetry if present.
+                try:
+                    last_marker = getattr(ctx.cavebot_gate.telemetry, 'marker_after', None) or getattr(ctx.cavebot_gate.telemetry, 'marker_before', None)
+                except Exception:
+                    last_marker = None
+
+                try:
+                    held_key = getattr(ctx.cavebot_gate.telemetry, 'held_key', None)
+                except Exception:
+                    held_key = None
+
+                try:
+                    key = _select_key_toward_waypoint(last_marker, wp)
+                except Exception:
+                    key = 'UP'
+
+                try:
+                    if str(held_key or '') != str(key):
+                        if held_key:
+                            try:
+                                input_.key_up(str(held_key))
+                            except Exception:
+                                pass
+                        try:
+                            input_.key_down(str(key))
+                        except Exception:
+                            try:
+                                input_.press_key(str(key))
+                            except Exception:
+                                pass
+                        try:
+                            ctx.cavebot_gate.telemetry.held_key = str(key)
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            input_.auto_walk_tick(str(key))
+                        except Exception:
+                            pass
+                finally:
+                    ctx.cavebot.gate_inputs_sent += 1
+                    ctx.telemetry.tick_count += 1
+                    log_json(
+                        logger,
+                        event='tick_input_only',
+                        gate='cavebot',
+                        tick_index=int(tick_index),
+                        waypoint_id=str(wp.waypoint_id),
+                        marker_before=_fmt_marker(getattr(ctx.cavebot_gate.telemetry, 'marker_before', None)),
+                        marker_after=_fmt_marker(getattr(ctx.cavebot_gate.telemetry, 'marker_after', None)),
+                        inputs_sent=int(ctx.cavebot.gate_inputs_sent),
+                    )
+            tick_index += 1
 
         if is_prod_emergency():
             raise PreflightFailed('session_tick_budget_exhausted')

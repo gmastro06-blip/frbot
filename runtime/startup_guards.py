@@ -335,6 +335,11 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
                 if hwnd_parse_error is None:
                     hwnd_parse_error = 'window_hwnd_invalid'
         except Exception:
+            try:
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             hwnd = 0
             if hwnd_parse_error is None:
                 hwnd_parse_error = 'window_hwnd_invalid'
@@ -365,7 +370,13 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
                     if should_reraise():
                         raise
                 except Exception:
-                    pass
+                    try:
+                        from runtime.error_policy import should_reraise
+
+                        if should_reraise():
+                            raise
+                    except Exception:
+                        pass
     found_windows = _list_found_windows()
     info = _collect_details(hwnd=int(hwnd), title_substring=str(title_substring))
     d = asdict(info)
@@ -425,7 +436,15 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
         try_focus = _env_bool('FRBOT_TRY_FOCUS', False)
 
         last_fg = int(info.foreground_hwnd)
-        last_title = str(w32.get_window_text(int(last_fg)) or '') if int(last_fg) > 0 else ''
+        try:
+            last_title = str(w32.get_window_text(int(last_fg)) or '') if int(last_fg) > 0 else ''
+        except Exception:
+            try:
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
+            last_title = ''
 
         # Import locally to keep startup dependencies minimal.
         from runtime.pacing import sleep_ms
@@ -445,13 +464,32 @@ def enforce_prod_emergency_real_startup_guards(*, write_fatal_on_fail: bool) -> 
                             if should_reraise():
                                 raise
                         except Exception:
-                            pass
+                            try:
+                                from runtime.error_policy import should_reraise
+
+                                if should_reraise():
+                                    raise
+                            except Exception:
+                                pass
             try:
                 fg_now = int(w32.get_foreground_window())
             except Exception:
+                try:
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
                 fg_now = 0
             last_fg = int(fg_now)
-            last_title = str(w32.get_window_text(int(last_fg)) or '') if int(last_fg) > 0 else ''
+            try:
+                last_title = str(w32.get_window_text(int(last_fg)) or '') if int(last_fg) > 0 else ''
+            except Exception:
+                try:
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
+                last_title = ''
             if int(fg_now) == int(hwnd):
                 # Refresh info for downstream consumers.
                 info = _collect_details(hwnd=int(hwnd), title_substring=str(title_substring))

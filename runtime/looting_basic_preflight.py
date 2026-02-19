@@ -150,6 +150,13 @@ def looting_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
         try:
             input_real = Win32HwndKeyboard(hwnd=int(input_hwnd))
         except Exception as exc:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             raise PreflightFailed(f'failed to initialize win32 input: {type(exc).__name__}: {exc}') from exc
 
         try:
@@ -170,6 +177,13 @@ def looting_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
         try:
             binding_real.assert_bound()
         except Exception:
+            try:
+                from runtime.error_policy import should_reraise
+
+                if should_reraise():
+                    raise
+            except Exception:
+                pass
             raise PreflightFailed('looting_window_binding_lost')
 
         try:
@@ -196,6 +210,13 @@ def looting_basic_preflight(ctx: RuntimeContext) -> tuple[CaptureAdapter, InputA
             except PreflightFailed:
                 raise
             except Exception:
+                try:
+                    from runtime.error_policy import should_reraise
+
+                    if should_reraise():
+                        raise
+                except Exception:
+                    pass
                 raise PreflightFailed('looting_chat_unreadable')
 
         # Certification contract: we cannot introspect Tibia config.
