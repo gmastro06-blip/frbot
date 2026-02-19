@@ -57,6 +57,7 @@ from runtime.tibia_map_data import TibiaMapDataset, load_tibia_map_dataset
 from runtime.env_bootstrap import load_repo_env
 from adapters.capture.obs_source_real import list_obs_input_names
 from adapters.windows import win32 as w32
+from runtime.navigator_types import validate_waypoints
 
 
 # PySide6 exposes many Qt enums/flags dynamically. Some type-checker versions
@@ -1183,6 +1184,16 @@ class MainWindow(QMainWindow):
                     "options": dict(rwp.options),
                 }
             )
+        # Non-invasive pre-flight validation of the generated runtime route.
+        # If validation fails, raise a PreflightFailed so callers abort startup
+        # and surface a clear error to the user.
+        try:
+            errs = validate_waypoints(route)
+        except Exception as _exc:  # validation should be safe, but guard anyway
+            raise PreflightFailed(f"waypoints_preflight_error: {str(_exc)}")
+        if errs:
+            raise PreflightFailed("waypoints_preflight_failed: " + "; ".join(errs))
+
         return route
 
     def _script_waypoints_for_cavebot(self) -> list[dict[str, object]]:
