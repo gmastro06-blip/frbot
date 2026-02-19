@@ -2277,14 +2277,30 @@ class MainWindow(QMainWindow):
             if self._route_session is None or not bool(self._route_recording_active):
                 return
             a = str(action)
+            # If recorder has no last sampled tile, attempt to sample immediately
+            try:
+                if getattr(self._route_session, "_last_tile", None) is None:
+                    if self._route_capture is not None and self._route_sampler is not None:
+                        try:
+                            frame = self._route_capture.grab()
+                            tile = self._route_sampler.sample_tile(frame)
+                            if tile is not None:
+                                self._route_session.record_tile(int(tile[0]), int(tile[1]), int(tile[2]))
+                        except Exception:
+                            # sampling failed; proceed to mark_action which will raise a clear error
+                            pass
+            except Exception:
+                pass
+
             _ = self._route_session.mark_action(a)
             self.route_steps_list.addItem(f"#{len(self._route_session.waypoints) - 1} {a}")
             self.lbl_route_status.setText(f"Recorder: acción {action} marcada")
             self._update_route_counters()
         except Exception as exc:
             _LOG.exception("Failed to mark route action: %s", exc)
+            # Provide explicit reason to user and diagnostics instead of bubbling raw ValueError
             write_fatal("waypoint_record_failed", exc, details={"reason": str(exc), "phase": "action", "action": str(action)})
-            self._show_error("Route Recorder", f"No se pudo marcar acción {action}.\n\n{exc}")
+            self._show_error("Route Recorder", f"No se pudo marcar acción {action}.\n\nMotivo: {str(exc)}\n\nAsegúrate de que el recorder haya detectado tu posición en el minimapa antes de marcar la acción.")
 
     def _on_route_tick(self) -> None:
         try:

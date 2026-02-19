@@ -45,6 +45,8 @@ diagnostics/**
 *_full.ppm
 *_minimap.ppm
 logs/
+out/
+latency_*.csv
 
 # UI runtime log (desktop editor)
 runtime_ui.log

@@ -258,6 +258,7 @@ class WaypointRecorder:
         out_path: Path | None = None
         if save:
             payload = {
+                "schema_version": 1,
                 "session_id": self._session_id,
                 "ts": now_iso(),
                 "session_meta": dict(self._session_meta),
