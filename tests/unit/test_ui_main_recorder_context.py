@@ -15,6 +15,7 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication
 
+from storage import canonical_json
 from ui_main import MainWindow
 
 
@@ -35,6 +36,8 @@ def test_new_route_runtime_context_mode_is_always_real(monkeypatch: pytest.Monke
             "(FRBOT_MODE=prod_full no debe afectar al recorder)"
         )
     finally:
+        # Evitar diálogo de "unsaved changes" en closeEvent
+        w._last_saved_state = canonical_json(w._script)
         w.close()
 
 
@@ -50,6 +53,7 @@ def test_new_route_runtime_context_mode_is_real_even_with_cavebot_mode(monkeypat
             f"mode esperado 'real', got {ctx.config.mode!r}"
         )
     finally:
+        w._last_saved_state = canonical_json(w._script)
         w.close()
 
 
@@ -62,7 +66,19 @@ def test_route_start_empty_config_no_fallback_shows_error(monkeypatch: pytest.Mo
     accionable sin crashear y sin iniciar la grabación."""
     app = QApplication.instance() or QApplication([])
 
+    # Suprimir log_json y write_fatal para evitar E/S durante el test
+    monkeypatch.setattr("ui_main.log_json", lambda *a, **kw: None)
+    monkeypatch.setattr("ui_main.write_fatal", lambda *a, **kw: None)
+
     errors_shown: list[tuple[str, str]] = []
+
+    # Parchear _show_error a nivel de clase para interceptar TODAS las rutas
+    # (incluyendo señales Qt y cierre de ventana) y evitar QMessageBox.critical
+    monkeypatch.setattr(
+        MainWindow,
+        "_show_error",
+        lambda self, title, msg: errors_shown.append((title, msg)),
+    )
 
     w = MainWindow()
     try:
@@ -76,12 +92,6 @@ def test_route_start_empty_config_no_fallback_shows_error(monkeypatch: pytest.Mo
             lambda requested, *, profile: "/nonexistent/__frbot_test_cfg__.json",
         )
 
-        # Capturar _show_error en vez de mostrar diálogo real
-        def _fake_show_error(title: str, msg: str) -> None:
-            errors_shown.append((title, msg))
-
-        w._show_error = _fake_show_error  # type: ignore[method-assign]
-
         w._on_route_start_clicked()
         app.processEvents()
 
@@ -94,6 +104,8 @@ def test_route_start_empty_config_no_fallback_shows_error(monkeypatch: pytest.Mo
             "La grabación NO debe iniciar con config_path inválido"
         )
     finally:
+        # Marcar limpio para evitar diálogo de unsaved changes en closeEvent
+        w._last_saved_state = canonical_json(w._script)
         w.close()
 
 
@@ -112,6 +124,10 @@ def test_route_start_empty_config_with_fallback_updates_path_and_continues(
     real_cfg = Path("config/rois_prod_full.json")
     if not real_cfg.exists():
         pytest.skip("config/rois_prod_full.json no existe — omitiendo test de fallback")
+
+    # Suprimir log_json y write_fatal para evitar E/S durante el test
+    monkeypatch.setattr("ui_main.log_json", lambda *a, **kw: None)
+    monkeypatch.setattr("ui_main.write_fatal", lambda *a, **kw: None)
 
     from contracts.capture import Frame
 
@@ -154,4 +170,5 @@ def test_route_start_empty_config_with_fallback_updates_path_and_continues(
         )
     finally:
         w._route_timer.stop()
+        w._last_saved_state = canonical_json(w._script)
         w.close()
