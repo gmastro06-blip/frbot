@@ -5,161 +5,46 @@
       "default_z": 7,
       "format": "legacy_waypoints_in",
       "labels": {
-        "go_hunt": 0,
-        "go_task": 6,
-        "hunt": 21,
-        "leave": 37,
-        "repeat_task": 10,
-        "skip_task": 14,
-        "start": 0,
-        "start_trainer": 51,
-        "train": 50
+        "go_hunt": 14,
+        "hunt": 24,
+        "leave": 54,
+        "logout": 64,
+        "refill": 0,
+        "start": 0
       },
-      "source": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\Waypoints\\antiguos\\tarantula_cave\\waypoints.in",
+      "source": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\Waypoints\\antiguos\\salamander_cave\\waypoints.in",
       "stats": {
         "ignored_empty_or_comments": 0,
         "ignored_unknown": 0,
-        "parsed_waypoints": 52,
-        "total_lines": 61
+        "parsed_waypoints": 65,
+        "total_lines": 71
       },
       "warnings": []
-    },
-    "schema_version": 1
+    }
   },
-  "name": "tarantula_cave",
+  "name": "salamander_cave",
   "run_to_target": false,
   "waypoints": [
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
-      "options": {
-        "action_kind": "load",
-        "legacy_include": "scripts/general/refill_port_hope.in"
-      },
-      "type": "walk_ignore",
-      "x": 32627,
-      "y": 32771,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32627,
-      "y": 32771,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "travel_east"
-      },
-      "type": "travel",
-      "x": 32627,
-      "y": 32771,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32690,
-      "y": 32778,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "call",
-        "legacy_call": "conditional_jump_script_options",
-        "legacy_payload": "\"var_name\":\"task\" , \"label_skip\":\"skip_task\""
-      },
-      "type": "walk_ignore",
-      "x": 32690,
-      "y": 32778,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "call",
-        "legacy_call": "check_kill_count",
-        "legacy_payload": "\"monster_name\":\"tarantula\", \"kill_amount\":300,  \"label_jump\":\"go_task\", \"label_skip\":\"skip_task\""
-      },
-      "type": "walk_ignore",
-      "x": 32690,
-      "y": 32778,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32694,
-      "y": 32773,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32694,
-      "y": 32772,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32694,
-      "y": 32768,
+      "x": 33019,
+      "y": 32053,
       "z": 6
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {
-        "action_kind": "call",
-        "legacy_call": "talk_npc",
-        "legacy_payload": "\"list_words\":[\"tasks\", \"tarantula\", \"yes\"]"
+        "action_kind": "bank",
+        "legacy_action": true,
+        "legacy_raw": "action bank"
       },
       "type": "walk_ignore",
-      "x": 32694,
-      "y": 32768,
-      "z": 6
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "call",
-        "legacy_call": "talk_npc",
-        "legacy_payload": "\"list_words\":[\"promotion\", \"yes\"]"
-      },
-      "type": "walk_ignore",
-      "x": 32694,
-      "y": 32768,
-      "z": 6
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "call",
-        "legacy_call": "talk_npc",
-        "legacy_payload": "\"list_words\":[\"tasks\", \"tarantula\", \"yes\"]"
-      },
-      "type": "walk_ignore",
-      "x": 32694,
-      "y": 32768,
+      "x": 33019,
+      "y": 32053,
       "z": 6
     },
     {
@@ -167,8 +52,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32694,
-      "y": 32772,
+      "x": 33020,
+      "y": 32059,
       "z": 6
     },
     {
@@ -176,8 +61,39 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32694,
-      "y": 32772,
+      "x": 33018,
+      "y": 32053,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "deposit",
+        "legacy_action": true,
+        "legacy_raw": "action deposit"
+      },
+      "type": "walk_ignore",
+      "x": 33018,
+      "y": 32053,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 33020,
+      "y": 32059,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 33007,
+      "y": 32053,
       "z": 6
     },
     {
@@ -185,8 +101,155 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32699,
-      "y": 32789,
+      "x": 32982,
+      "y": 32054,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32982,
+      "y": 32072,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32971,
+      "y": 32085,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "sell",
+        "legacy_action": true,
+        "legacy_raw": "action sell"
+      },
+      "type": "walk_ignore",
+      "x": 32971,
+      "y": 32085,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "buy_potions",
+        "legacy_action": true,
+        "legacy_raw": "action buy_potions"
+      },
+      "type": "walk_ignore",
+      "x": 32971,
+      "y": 32085,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32970,
+      "y": 32082,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "check_supplies",
+        "legacy_action": true,
+        "legacy_raw": "action check_supplies"
+      },
+      "type": "walk_ignore",
+      "x": 32970,
+      "y": 32082,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32977,
+      "y": 32073,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32973,
+      "y": 32073,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32956,
+      "y": 32075,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32949,
+      "y": 32096,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32935,
+      "y": 32113,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32935,
+      "y": 32137,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32936,
+      "y": 32154,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32936,
+      "y": 32159,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32924,
+      "y": 32148,
       "z": 7
     },
     {
@@ -194,62 +257,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32728,
-      "y": 32812,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32752,
-      "y": 32832,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32784,
-      "y": 32852,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32811,
-      "y": 32866,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32844,
-      "y": 32875,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32851,
-      "y": 32870,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32880,
-      "y": 32866,
+      "x": 32919,
+      "y": 32142,
       "z": 8
     },
     {
@@ -257,126 +266,263 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32853,
-      "y": 32873,
-      "z": 8
+      "x": 32914,
+      "y": 32141,
+      "z": 9
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32867,
-      "y": 32889,
-      "z": 8
+      "x": 32924,
+      "y": 32106,
+      "z": 9
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32884,
-      "y": 32883,
-      "z": 8
+      "x": 32937,
+      "y": 32106,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32880,
-      "y": 32903,
-      "z": 8
+      "x": 32946,
+      "y": 32104,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32862,
-      "y": 32911,
-      "z": 8
+      "x": 32959,
+      "y": 32088,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32852,
-      "y": 32905,
-      "z": 8
+      "x": 32982,
+      "y": 32084,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32836,
-      "y": 32924,
-      "z": 8
+      "x": 33005,
+      "y": 32068,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32816,
-      "y": 32912,
-      "z": 8
+      "x": 32996,
+      "y": 32039,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32815,
-      "y": 32891,
-      "z": 8
+      "x": 32967,
+      "y": 32055,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32839,
-      "y": 32891,
-      "z": 8
+      "x": 32959,
+      "y": 32089,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32825,
-      "y": 32878,
-      "z": 8
+      "x": 32958,
+      "y": 32114,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32808,
-      "y": 32875,
-      "z": 8
+      "x": 32975,
+      "y": 32106,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32831,
-      "y": 32872,
-      "z": 8
+      "x": 32987,
+      "y": 32101,
+      "z": 10
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32850,
-      "y": 32874,
-      "z": 8
+      "x": 32988,
+      "y": 32116,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32990,
+      "y": 32124,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 33001,
+      "y": 32125,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 33008,
+      "y": 32130,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 33014,
+      "y": 32131,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 33027,
+      "y": 32129,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 33003,
+      "y": 32135,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32975,
+      "y": 32132,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32968,
+      "y": 32114,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32960,
+      "y": 32115,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32934,
+      "y": 32108,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "rope"
+      },
+      "type": "rope",
+      "x": 32924,
+      "y": 32106,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32890,
+      "y": 32106,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32883,
+      "y": 32107,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32905,
+      "y": 32109,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32914,
+      "y": 32141,
+      "z": 9
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
@@ -387,100 +533,48 @@
         "legacy_raw": "action check"
       },
       "type": "walk_ignore",
-      "x": 32850,
-      "y": 32874,
-      "z": 8
+      "x": 32914,
+      "y": 32141,
+      "z": 9
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32847,
-      "y": 32873,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32851,
-      "y": 32870,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32812,
-      "y": 32856,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32776,
-      "y": 32835,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32733,
-      "y": 32817,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32707,
-      "y": 32809,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32686,
-      "y": 32796,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32686,
-      "y": 32792,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32679,
-      "y": 32776,
-      "z": 7
+      "x": 32914,
+      "y": 32141,
+      "z": 9
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {
-        "action_kind": "travel_center"
+        "action_kind": "rope"
       },
-      "type": "travel",
-      "x": 32679,
-      "y": 32776,
+      "type": "rope",
+      "x": 32919,
+      "y": 32142,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "rope"
+      },
+      "type": "rope",
+      "x": 32924,
+      "y": 32148,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32936,
+      "y": 32159,
       "z": 7
     },
     {
@@ -488,18 +582,45 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32630,
-      "y": 32759,
-      "z": 7
+      "x": 32936,
+      "y": 32149,
+      "z": 6
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32623,
-      "y": 32747,
-      "z": 7
+      "x": 32940,
+      "y": 32126,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32981,
+      "y": 32108,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32998,
+      "y": 32097,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 33006,
+      "y": 32064,
+      "z": 6
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
@@ -509,33 +630,21 @@
         "legacy_action": true
       },
       "type": "walk_ignore",
-      "x": 32623,
-      "y": 32747,
-      "z": 7
+      "x": 33006,
+      "y": 32064,
+      "z": 6
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {
-        "action_kind": "load",
-        "legacy_include": "scripts/general/dp_to_train_port_hope.in"
+        "action_kind": "end",
+        "legacy_action": true
       },
       "type": "walk_ignore",
-      "x": 32623,
-      "y": 32747,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "load",
-        "legacy_include": "scripts/general/train_to_dp_port_hope.in"
-      },
-      "type": "walk_ignore",
-      "x": 32623,
-      "y": 32747,
-      "z": 7
+      "x": 33006,
+      "y": 32064,
+      "z": 6
     }
   ]
 }

@@ -23,8 +23,7 @@
         "total_lines": 61
       },
       "warnings": []
-    },
-    "schema_version": 1
+    }
   },
   "name": "tarantula_cave",
   "run_to_target": false,

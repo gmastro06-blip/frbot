@@ -1,0 +1,111 @@
+```json
+Apply Thais fixes: I can replace the originals with the .fixed.json versions and create .bak backups.{
+  "_default": {
+    "1": {
+      "enabled": true,
+      "config": {
+        "ng_backpacks": {
+          *** End Patch
+              {"label": "", "type": "walk", "coordinate": [32430, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32430,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32420, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32420,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32410, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32410,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32400, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32400,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32390, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32390,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32380, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32380,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32370, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32370,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32360, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32360,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32350, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32350,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "loop", "type": "walk", "coordinate": [32350, 32290, 7], "options": {"legacy": {"kind": "label"}}, "ignore": true, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32350, 32200, 7], "options": {"legacy": {"kind": "node", "raw": "node (32350,32200,7)"}}, "ignore": false, "passinho": false}
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+
+```
+```json
+Apply Thais fixes: I can replace the originals with the .fixed.json versions and create .bak backups.{
+  "_default": {
+    "1": {
+      "enabled": true,
+      "config": {
+        "ng_backpacks": {
+          "main": "Backpack",
+          "loot": "Backpack"
+        },
+        "ng_cave": {
+          "enabled": false,
+          "runToCreatures": false,
+          "waypoints": {
+            "items": [
+              {"label": "start", "type": "walk", "coordinate": [32350, 32200, 7], "options": {"legacy": {"kind": "label"}}, "ignore": true, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32350, 32200, 7], "options": {"legacy": {"kind": "node", "raw": "node (32350,32200,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32360, 32200, 7], "options": {"legacy": {"kind": "node", "raw": "node (32360,32200,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32370, 32200, 7], "options": {"legacy": {"kind": "node", "raw": "node (32370,32200,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32380, 32200, 7], "options": {"legacy": {"kind": "node", "raw": "node (32380,32200,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32390, 32200, 7], "options": {"legacy": {"kind": "node", "raw": "node (32390,32200,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32400, 32200, 7], "options": {"legacy": {"kind": "node", "raw": "node (32400,32200,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32410, 32200, 7], "options": {"legacy": {"kind": "node", "raw": "node (32410,32200,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32420, 32200, 7], "options": {"legacy": {"kind": "node", "raw": "node (32420,32200,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32420, 32210, 7], "options": {"legacy": {"kind": "node", "raw": "node (32420,32210,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32420, 32220, 7], "options": {"legacy": {"kind": "node", "raw": "node (32420,32220,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32420, 32230, 7], "options": {"legacy": {"kind": "node", "raw": "node (32420,32230,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32410, 32230, 7], "options": {"legacy": {"kind": "node", "raw": "node (32410,32230,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32400, 32230, 7], "options": {"legacy": {"kind": "node", "raw": "node (32400,32230,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32390, 32230, 7], "options": {"legacy": {"kind": "node", "raw": "node (32390,32230,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32380, 32230, 7], "options": {"legacy": {"kind": "node", "raw": "node (32380,32230,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32370, 32230, 7], "options": {"legacy": {"kind": "node", "raw": "node (32370,32230,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32360, 32230, 7], "options": {"legacy": {"kind": "node", "raw": "node (32360,32230,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32350, 32230, 7], "options": {"legacy": {"kind": "node", "raw": "node (32350,32230,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32350, 32240, 7], "options": {"legacy": {"kind": "node", "raw": "node (32350,32240,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32360, 32240, 7], "options": {"legacy": {"kind": "node", "raw": "node (32360,32240,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32370, 32240, 7], "options": {"legacy": {"kind": "node", "raw": "node (32370,32240,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32380, 32240, 7], "options": {"legacy": {"kind": "node", "raw": "node (32380,32240,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32390, 32240, 7], "options": {"legacy": {"kind": "node", "raw": "node (32390,32240,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32400, 32240, 7], "options": {"legacy": {"kind": "node", "raw": "node (32400,32240,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32410, 32240, 7], "options": {"legacy": {"kind": "node", "raw": "node (32410,32240,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32420, 32240, 7], "options": {"legacy": {"kind": "node", "raw": "node (32420,32240,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32430, 32240, 7], "options": {"legacy": {"kind": "node", "raw": "node (32430,32240,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32430, 32250, 7], "options": {"legacy": {"kind": "node", "raw": "node (32430,32250,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32430, 32260, 7], "options": {"legacy": {"kind": "node", "raw": "node (32430,32260,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32420, 32260, 7], "options": {"legacy": {"kind": "node", "raw": "node (32420,32260,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32410, 32260, 7], "options": {"legacy": {"kind": "node", "raw": "node (32410,32260,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32400, 32260, 7], "options": {"legacy": {"kind": "node", "raw": "node (32400,32260,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32390, 32260, 7], "options": {"legacy": {"kind": "node", "raw": "node (32390,32260,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32380, 32260, 7], "options": {"legacy": {"kind": "node", "raw": "node (32380,32260,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32370, 32260, 7], "options": {"legacy": {"kind": "node", "raw": "node (32370,32260,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32360, 32260, 7], "options": {"legacy": {"kind": "node", "raw": "node (32360,32260,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32350, 32260, 7], "options": {"legacy": {"kind": "node", "raw": "node (32350,32260,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32350, 32270, 7], "options": {"legacy": {"kind": "node", "raw": "node (32350,32270,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32360, 32270, 7], "options": {"legacy": {"kind": "node", "raw": "node (32360,32270,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32370, 32270, 7], "options": {"legacy": {"kind": "node", "raw": "node (32370,32270,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32380, 32270, 7], "options": {"legacy": {"kind": "node", "raw": "node (32380,32270,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32390, 32270, 7], "options": {"legacy": {"kind": "node", "raw": "node (32390,32270,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32400, 32270, 7], "options": {"legacy": {"kind": "node", "raw": "node (32400,32270,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32410, 32270, 7], "options": {"legacy": {"kind": "node", "raw": "node (32410,32270,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32420, 32270, 7], "options": {"legacy": {"kind": "node", "raw": "node (32420,32270,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32430, 32270, 7], "options": {"legacy": {"kind": "node", "raw": "node (32430,32270,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32430, 32280, 7], "options": {"legacy": {"kind": "node", "raw": "node (32430,32280,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32430, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32430,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32420, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32420,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32410, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32410,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32400, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32400,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32390, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32390,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32380, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32380,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32370, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32370,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32360, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32360,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32350, 32290, 7], "options": {"legacy": {"kind": "node", "raw": "node (32350,32290,7)"}}, "ignore": false, "passinho": false},
+              {"label": "loop", "type": "walk", "coordinate": [32350, 32290, 7], "options": {"legacy": {"kind": "label"}}, "ignore": true, "passinho": false},
+              {"label": "", "type": "walk", "coordinate": [32350, 32200, 7], "options": {"legacy": {"kind": "node", "raw": "node (32350,32200,7)"}}, "ignore": false, "passinho": false}
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+
+```

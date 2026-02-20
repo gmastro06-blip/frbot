@@ -23,8 +23,7 @@
         "total_lines": 59
       },
       "warnings": []
-    },
-    "schema_version": 1
+    }
   },
   "name": "quests_sea_serpent",
   "run_to_target": false,

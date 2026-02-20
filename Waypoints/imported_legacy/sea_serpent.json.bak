@@ -124,8 +124,7 @@
           "reason": "unsupported_action"
         }
       ]
-    },
-    "schema_version": 1
+    }
   },
   "name": "sea_serpent",
   "run_to_target": false,

@@ -2378,6 +2378,11 @@ class MainWindow(QMainWindow):
             self._set_route_controls_enabled(recording=False)
             if self._waypoint_export_path:
                 self.lbl_route_status.setText(f"Recorder: exportado {Path(self._waypoint_export_path).name}")
+                try:
+                    self._last_saved_state = canonical_json(self._script)
+                    self._update_title()
+                except Exception:
+                    pass
         except Exception as exc:
             _LOG.exception("Failed to export route recorder session: %s", exc)
             write_fatal("waypoint_record_failed", exc, details={"reason": str(exc), "phase": "export"})

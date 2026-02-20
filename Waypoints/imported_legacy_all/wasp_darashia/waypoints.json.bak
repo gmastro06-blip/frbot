@@ -28,8 +28,7 @@
         "total_lines": 100
       },
       "warnings": []
-    },
-    "schema_version": 1
+    }
   },
   "name": "wasp_darashia",
   "run_to_target": false,

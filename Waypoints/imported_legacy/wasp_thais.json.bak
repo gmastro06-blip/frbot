@@ -5,35 +5,80 @@
       "default_z": 7,
       "format": "legacy_waypoints_in",
       "labels": {
-        "continue": 64,
-        "count": 64,
-        "downcave": 49,
-        "go_hunt": 24,
-        "hunt": 40,
-        "leave": 65,
+        "continue": 57,
+        "count": 57,
+        "downcave": 42,
+        "go_hunt": 18,
+        "hunt": 34,
+        "leave": 57,
         "refill": 0,
-        "skip_ammo": 16,
+        "skip_ammo": 13,
         "start": 0,
-        "start_trainer": 84,
-        "train": 82,
-        "upcave": 62
+        "start_trainer": 75,
+        "train": 73,
+        "upcave": 55
       },
       "source": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\Waypoints\\antiguos\\wasp_thais\\waypoints.in",
       "stats": {
         "ignored_empty_or_comments": 0,
-        "ignored_unknown": 0,
-        "parsed_waypoints": 84,
+        "ignored_unknown": 9,
+        "parsed_waypoints": 75,
         "total_lines": 96
       },
-      "warnings": []
-    },
-    "schema_version": 1
+      "warnings": [
+        {
+          "content": "action deposit",
+          "line": 4,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action check_ammo",
+          "line": 7,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action buy_ammo",
+          "line": 13,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action sell",
+          "line": 24,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action buy_potions",
+          "line": 25,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action check_supplies",
+          "line": 26,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action walk_keys",
+          "line": 46,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action check",
+          "line": 74,
+          "reason": "unsupported_action"
+        },
+        {
+          "content": "action walk_mouse",
+          "line": 77,
+          "reason": "unsupported_action"
+        }
+      ]
+    }
   },
   "name": "wasp_thais",
   "run_to_target": false,
   "waypoints": [
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -42,20 +87,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "deposit",
-        "legacy_action": true,
-        "legacy_raw": "action deposit"
-      },
-      "type": "walk_ignore",
-      "x": 32349,
-      "y": 32225,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -64,7 +96,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -73,20 +105,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "check_ammo",
-        "legacy_action": true,
-        "legacy_raw": "action check_ammo"
-      },
-      "type": "walk_ignore",
-      "x": 32345,
-      "y": 32221,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -95,7 +114,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -104,7 +123,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -113,7 +132,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -122,7 +141,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -131,20 +150,7 @@
       "z": 6
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "buy_ammo",
-        "legacy_action": true,
-        "legacy_raw": "action buy_ammo"
-      },
-      "type": "walk_ignore",
-      "x": 32344,
-      "y": 32244,
-      "z": 6
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -153,7 +159,7 @@
       "z": 6
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -162,7 +168,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -171,7 +177,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -180,7 +186,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -189,7 +195,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -198,7 +204,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -207,7 +213,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {
         "action_kind": "door"
@@ -218,7 +224,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -227,46 +233,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "sell",
-        "legacy_action": true,
-        "legacy_raw": "action sell"
-      },
-      "type": "walk_ignore",
-      "x": 32399,
-      "y": 32220,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "buy_potions",
-        "legacy_action": true,
-        "legacy_raw": "action buy_potions"
-      },
-      "type": "walk_ignore",
-      "x": 32399,
-      "y": 32220,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "check_supplies",
-        "legacy_action": true,
-        "legacy_raw": "action check_supplies"
-      },
-      "type": "walk_ignore",
-      "x": 32399,
-      "y": 32220,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {
         "action_kind": "door"
@@ -277,7 +244,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -286,7 +253,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -295,7 +262,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -304,7 +271,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -313,7 +280,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -322,7 +289,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -331,7 +298,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -340,7 +307,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -349,7 +316,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -358,7 +325,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -367,7 +334,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -376,7 +343,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -385,7 +352,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -394,7 +361,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -403,7 +370,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -412,7 +379,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {
         "action_kind": "shovel",
@@ -424,19 +391,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "walk_keys",
-        "legacy_action": true
-      },
-      "type": "walk_ignore",
-      "x": 32428,
-      "y": 32314,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -445,7 +400,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -454,7 +409,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -463,7 +418,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -472,7 +427,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -481,7 +436,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -490,7 +445,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -499,7 +454,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -508,7 +463,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -517,7 +472,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -526,7 +481,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -535,7 +490,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -544,7 +499,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -553,7 +508,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -562,7 +517,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -571,7 +526,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -580,7 +535,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -589,7 +544,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -598,7 +553,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -607,7 +562,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -616,7 +571,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -625,7 +580,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {
         "action_kind": "rope"
@@ -636,7 +591,7 @@
       "z": 9
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -645,20 +600,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "check",
-        "legacy_action": true,
-        "legacy_raw": "action check"
-      },
-      "type": "walk_ignore",
-      "x": 32428,
-      "y": 32313,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {
         "action_kind": "rope"
@@ -669,19 +611,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "walk_mouse",
-        "legacy_action": true
-      },
-      "type": "walk_ignore",
-      "x": 32428,
-      "y": 32314,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -690,7 +620,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -699,7 +629,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -708,7 +638,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -717,7 +647,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -726,7 +656,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -735,7 +665,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -744,7 +674,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -753,7 +683,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -762,7 +692,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -771,7 +701,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -780,7 +710,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -789,7 +719,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -798,7 +728,7 @@
       "z": 7
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -807,7 +737,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {
         "action_kind": "check_time",
@@ -819,7 +749,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
@@ -828,7 +758,7 @@
       "z": 8
     },
     {
-      "created_at": "2026-02-13T18:56:07+01:00",
+      "created_at": "2026-02-13T18:43:51+01:00",
       "enabled": true,
       "options": {
         "action_kind": "end",

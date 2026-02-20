@@ -6,24 +6,19 @@
       "heal_key": "F1",
       "hp_threshold_percent": 50
     },
+    "recorded_at": "2026-02-15T10:38:32+01:00",
+    "recorder": {
+      "default_z": 0,
+      "simplify_straight_every": 3
+    },
     "settings": {
       "config_path": "config/rois_prod_full.json",
+      "route_localize_min_score": 0.73,
       "tick_hz": 20,
       "try_focus": true
-    },
-    "schema_version": 1
-  },
-  "name": "script1",
-  "run_to_target": false,
-  "waypoints": [
-    {
-      "created_at": "2026-02-13T17:25:53+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 10,
-      "y": 20,
-      "z": 7
     }
-  ]
+  },
+  "name": "recorded_route_1771148305",
+  "run_to_target": false,
+  "waypoints": []
 }

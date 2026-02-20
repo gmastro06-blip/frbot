@@ -16,8 +16,7 @@
       "route_localize_min_score": 0.73,
       "tick_hz": 20,
       "try_focus": true
-    },
-    "schema_version": 1
+    }
   },
   "name": "recorded_route_1771536732",
   "run_to_target": false,

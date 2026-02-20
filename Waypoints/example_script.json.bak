@@ -1,8 +1,6 @@
 {
   "enabled": true,
-  "metadata": {
-    "schema_version": 1
-  },
+  "metadata": {},
   "name": "script1",
   "run_to_target": false,
   "waypoints": [

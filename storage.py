@@ -5,7 +5,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from models import Script, Waypoint, WaypointType
+from models import Script, Waypoint, WaypointType, now_iso
 
 
 class SchemaError(Exception):
@@ -88,11 +88,11 @@ def waypoint_from_dict(data: Any) -> Waypoint:
         enabled = True
     enabled = _as_bool(enabled, field="waypoint.enabled")
 
-    created_at = data.get("created_at", "")
+    created_at = data.get("created_at")
     if created_at is None:
-        created_at = ""
+        # tolerate missing created_at from legacy/converted files by using now
+        created_at = now_iso()
     created_at = _as_str(created_at, field="waypoint.created_at")
-    _require(created_at.strip() != "", "waypoint.created_at: required")
 
     return Waypoint(type=t, x=x, y=y, z=z, options=options, enabled=enabled, created_at=created_at)
 

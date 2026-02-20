@@ -10,8 +10,7 @@
       "config_path": "config/rois_prod_full.json",
       "tick_hz": 20,
       "try_focus": true
-    },
-    "schema_version": 1
+    }
   },
   "name": "script1",
   "run_to_target": false,

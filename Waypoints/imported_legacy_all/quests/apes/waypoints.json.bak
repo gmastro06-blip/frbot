@@ -43,8 +43,7 @@
         "total_lines": 806
       },
       "warnings": []
-    },
-    "schema_version": 1
+    }
   },
   "name": "quests_apes",
   "run_to_target": false,

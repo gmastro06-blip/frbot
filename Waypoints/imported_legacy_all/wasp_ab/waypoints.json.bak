@@ -5,377 +5,355 @@
       "default_z": 7,
       "format": "legacy_waypoints_in",
       "labels": {
-        "go_hunt": 0,
-        "go_task": 6,
-        "hunt": 21,
-        "leave": 37,
-        "repeat_task": 10,
-        "skip_task": 14,
+        "continue": 34,
+        "count": 34,
+        "go_hunt": 9,
+        "hunt": 15,
+        "leave": 35,
+        "refill": 0,
         "start": 0,
-        "start_trainer": 51,
-        "train": 50
+        "start_trainer": 45,
+        "train": 43
       },
-      "source": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\Waypoints\\antiguos\\tarantula_cave\\waypoints.in",
+      "source": "C:\\Users\\gmast\\Documents\\GitHub\\frbot\\Waypoints\\antiguos\\wasp_ab\\waypoints.in",
       "stats": {
         "ignored_empty_or_comments": 0,
         "ignored_unknown": 0,
-        "parsed_waypoints": 52,
-        "total_lines": 61
+        "parsed_waypoints": 45,
+        "total_lines": 54
       },
       "warnings": []
-    },
-    "schema_version": 1
+    }
   },
-  "name": "tarantula_cave",
+  "name": "wasp_ab",
   "run_to_target": false,
   "waypoints": [
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32681,
+      "y": 31686,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
       "options": {
-        "action_kind": "load",
-        "legacy_include": "scripts/general/refill_port_hope.in"
+        "action_kind": "deposit",
+        "legacy_action": true,
+        "legacy_raw": "action deposit"
       },
       "type": "walk_ignore",
+      "x": 32681,
+      "y": 31686,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32681,
+      "y": 31669,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32670,
+      "y": 31660,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32670,
+      "y": 31659,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "sell",
+        "legacy_action": true,
+        "legacy_raw": "action sell"
+      },
+      "type": "walk_ignore",
+      "x": 32670,
+      "y": 31659,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "buy_potions",
+        "legacy_action": true,
+        "legacy_raw": "action buy_potions"
+      },
+      "type": "walk_ignore",
+      "x": 32670,
+      "y": 31659,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32669,
+      "y": 31663,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "check_supplies",
+        "legacy_action": true,
+        "legacy_raw": "action check_supplies"
+      },
+      "type": "walk_ignore",
+      "x": 32669,
+      "y": 31663,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32659,
+      "y": 31664,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32656,
+      "y": 31673,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32656,
+      "y": 31674,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32645,
+      "y": 31693,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32638,
+      "y": 31713,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32616,
+      "y": 31716,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32607,
+      "y": 31702,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32603,
+      "y": 31704,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32612,
+      "y": 31703,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32616,
+      "y": 31700,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32612,
+      "y": 31683,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32618,
+      "y": 31706,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32634,
+      "y": 31700,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32623,
+      "y": 31688,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "rope"
+      },
+      "type": "rope",
+      "x": 32612,
+      "y": 31683,
+      "z": 10
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32604,
+      "y": 31707,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
       "x": 32627,
-      "y": 32771,
-      "z": 7
+      "y": 31709,
+      "z": 9
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32627,
-      "y": 32771,
-      "z": 7
+      "x": 32642,
+      "y": 31709,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32639,
+      "y": 31692,
+      "z": 9
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32631,
+      "y": 31677,
+      "z": 9
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {
-        "action_kind": "travel_east"
+        "action_kind": "rope"
       },
-      "type": "travel",
-      "x": 32627,
-      "y": 32771,
-      "z": 7
+      "type": "rope",
+      "x": 32622,
+      "y": 31691,
+      "z": 9
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32690,
-      "y": 32778,
-      "z": 7
+      "x": 32607,
+      "y": 31697,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32605,
+      "y": 31701,
+      "z": 8
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32603,
+      "y": 31703,
+      "z": 8
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {
-        "action_kind": "call",
-        "legacy_call": "conditional_jump_script_options",
-        "legacy_payload": "\"var_name\":\"task\" , \"label_skip\":\"skip_task\""
+        "action_kind": "rope"
       },
-      "type": "walk_ignore",
-      "x": 32690,
-      "y": 32778,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "call",
-        "legacy_call": "check_kill_count",
-        "legacy_payload": "\"monster_name\":\"tarantula\", \"kill_amount\":300,  \"label_jump\":\"go_task\", \"label_skip\":\"skip_task\""
-      },
-      "type": "walk_ignore",
-      "x": 32690,
-      "y": 32778,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32694,
-      "y": 32773,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32694,
-      "y": 32772,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32694,
-      "y": 32768,
-      "z": 6
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "call",
-        "legacy_call": "talk_npc",
-        "legacy_payload": "\"list_words\":[\"tasks\", \"tarantula\", \"yes\"]"
-      },
-      "type": "walk_ignore",
-      "x": 32694,
-      "y": 32768,
-      "z": 6
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "call",
-        "legacy_call": "talk_npc",
-        "legacy_payload": "\"list_words\":[\"promotion\", \"yes\"]"
-      },
-      "type": "walk_ignore",
-      "x": 32694,
-      "y": 32768,
-      "z": 6
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "call",
-        "legacy_call": "talk_npc",
-        "legacy_payload": "\"list_words\":[\"tasks\", \"tarantula\", \"yes\"]"
-      },
-      "type": "walk_ignore",
-      "x": 32694,
-      "y": 32768,
-      "z": 6
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32694,
-      "y": 32772,
-      "z": 6
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32694,
-      "y": 32772,
-      "z": 6
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32699,
-      "y": 32789,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32728,
-      "y": 32812,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32752,
-      "y": 32832,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32784,
-      "y": 32852,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32811,
-      "y": 32866,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32844,
-      "y": 32875,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32851,
-      "y": 32870,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32880,
-      "y": 32866,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32853,
-      "y": 32873,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32867,
-      "y": 32889,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32884,
-      "y": 32883,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32880,
-      "y": 32903,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32862,
-      "y": 32911,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32852,
-      "y": 32905,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32836,
-      "y": 32924,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32816,
-      "y": 32912,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32815,
-      "y": 32891,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32839,
-      "y": 32891,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32825,
-      "y": 32878,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32808,
-      "y": 32875,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32831,
-      "y": 32872,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32850,
-      "y": 32874,
+      "type": "rope",
+      "x": 32603,
+      "y": 31704,
       "z": 8
     },
     {
@@ -387,8 +365,8 @@
         "legacy_raw": "action check"
       },
       "type": "walk_ignore",
-      "x": 32850,
-      "y": 32874,
+      "x": 32603,
+      "y": 31704,
       "z": 8
     },
     {
@@ -396,91 +374,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32847,
-      "y": 32873,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32851,
-      "y": 32870,
-      "z": 8
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32812,
-      "y": 32856,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32776,
-      "y": 32835,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32733,
-      "y": 32817,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32707,
-      "y": 32809,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32686,
-      "y": 32796,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32686,
-      "y": 32792,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {},
-      "type": "walk",
-      "x": 32679,
-      "y": 32776,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "travel_center"
-      },
-      "type": "travel",
-      "x": 32679,
-      "y": 32776,
+      "x": 32610,
+      "y": 31712,
       "z": 7
     },
     {
@@ -489,7 +384,7 @@
       "options": {},
       "type": "walk",
       "x": 32630,
-      "y": 32759,
+      "y": 31713,
       "z": 7
     },
     {
@@ -497,9 +392,47 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": 32623,
-      "y": 32747,
+      "x": 32640,
+      "y": 31709,
       "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32649,
+      "y": 31684,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "ladder"
+      },
+      "type": "use_ladder",
+      "x": 32656,
+      "y": 31674,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32666,
+      "y": 31686,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32681,
+      "y": 31687,
+      "z": 6
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
@@ -509,33 +442,30 @@
         "legacy_action": true
       },
       "type": "walk_ignore",
-      "x": 32623,
-      "y": 32747,
-      "z": 7
+      "x": 32681,
+      "y": 31687,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-13T18:56:07+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 32681,
+      "y": 31687,
+      "z": 6
     },
     {
       "created_at": "2026-02-13T18:56:07+01:00",
       "enabled": true,
       "options": {
-        "action_kind": "load",
-        "legacy_include": "scripts/general/dp_to_train_port_hope.in"
+        "action_kind": "end",
+        "legacy_action": true
       },
       "type": "walk_ignore",
-      "x": 32623,
-      "y": 32747,
-      "z": 7
-    },
-    {
-      "created_at": "2026-02-13T18:56:07+01:00",
-      "enabled": true,
-      "options": {
-        "action_kind": "load",
-        "legacy_include": "scripts/general/train_to_dp_port_hope.in"
-      },
-      "type": "walk_ignore",
-      "x": 32623,
-      "y": 32747,
-      "z": 7
+      "x": 32681,
+      "y": 31687,
+      "z": 6
     }
   ]
 }

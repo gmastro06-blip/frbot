@@ -17,8 +17,7 @@
         "total_lines": 289
       },
       "warnings": []
-    },
-    "schema_version": 1
+    }
   },
   "name": "yalahar",
   "run_to_target": false,
