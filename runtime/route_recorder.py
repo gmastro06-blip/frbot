@@ -396,7 +396,10 @@ class WaypointRecorder:
         dx = float(after_det.pos.px) - float(before_det.pos.px)
         dy = float(after_det.pos.py) - float(before_det.pos.py)
         distance = math.hypot(dx, dy)
-        floor_change = bool(int(before.height) == int(after.height) and str(before.minimap_digest_hex) != str(after.minimap_digest_hex))
+        # A floor change is indicated by a different minimap digest between
+        # frames. Keep this logic consistent with `_metrics` which compares
+        # the digests directly.
+        floor_change = bool(str(before.minimap_digest_hex) != str(after.minimap_digest_hex))
 
         if action_kind == "move":
             if distance <= 0.5:
@@ -441,25 +444,16 @@ class WaypointRecorder:
             snap = self._binding.snapshot()
             return int(getattr(snap, "hwnd", 0) or 0)
         except Exception:
+            # If the error policy requests re-raising, propagate; otherwise
+            # swallow and return 0. `should_reraise` itself may raise, so
+            # guard that call.
             try:
                 from runtime.error_policy import should_reraise
 
                 if should_reraise():
                     raise
             except Exception:
-                try:
-                    from runtime.error_policy import should_reraise
-
-                    if should_reraise():
-                        raise
-                except Exception:
-                    try:
-                        from runtime.error_policy import should_reraise
-
-                        if should_reraise():
-                            raise
-                    except Exception:
-                        pass
+                pass
             return 0
 
     def _frame_path(self, *, step_index: int, suffix: str) -> str:

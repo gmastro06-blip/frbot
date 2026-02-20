@@ -562,6 +562,8 @@ def _special_action_key_for_waypoint(waypoint: Waypoint) -> str:
         return str(os.environ.get('FRBOT_LADDER_UP_KEY', 'F11') or 'F11').strip() or 'F11'
     if action_kind == 'stairs_down' or wp_type == 'move_down':
         return str(os.environ.get('FRBOT_LADDER_DOWN_KEY', 'F12') or 'F12').strip() or 'F12'
+    if action_kind == 'open_door' or wp_type == 'open_door':
+        return str(os.environ.get('FRBOT_OPEN_DOOR_KEY', 'F7') or 'F7').strip() or 'F7'
     if wp_type == 'use_right_click' and action_kind in {'open_hole', 'shovel'}:
         return str(os.environ.get('FRBOT_SHOVEL_KEY', 'F9') or 'F9').strip() or 'F9'
     if wp_type == 'use_right_click' and action_kind == 'pick':
@@ -574,9 +576,34 @@ def _is_special_action_waypoint(waypoint: Waypoint) -> bool:
     opts = getattr(waypoint, 'options', {}) or {}
     action_kind = str(opts.get('action_kind', '') or '').strip().lower() if isinstance(opts, dict) else ''
     return bool(
-        wp_type in {'rope', 'use_ladder', 'use_right_click', 'move_up', 'move_down'}
-        or action_kind in {'rope', 'shovel', 'pick', 'open_hole', 'ladder', 'stairs_up', 'stairs_down'}
+        wp_type in {'rope', 'use_ladder', 'use_right_click', 'move_up', 'move_down', 'open_door'}
+        or action_kind in {'rope', 'shovel', 'pick', 'open_hole', 'open_door', 'ladder', 'stairs_up', 'stairs_down'}
     )
+
+
+def _requires_movement_for_waypoint(waypoint: Waypoint) -> bool:
+    """Decide si una acción especial debe requerir movimiento como evidencia de éxito.
+
+    Defaults:
+    - Actions that usually do NOT move the player (open_hole/shovel/pick/open_door) -> False
+    - Other special actions (rope, ladder) -> True
+    Caller may override by setting `options['requires_movement']` explicitly.
+    """
+    opts = getattr(waypoint, 'options', {}) or {}
+    if isinstance(opts, dict) and 'requires_movement' in opts:
+        try:
+            return bool(opts.get('requires_movement'))
+        except Exception:
+            return True
+
+    action_kind = str(opts.get('action_kind', '') or '').strip().lower() if isinstance(opts, dict) else ''
+    wp_type = str(getattr(waypoint, 'waypoint_type', '') or '').strip().lower()
+
+    non_moving_actions = {'open_hole', 'shovel', 'pick', 'open_door'}
+    if action_kind in non_moving_actions or wp_type in non_moving_actions:
+        return False
+    # Default: require movement for other actions
+    return True
 
 
 def _dialog_phrase_from_waypoint(waypoint: Waypoint) -> str:
@@ -1205,7 +1232,8 @@ def execute_cavebot_tick(
                 or float(dist_after) < float(dist_before)
             )
 
-        if not moved:
+        requires_movement = _requires_movement_for_waypoint(waypoint)
+        if not moved and requires_movement:
             blocked_reason, pnf = _blocked_reason_from_abort('cavebot_needs_special_action')
             return _emit_abort_return(
                 ctx=ctx,
