@@ -1,0 +1,101 @@
+https://github.com/tibiamaps/tibia-map-datahttps://github.com/tibiamaps/tibia-map-data{
+  "enabled": true,
+  "metadata": {
+    "created_for": "manual_real_test",
+    "healing": {
+      "enabled": true,
+      "heal_key": "F1",
+      "hp_threshold_percent": 50
+    },
+    "settings": {
+      "config_path": "config/rois_prod_full.json",
+      "route_localize_min_score": 0.0,
+      "tick_hz": 20,
+      "try_focus": true
+    }
+  },
+  "name": "real_test_actions",
+  "run_to_target": false,
+  "waypoints": [
+    {
+      "created_at": "2026-02-20T10:52:03+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 100,
+      "y": 100,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-20T10:52:03+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "open_door",
+      "x": 101,
+      "y": 100,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-20T10:52:03+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "rope",
+      "x": 102,
+      "y": 100,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-20T10:52:03+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "shovel"
+      },
+      "type": "use_right_click",
+      "x": 103,
+      "y": 100,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-20T10:52:03+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "pick"
+      },
+      "type": "use_right_click",
+      "x": 104,
+      "y": 100,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-20T10:52:03+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "stairs_up"
+      },
+      "type": "use_ladder",
+      "x": 105,
+      "y": 100,
+      "z": 7
+    },
+    {
+      "created_at": "2026-02-20T10:52:03+01:00",
+      "enabled": true,
+      "options": {
+        "action_kind": "stairs_down"
+      },
+      "type": "use_ladder",
+      "x": 106,
+      "y": 100,
+      "z": 6
+    },
+    {
+      "created_at": "2026-02-20T10:54:58+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "open_door",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "name": "real_test_actions_no_movement",
+  "enabled": true,
+  "run_to_target": false,
+  "waypoints": [
+    {
+      "type": "walk",
+      "x": 100,
+      "y": 100,
+      "z": 7,
+      "options": {}
+    },
+    {
+      "type": "open_door",
+      "x": 101,
+      "y": 100,
+      "z": 7,
+      "options": { "requires_movement": false }
+    },
+    {
+      "type": "rope",
+      "x": 102,
+      "y": 100,
+      "z": 7,
+      "options": {}
+    },
+    {
+      "type": "use_right_click",
+      "x": 103,
+      "y": 100,
+      "z": 7,
+      "options": { "action_kind": "shovel", "requires_movement": false }
+    },
+    {
+      "type": "use_right_click",
+      "x": 104,
+      "y": 100,
+      "z": 7,
+      "options": { "action_kind": "pick", "requires_movement": false }
+    },
+    {
+      "type": "use_ladder",
+      "x": 105,
+      "y": 100,
+      "z": 7,
+      "options": { "action_kind": "stairs_up" }
+    },
+    {
+      "type": "use_ladder",
+      "x": 106,
+      "y": 100,
+      "z": 6,
+      "options": { "action_kind": "stairs_down" }
+    }
+  ],
+  "metadata": { "created_for": "manual_real_test_no_movement" }
+}

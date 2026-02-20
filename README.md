@@ -148,6 +148,25 @@ The template includes validated minimap marker defaults for OBS source capture i
 - `FRBOT_PLAYER_MARKER_RGB=0,200,0`
 - `FRBOT_PLAYER_MARKER_TOL=45`
 
+Map data integration
+--------------------
+
+The recorder can optionally download and use the `tibiamaps/tibia-map-data` assets
+to validate and snap recorded tiles. These downloads are cached locally and are
+opt-in by environment configuration.
+
+- `FRBOT_DISABLE_MAP_DOWNLOAD`: if set to `1`, `true`, or `yes`, automatic map
+  downloads are disabled and the recorder will behave permissively (no map
+  validation).
+- `FRBOT_MAP_CACHE_DIR`: optional path to a folder where downloaded map assets
+  (`bounds.json`, `floor-XX-path.png`) will be stored. If unset a default
+  location under the user's home directory is used (e.g. `~/.frbot/tibia_map_data`).
+
+The factory `create_default_map_index()` is used by `RouteRecordingSession` to
+instantiate the adapter when no explicit `map_index` is provided. You can
+override this behavior by passing your own `MapIndex` or by setting the env vars
+above.
+
 `.env` autoload behavior:
 
 - Entry points and `tools/*.py` now auto-load local `.env` on startup.

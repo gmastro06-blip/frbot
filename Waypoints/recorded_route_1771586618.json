@@ -1,0 +1,187 @@
+{
+  "enabled": true,
+  "metadata": {
+    "healing": {
+      "enabled": true,
+      "heal_key": "F1",
+      "hp_threshold_percent": 50
+    },
+    "recorded_at": "2026-02-20T12:24:57+01:00",
+    "recorder": {
+      "default_z": 0,
+      "simplify_straight_every": 3
+    },
+    "settings": {
+      "config_path": "config/rois_prod_full.json",
+      "route_localize_min_score": 0.73,
+      "tick_hz": 20,
+      "try_focus": true
+    }
+  },
+  "name": "recorded_route_1771586618",
+  "run_to_target": false,
+  "waypoints": [
+    {
+      "created_at": "2026-02-20T12:23:38+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:41+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 23,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:41+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 23,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:43+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 24,
+      "y": 2,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:44+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 24,
+      "y": 3,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:44+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 23,
+      "y": 3,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:45+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 23,
+      "y": 5,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:46+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:47+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:47+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:49+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:50+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:50+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:51+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 24,
+      "y": 4,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:52+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 25,
+      "y": 3,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:53+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 25,
+      "y": 2,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:54+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 25,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T12:23:56+01:00",
+      "enabled": true,
+      "options": {},
+      "type": "walk",
+      "x": 24,
+      "y": 0,
+      "z": 0
+    }
+  ]
+}

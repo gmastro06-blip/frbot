@@ -1,10 +1,21 @@
 {
   "enabled": true,
   "metadata": {
+    "healing": {
+      "enabled": true,
+      "heal_key": "F1",
+      "hp_threshold_percent": 50
+    },
     "recorded_at": "2026-02-20T09:44:47+01:00",
     "recorder": {
       "default_z": 0,
       "simplify_straight_every": 3
+    },
+    "settings": {
+      "config_path": "config/rois_prod_full.json",
+      "route_localize_min_score": 0.73,
+      "tick_hz": 20,
+      "try_focus": true
     }
   },
   "name": "recorded_route_1771577014",
@@ -24,7 +35,7 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -1,
+      "x": 0,
       "y": 0,
       "z": 0
     },
@@ -33,7 +44,7 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -4,
+      "x": 0,
       "y": 0,
       "z": 0
     },
@@ -42,7 +53,7 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -8,
+      "x": 0,
       "y": 0,
       "z": 0
     },
@@ -51,7 +62,7 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -12,
+      "x": 0,
       "y": 0,
       "z": 0
     },
@@ -88,7 +99,7 @@
       "options": {},
       "type": "walk",
       "x": 35,
-      "y": -47,
+      "y": 0,
       "z": 0
     },
     {
@@ -97,7 +108,7 @@
       "options": {},
       "type": "walk",
       "x": 34,
-      "y": -47,
+      "y": 0,
       "z": 0
     },
     {
@@ -106,7 +117,7 @@
       "options": {},
       "type": "walk",
       "x": 33,
-      "y": -46,
+      "y": 0,
       "z": 0
     },
     {
@@ -115,7 +126,7 @@
       "options": {},
       "type": "walk",
       "x": 32,
-      "y": -46,
+      "y": 0,
       "z": 0
     },
     {
@@ -124,7 +135,7 @@
       "options": {},
       "type": "walk",
       "x": 30,
-      "y": -22,
+      "y": 0,
       "z": 0
     },
     {
@@ -133,7 +144,7 @@
       "options": {},
       "type": "walk",
       "x": 29,
-      "y": -22,
+      "y": 0,
       "z": 0
     },
     {
@@ -142,7 +153,7 @@
       "options": {},
       "type": "walk",
       "x": 27,
-      "y": -22,
+      "y": 0,
       "z": 0
     },
     {
@@ -151,7 +162,7 @@
       "options": {},
       "type": "walk",
       "x": 24,
-      "y": -21,
+      "y": 0,
       "z": 0
     },
     {
@@ -160,7 +171,7 @@
       "options": {},
       "type": "walk",
       "x": 23,
-      "y": -21,
+      "y": 0,
       "z": 0
     },
     {
@@ -169,7 +180,7 @@
       "options": {},
       "type": "walk",
       "x": 22,
-      "y": -20,
+      "y": 0,
       "z": 0
     },
     {
@@ -178,7 +189,7 @@
       "options": {},
       "type": "walk",
       "x": 20,
-      "y": -20,
+      "y": 0,
       "z": 0
     },
     {
@@ -187,7 +198,7 @@
       "options": {},
       "type": "walk",
       "x": 19,
-      "y": -19,
+      "y": 0,
       "z": 0
     },
     {
@@ -196,7 +207,7 @@
       "options": {},
       "type": "walk",
       "x": 18,
-      "y": -20,
+      "y": 0,
       "z": 0
     },
     {
@@ -205,7 +216,7 @@
       "options": {},
       "type": "walk",
       "x": 18,
-      "y": -21,
+      "y": 0,
       "z": 0
     },
     {
@@ -214,7 +225,7 @@
       "options": {},
       "type": "walk",
       "x": 19,
-      "y": -20,
+      "y": 0,
       "z": 0
     },
     {
@@ -223,7 +234,7 @@
       "options": {},
       "type": "walk",
       "x": 18,
-      "y": -21,
+      "y": 0,
       "z": 0
     },
     {
@@ -232,7 +243,7 @@
       "options": {},
       "type": "walk",
       "x": 18,
-      "y": -22,
+      "y": 0,
       "z": 0
     },
     {
@@ -241,7 +252,7 @@
       "options": {},
       "type": "walk",
       "x": 19,
-      "y": -22,
+      "y": 0,
       "z": 0
     },
     {
@@ -250,7 +261,7 @@
       "options": {},
       "type": "walk",
       "x": 19,
-      "y": -23,
+      "y": 0,
       "z": 0
     },
     {
@@ -259,7 +270,7 @@
       "options": {},
       "type": "walk",
       "x": 20,
-      "y": -23,
+      "y": 0,
       "z": 0
     },
     {
@@ -268,7 +279,7 @@
       "options": {},
       "type": "walk",
       "x": 18,
-      "y": -26,
+      "y": 0,
       "z": 0
     },
     {
@@ -277,7 +288,7 @@
       "options": {},
       "type": "walk",
       "x": 17,
-      "y": -26,
+      "y": 0,
       "z": 0
     },
     {
@@ -286,7 +297,7 @@
       "options": {},
       "type": "walk",
       "x": 17,
-      "y": -27,
+      "y": 0,
       "z": 0
     },
     {
@@ -295,7 +306,7 @@
       "options": {},
       "type": "walk",
       "x": 16,
-      "y": -27,
+      "y": 0,
       "z": 0
     },
     {
@@ -304,7 +315,7 @@
       "options": {},
       "type": "walk",
       "x": 17,
-      "y": -27,
+      "y": 0,
       "z": 0
     },
     {
@@ -313,7 +324,7 @@
       "options": {},
       "type": "walk",
       "x": 18,
-      "y": -28,
+      "y": 0,
       "z": 0
     },
     {
@@ -322,7 +333,7 @@
       "options": {},
       "type": "walk",
       "x": 20,
-      "y": -28,
+      "y": 0,
       "z": 0
     },
     {
@@ -331,7 +342,7 @@
       "options": {},
       "type": "walk",
       "x": 21,
-      "y": -28,
+      "y": 0,
       "z": 0
     },
     {
@@ -340,7 +351,7 @@
       "options": {},
       "type": "walk",
       "x": 22,
-      "y": -29,
+      "y": 0,
       "z": 0
     },
     {
@@ -349,7 +360,7 @@
       "options": {},
       "type": "walk",
       "x": 23,
-      "y": -29,
+      "y": 0,
       "z": 0
     },
     {
@@ -358,7 +369,7 @@
       "options": {},
       "type": "walk",
       "x": 25,
-      "y": -30,
+      "y": 0,
       "z": 0
     },
     {
@@ -367,7 +378,7 @@
       "options": {},
       "type": "walk",
       "x": 26,
-      "y": -31,
+      "y": 0,
       "z": 0
     },
     {
@@ -376,7 +387,7 @@
       "options": {},
       "type": "walk",
       "x": 26,
-      "y": -32,
+      "y": 0,
       "z": 0
     },
     {
@@ -385,7 +396,7 @@
       "options": {},
       "type": "walk",
       "x": 27,
-      "y": -33,
+      "y": 0,
       "z": 0
     },
     {
@@ -394,7 +405,7 @@
       "options": {},
       "type": "walk",
       "x": 28,
-      "y": -35,
+      "y": 0,
       "z": 0
     },
     {
@@ -403,7 +414,7 @@
       "options": {},
       "type": "walk",
       "x": 29,
-      "y": -37,
+      "y": 0,
       "z": 0
     },
     {
@@ -412,7 +423,7 @@
       "options": {},
       "type": "walk",
       "x": 30,
-      "y": -38,
+      "y": 0,
       "z": 0
     },
     {
@@ -421,7 +432,7 @@
       "options": {},
       "type": "walk",
       "x": 24,
-      "y": -61,
+      "y": 0,
       "z": 0
     },
     {
@@ -429,8 +440,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -53,
-      "y": -54,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -438,8 +449,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -52,
-      "y": -54,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -447,8 +458,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -50,
-      "y": -54,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -456,8 +467,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -47,
-      "y": -54,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -465,8 +476,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -46,
-      "y": -53,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -474,8 +485,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -45,
-      "y": -53,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -483,8 +494,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -43,
-      "y": -54,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -492,8 +503,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -42,
-      "y": -54,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -501,8 +512,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -40,
-      "y": -54,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -510,8 +521,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -40,
-      "y": -55,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -519,8 +530,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -33,
-      "y": -56,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -528,8 +539,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -33,
-      "y": -57,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -537,8 +548,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -32,
-      "y": -60,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -546,8 +557,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -32,
-      "y": -62,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -555,8 +566,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -36,
-      "y": -63,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -564,8 +575,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -35,
-      "y": -64,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -573,8 +584,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -31,
-      "y": -65,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -582,8 +593,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -37,
-      "y": -65,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -591,8 +602,8 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -38,
-      "y": -66,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     {
@@ -619,7 +630,7 @@
       "options": {},
       "type": "walk",
       "x": 30,
-      "y": -51,
+      "y": 0,
       "z": 0
     },
     {
@@ -645,7 +656,7 @@
       "enabled": true,
       "options": {},
       "type": "walk",
-      "x": -1,
+      "x": 0,
       "y": 0,
       "z": 0
     }

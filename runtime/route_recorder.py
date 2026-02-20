@@ -6,6 +6,8 @@ import math
 import os
 from pathlib import Path
 from typing import Any, Optional
+from runtime.map_index import MapIndex, create_default_map_index
+import logging
 
 from contracts.capture import Frame
 from diagnostics.fatal import write_fatal
@@ -29,6 +31,19 @@ class RouteRecordingSession:
     default_z: int = 7
     simplify_straight_every: int = 3
     enabled: bool = True
+    # Optional MapIndex to validate and snap tiles. If None, no map validation is performed.
+    map_index: MapIndex | None = None
+
+    def __post_init__(self) -> None:
+        # If no explicit MapIndex provided, attempt to create a default one
+        # which may download tibia-map-data assets. Falls back to permissive
+        # MapIndex if the adapter is unavailable.
+        if self.map_index is None:
+            try:
+                self.map_index = create_default_map_index()
+            except Exception:
+                # defensive: leave as None to retain previous permissive behavior
+                self.map_index = None
 
     waypoints: list[Waypoint] = field(default_factory=list)
 
@@ -37,11 +52,57 @@ class RouteRecordingSession:
     _same_dir_steps: int = 0
 
     def _add_waypoint(self, *, waypoint_type: str, x: int, y: int, z: int, options: Optional[dict[str, Any]] = None) -> Waypoint:
+        # Coerce and sanitize coordinates at creation time to avoid
+        # propagating negative or non-integer tiles into saved scripts.
+        try:
+            xi = int(x)
+        except Exception:
+            xi = 0
+        try:
+            yi = int(y)
+        except Exception:
+            yi = 0
+        try:
+            zi = int(z)
+        except Exception:
+            zi = int(self.default_z)
+
+        xi = max(0, xi)
+        yi = max(0, yi)
+
+        # If a MapIndex is provided, allow it to snap coordinates and verify walkability.
+        try:
+            if self.map_index is not None:
+                try:
+                    sx, sy, sz = self.map_index.snap_tile(xi, yi, zi)
+                    xi, yi, zi = int(sx), int(sy), int(sz)
+                except Exception:
+                    # ignore snapping errors and proceed with original coords
+                    pass
+
+                try:
+                    if not self.map_index.is_walkable(xi, yi, zi):
+                        # try to find a nearby walkable tile
+                        near = self.map_index.find_nearest_walkable(xi, yi, zi, max_radius=2)
+                        if near:
+                            xi, yi, zi = int(near[0]), int(near[1]), int(near[2])
+                        else:
+                            # mark waypoint as non-walkable but still record it
+                            opts = dict(options or {})
+                            opts['invalid_tile'] = True
+                            options = opts
+                            logging.getLogger(__name__).warning("Recording waypoint on non-walkable tile (%s,%s,%s)", xi, yi, zi)
+                except Exception:
+                    pass
+        except Exception:
+            # defensive: don't let map index failures stop recording
+            pass
+
         wp = Waypoint(
             type=str(waypoint_type),
-            x=int(x),
-            y=int(y),
-            z=int(z),
+            x=xi,
+            y=yi,
+            z=zi,
             options=dict(options or {}),
             enabled=bool(self.enabled),
             created_at=now_iso(),
@@ -116,6 +177,15 @@ class RouteRecordingSession:
                 y=y,
                 z=z,
                 options={'interaction': 'open_hole', 'action_kind': a},
+            )
+        # Support explicit open_door action recorded as its own waypoint type.
+        if a in {'open_door', 'opendoor', 'open'}:
+            return self._add_waypoint(
+                waypoint_type=WaypointType.OPEN_DOOR.value,
+                x=x,
+                y=y,
+                z=z,
+                options={"action_kind": "open_door"},
             )
         raise ValueError(f'route_recorder_unknown_action:{a}')
 
@@ -476,6 +546,28 @@ class WaypointRecorder:
         return path
 
     def _step_to_dict(self, step: WaypointRecorderStep) -> dict[str, Any]:
+        # Defensive sanitization to ensure serializable and well-formed step dicts
+        try:
+            hwnd = int(step.window_hwnd)
+        except Exception:
+            hwnd = 0
+
+        # Sanitize frame_size keys/values
+        fs_raw = dict(step.frame_size or {})
+        fs: dict[str, int] = {}
+        for k, v in fs_raw.items():
+            try:
+                vi = int(v)
+            except Exception:
+                vi = 0
+            fs[str(k)] = max(0, vi)
+
+        # Ensure metrics is a dict copy (avoid non-serializable types leaking)
+        try:
+            metrics = dict(step.metrics or {})
+        except Exception:
+            metrics = {}
+
         return {
             "step_index": int(step.step_index),
             "action_kind": str(step.action_kind),
@@ -483,10 +575,10 @@ class WaypointRecorder:
             "before_ppm": str(step.before_ppm),
             "after_ppm": str(step.after_ppm),
             "ts": str(step.ts),
-            "window_hwnd": int(step.window_hwnd),
+            "window_hwnd": hwnd,
             "capture_source": str(step.capture_source),
-            "frame_size": dict(step.frame_size),
-            "metrics": dict(step.metrics),
+            "frame_size": fs,
+            "metrics": metrics,
             "inputs_sent": int(step.inputs_sent),
         }
 

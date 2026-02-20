@@ -1,0 +1,1459 @@
+{
+  "anchor_candidate": {
+    "marker": {
+      "description": "Thais",
+      "icon": "flag",
+      "x": 32815,
+      "y": 32344,
+      "z": 6
+    },
+    "anchor": {
+      "x": 32792,
+      "y": 32342,
+      "z": 6
+    }
+  },
+  "candidates_top": [
+    {
+      "marker": {
+        "description": "Thais",
+        "icon": "flag",
+        "x": 32815,
+        "y": 32344,
+        "z": 6
+      },
+      "anchor": [
+        32792,
+        32342,
+        6
+      ],
+      "matched": 71,
+      "total": 71,
+      "matched_ratio": 1.0,
+      "mean_snap_distance": 0.0
+    },
+    {
+      "marker": {
+        "description": "To Thais",
+        "icon": "down",
+        "x": 32179,
+        "y": 32367,
+        "z": 7
+      },
+      "anchor": [
+        32156,
+        32365,
+        7
+      ],
+      "matched": 71,
+      "total": 71,
+      "matched_ratio": 1.0,
+      "mean_snap_distance": 0.0
+    },
+    {
+      "marker": {
+        "description": "Teleport to Thais depot",
+        "icon": "flag",
+        "x": 32256,
+        "y": 32244,
+        "z": 7
+      },
+      "anchor": [
+        32233,
+        32242,
+        7
+      ],
+      "matched": 71,
+      "total": 71,
+      "matched_ratio": 1.0,
+      "mean_snap_distance": 0.0
+    },
+    {
+      "marker": {
+        "description": "Thais",
+        "icon": "?",
+        "x": 32805,
+        "y": 31743,
+        "z": 9
+      },
+      "anchor": [
+        32782,
+        31741,
+        9
+      ],
+      "matched": 71,
+      "total": 71,
+      "matched_ratio": 1.0,
+      "mean_snap_distance": 0.0
+    },
+    {
+      "marker": {
+        "description": "Duke Krule, Thais",
+        "icon": "checkmark",
+        "x": 33457,
+        "y": 31496,
+        "z": 13
+      },
+      "anchor": [
+        33434,
+        31494,
+        13
+      ],
+      "matched": 71,
+      "total": 71,
+      "matched_ratio": 1.0,
+      "mean_snap_distance": 0.0
+    }
+  ],
+  "items": [
+    {
+      "index": 0,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 1,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 2,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 3,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 4,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 5,
+      "local": {
+        "x": 37,
+        "y": 17,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32829,
+        "y": 32359,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32829,
+        "y": 32359,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 6,
+      "local": {
+        "x": 35,
+        "y": 18,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32827,
+        "y": 32360,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32827,
+        "y": 32360,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 7,
+      "local": {
+        "x": 34,
+        "y": 18,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32826,
+        "y": 32360,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32826,
+        "y": 32360,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 8,
+      "local": {
+        "x": 35,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32827,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32827,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 9,
+      "local": {
+        "x": 34,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32826,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32826,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 10,
+      "local": {
+        "x": 33,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32825,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32825,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 11,
+      "local": {
+        "x": 32,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32824,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32824,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 12,
+      "local": {
+        "x": 30,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32822,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32822,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 13,
+      "local": {
+        "x": 29,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32821,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32821,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 14,
+      "local": {
+        "x": 27,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32819,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32819,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 15,
+      "local": {
+        "x": 24,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32816,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32816,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 16,
+      "local": {
+        "x": 23,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32815,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32815,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 17,
+      "local": {
+        "x": 22,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32814,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32814,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 18,
+      "local": {
+        "x": 20,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32812,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32812,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 19,
+      "local": {
+        "x": 19,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32811,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32811,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 20,
+      "local": {
+        "x": 18,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 21,
+      "local": {
+        "x": 18,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 22,
+      "local": {
+        "x": 19,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32811,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32811,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 23,
+      "local": {
+        "x": 18,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 24,
+      "local": {
+        "x": 18,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 25,
+      "local": {
+        "x": 19,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32811,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32811,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 26,
+      "local": {
+        "x": 19,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32811,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32811,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 27,
+      "local": {
+        "x": 20,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32812,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32812,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 28,
+      "local": {
+        "x": 18,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 29,
+      "local": {
+        "x": 17,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32809,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32809,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 30,
+      "local": {
+        "x": 17,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32809,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32809,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 31,
+      "local": {
+        "x": 16,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32808,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32808,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 32,
+      "local": {
+        "x": 17,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32809,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32809,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 33,
+      "local": {
+        "x": 18,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32810,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 34,
+      "local": {
+        "x": 20,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32812,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32812,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 35,
+      "local": {
+        "x": 21,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32813,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32813,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 36,
+      "local": {
+        "x": 22,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32814,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32814,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 37,
+      "local": {
+        "x": 23,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32815,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32815,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 38,
+      "local": {
+        "x": 25,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32817,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32817,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 39,
+      "local": {
+        "x": 26,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32818,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32818,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 40,
+      "local": {
+        "x": 26,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32818,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32818,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 41,
+      "local": {
+        "x": 27,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32819,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32819,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 42,
+      "local": {
+        "x": 28,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32820,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32820,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 43,
+      "local": {
+        "x": 29,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32821,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32821,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 44,
+      "local": {
+        "x": 30,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32822,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32822,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 45,
+      "local": {
+        "x": 24,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32816,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32816,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 46,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 47,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 48,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 49,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 50,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 51,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 52,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 53,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 54,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 55,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 56,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 57,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 58,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 59,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 60,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 61,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 62,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 63,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 64,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 65,
+      "local": {
+        "x": 0,
+        "y": 9,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32351,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32351,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 66,
+      "local": {
+        "x": 0,
+        "y": 7,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32349,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32349,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 67,
+      "local": {
+        "x": 30,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32822,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32822,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 68,
+      "local": {
+        "x": 0,
+        "y": 2,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32344,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32344,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 69,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    },
+    {
+      "index": 70,
+      "local": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "target_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snapped": {
+        "x": 32792,
+        "y": 32342,
+        "z": 0
+      },
+      "snap_distance": 0.0
+    }
+  ]
+}

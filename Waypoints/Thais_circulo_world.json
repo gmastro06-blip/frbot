@@ -1,0 +1,1103 @@
+{
+  "enabled": true,
+  "metadata": {
+    "healing": {
+      "enabled": true,
+      "heal_key": "F1",
+      "hp_threshold_percent": 50
+    },
+    "recorded_at": "2026-02-20T09:44:47+01:00",
+    "recorder": {
+      "default_z": 0,
+      "simplify_straight_every": 3
+    },
+    "settings": {
+      "config_path": "config/rois_prod_full.json",
+      "route_localize_min_score": 0.73,
+      "tick_hz": 20,
+      "try_focus": true
+    },
+    "map_transform": {
+      "anchor_marker": null,
+      "anchor_world": {
+        "x": 32792,
+        "y": 32342,
+        "z": 6
+      },
+      "local_centroid": {
+        "x": 23,
+        "y": 2
+      },
+      "matched_score": 71
+    }
+  },
+  "name": "recorded_route_1771577014",
+  "run_to_target": false,
+  "waypoints": [
+    {
+      "created_at": "2026-02-20T09:43:34+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:37+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:37+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:39+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:40+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:42+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 37,
+          "local_y": 17,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32829,
+      "y": 32359,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:43+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 35,
+          "local_y": 18,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32827,
+      "y": 32360,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:43+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 34,
+          "local_y": 18,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32826,
+      "y": 32360,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:46+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 35,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32827,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:46+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 34,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32826,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:47+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 33,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32825,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:48+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 32,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32824,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:49+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 30,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32822,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:49+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 29,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32821,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:51+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 27,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32819,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:53+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 24,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32816,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:53+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 23,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32815,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:54+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 22,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32814,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:55+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 20,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32812,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:56+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 19,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32811,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:56+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 18,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32810,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:57+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 18,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32810,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:58+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 19,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32811,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:43:59+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 18,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32810,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:00+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 18,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32810,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:00+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 19,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32811,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:02+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 19,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32811,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:03+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 20,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32812,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:03+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 18,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32810,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:05+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 17,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32809,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:06+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 17,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32809,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:06+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 16,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32808,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:08+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 17,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32809,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:08+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 18,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32810,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:09+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 20,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32812,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:10+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 21,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32813,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:11+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 22,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32814,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:11+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 23,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32815,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:12+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 25,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32817,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:13+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 26,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32818,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:14+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 26,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32818,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:14+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 27,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32819,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:16+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 28,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32820,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:16+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 29,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32821,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:17+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 30,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32822,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:18+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 24,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32816,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:19+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:20+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:21+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:22+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:22+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:23+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:25+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:25+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:29+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:30+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:30+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:31+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:32+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:33+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:34+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:35+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:36+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:36+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:37+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:38+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 9,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32351,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:39+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 7,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32349,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:39+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 30,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32822,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:40+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 2,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32344,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:41+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    },
+    {
+      "created_at": "2026-02-20T09:44:41+01:00",
+      "enabled": true,
+      "options": {
+        "snapped_from_local": {
+          "local_x": 0,
+          "local_y": 0,
+          "anchor_marker": null
+        }
+      },
+      "type": "walk",
+      "x": 32792,
+      "y": 32342,
+      "z": 0
+    }
+  ]
+}

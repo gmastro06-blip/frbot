@@ -131,7 +131,7 @@ def app_stylesheet() -> str:
     QWidget {{
         background: {_DARK_BG};
         color: {_TEXT};
-        font-size: 12px;
+        font-size: 12pt;
     }}
 
     QGroupBox {{
@@ -147,11 +147,11 @@ def app_stylesheet() -> str:
         left: 10px;
         padding: 0 6px;
         color: {_TEXT};
-        font-size: 11px;
+        font-size: 11pt;
     }}
 
     QLabel#header {{
-        font-size: 18px;
+        font-size: 18pt;
         font-weight: 600;
         padding: 6px 0;
     }}
@@ -2467,9 +2467,22 @@ class MainWindow(QMainWindow):
         action_name = ""
         try:
             action_name = str(btn.property("action_name"))
-            x = int(self.spin_x.value())
-            y = int(self.spin_y.value())
-            z = int(self.spin_z.value())
+            try:
+                x = int(self.spin_x.value())
+            except Exception:
+                x = 0
+            try:
+                y = int(self.spin_y.value())
+            except Exception:
+                y = 0
+            try:
+                z = int(self.spin_z.value())
+            except Exception:
+                z = 0
+
+            # Clamp coordinates to non-negative to avoid invalid waypoints
+            x = max(0, x)
+            y = max(0, y)
 
             options: dict[str, Any] = {}
             wp_type = action_name
@@ -2617,6 +2630,30 @@ class MainWindow(QMainWindow):
 
 def main() -> int:
     app = QApplication(sys.argv)
+    # Ensure the application's default font has a usable size. Some platforms
+    # (and stylesheets) configure fonts by pixel size which leaves
+    # `QFont.pointSize()` <= 0; calling `setPointSize()` with such values
+    # triggers Qt warnings. Prefer setting pixel size when point size is
+    # unavailable.
+    try:
+        from PySide6.QtGui import QFont
+        f = app.font()
+        if f is not None:
+            try:
+                if f.pointSize() <= 0:
+                    # If pixel size is already set, keep it. Otherwise set a
+                    # reasonable pixel size to match stylesheet px units.
+                    if f.pixelSize() <= 0:
+                        f.setPixelSize(12)
+                    app.setFont(f)
+            except Exception:
+                # Fall back to setting a minimal pixel font to avoid Qt warnings
+                ff = QFont()
+                ff.setPixelSize(12)
+                app.setFont(ff)
+    except Exception:
+        pass
+
     w = MainWindow()
     w.show()
     return int(app.exec())
